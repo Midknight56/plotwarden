@@ -1,0 +1,16 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "Run tests for the saved file",
+      "description": "Reads the saved path from standard input and runs the matching unit tests. An unknown or missing path runs a small fixed unit gate. No network, no model turn, no edit.",
+      "trigger": "PostFileSave",
+      "matcher": "\\.(ts|tsx)$",
+      "action": {
+        "type": "command",
+        "command": "node scripts/changed-tests.mjs"
+      },
+      "timeout": 120
+    }
+  ]
+}

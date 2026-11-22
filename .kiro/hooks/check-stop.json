@@ -1,0 +1,15 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "Check changed files at turn end",
+      "description": "Runs typecheck, import direction and the tests for files changed in the working tree. No network, no model turn, no edit.",
+      "trigger": "Stop",
+      "action": {
+        "type": "command",
+        "command": "npm run check:changed"
+      },
+      "timeout": 300
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "plot-inspector": {
+      "command": "node",
+      "args": ["dist/inspector/server.mjs"],
+      "disabled": true,
+      "autoApprove": []
+    }
+  }
+}

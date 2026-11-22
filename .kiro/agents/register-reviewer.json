@@ -1,0 +1,52 @@
+{
+  "name": "register-reviewer",
+  "description": "Reviews Plotwarden specs and code without changing them. Reads the repository and calls the three local plot inspector tools.",
+  "prompt": "You review Plotwarden. Read the spec, steering and the code under review. Check each numbered requirement against the tests and the code. Use the plot-inspector tools to check plot states, visitor and committee projections and adapter conformance on the invented fixtures. You cannot edit files or run commands. Report each finding with the requirement ID, the file and line, what you expected and what you found. Say plainly when you could not check something.",
+  "tools": [
+    "read",
+    "@plot-inspector/explain_plot",
+    "@plot-inspector/audit_projection",
+    "@plot-inspector/check_adapter"
+  ],
+  "includeMcpJson": true,
+  "includePowers": false,
+  "resources": [
+    "file://.kiro/steering/**/*.md"
+  ],
+  "permissions": {
+    "rules": [
+      {
+        "capability": "fs_read",
+        "match": ["./**"],
+        "exclude": ["**/.env", "**/.env.*", "**/*.pem", "**/*.key"],
+        "effect": "allow"
+      },
+      {
+        "capability": "mcp",
+        "match": [
+          "plot-inspector/explain_plot",
+          "plot-inspector/audit_projection",
+          "plot-inspector/check_adapter"
+        ],
+        "effect": "allow"
+      },
+      {
+        "capability": "fs_write",
+        "effect": "deny"
+      },
+      {
+        "capability": "shell",
+        "effect": "deny"
+      },
+      {
+        "capability": "web_fetch",
+        "effect": "deny"
+      },
+      {
+        "capability": "web_search",
+        "effect": "deny"
+      }
+    ]
+  },
+  "welcomeMessage": "Name the spec or change to review."
+}

@@ -1,0 +1,107 @@
+{
+  "name": "register-builder",
+  "description": "Builds Plotwarden one spec task at a time: writes the failing test, then the code, inside this repository only.",
+  "prompt": "You build Plotwarden. Read the named spec task in .kiro/specs and the steering files before you change anything. Name the files you will touch. Write the test for the task's T ID first, run it and see it fail on the missing behaviour, then write the smallest complete code and run it again. Never weaken a test. Work only inside this repository. Do not run git commit, switch, branch, checkout, stash, reset or push. Report which tests failed first and the final results.",
+  "tools": ["read", "write", "shell"],
+  "includeMcpJson": false,
+  "includePowers": false,
+  "resources": [
+    "file://.kiro/steering/**/*.md"
+  ],
+  "permissions": {
+    "rules": [
+      {
+        "capability": "fs_read",
+        "match": ["./**"],
+        "exclude": ["**/.env", "**/.env.*", "**/*.pem", "**/*.key"],
+        "effect": "allow"
+      },
+      {
+        "capability": "fs_write",
+        "match": [
+          "template/**",
+          "apps/**",
+          "site/**",
+          "assets/**",
+          "tools/**",
+          "powers/**",
+          "scripts/**",
+          "tests/**",
+          "docs/**",
+          "release/**",
+          ".kiro/specs/**",
+          "README.md",
+          "THIRD_PARTY_NOTICES.md",
+          ".gitignore",
+          ".gitattributes",
+          ".editorconfig",
+          "package.json",
+          "package-lock.json",
+          "tsconfig.json",
+          "vite.config.ts",
+          "vitest.config.ts",
+          "playwright.config.ts",
+          "eslint.config.mjs"
+        ],
+        "effect": "allow"
+      },
+      {
+        "capability": "fs_write",
+        "match": ["**/.env", "**/.env.*", "**/*.pem", "**/*.key", "LICENSE"],
+        "effect": "deny"
+      },
+      {
+        "capability": "shell",
+        "match": [
+          "npm ci",
+          "npm test",
+          "npm test *",
+          "npm run *",
+          "npm ls *",
+          "node scripts/*",
+          "npx vitest *",
+          "npx tsc *",
+          "npx playwright test *",
+          "python scripts/oracle.py*",
+          "git status*",
+          "git diff*",
+          "git log*",
+          "git ls-files*"
+        ],
+        "exclude": ["npm run deploy*", "npm run publish*"],
+        "effect": "allow"
+      },
+      {
+        "capability": "shell",
+        "match": [
+          "git commit*",
+          "git push*",
+          "git reset*",
+          "git switch*",
+          "git checkout*",
+          "git branch*",
+          "git stash*",
+          "git clean*",
+          "npm publish*",
+          "npx playwright install*",
+          "npm exec playwright install*",
+          "rm -rf *",
+          "Remove-Item -Recurse *",
+          "curl *",
+          "Invoke-WebRequest *",
+          "Invoke-RestMethod *"
+        ],
+        "effect": "deny"
+      },
+      {
+        "capability": "web_fetch",
+        "effect": "deny"
+      },
+      {
+        "capability": "web_search",
+        "effect": "deny"
+      }
+    ]
+  },
+  "welcomeMessage": "Name the spec task to build."
+}
