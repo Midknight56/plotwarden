@@ -26,7 +26,7 @@ const scope = self as unknown as WorkerScope;
 const manifest = readManifest(scope.__PLOTWARDEN_SHELL);
 
 scope.addEventListener("install", (event) => {
-  event.waitUntil(install(scope.caches, (request, init) => fetch(request as RequestInfo, init), manifest));
+  event.waitUntil(install(scope.caches, (request, init) => fetch(request as RequestInfo, init), manifest, scope.location.origin));
 });
 
 scope.addEventListener("activate", (event) => {

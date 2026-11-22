@@ -16,7 +16,7 @@ import type { Page } from "@playwright/test";
 import { measureLayout, trackRequests } from "../helpers/measureLayout";
 import { openPractice, sizeOf, storedSites } from "../helpers/routes";
 import { CHURCH, GARDEN } from "../helpers/routes";
-import { FAMILY_FILE, SEEKER_FILE, SITE, expectLayout, expectNoMissingPictures, hubCard, saveProof, startOwnFromHub, trackFailures, trackFaults, tryPracticeFromHub } from "../helpers/siteOrigin";
+import { FAMILY_FILE, HOSTS, SEEKER_FILE, SITE, expectLayout, expectNoMissingPictures, hubCard, saveProof, startOwnFromHub, trackFailures, trackFaults, tryPracticeFromHub } from "../helpers/siteOrigin";
 
 test.use({ baseURL: SITE });
 
@@ -381,114 +381,137 @@ test.describe("the registers and the Desk, from the hub", () => {
   });
 });
 
+/** The shell version, as the worker's own file says it, and the files that it lists. */
+async function shellOf(page: Page, origin: string): Promise<{ version: string; files: string[] }> {
+  const text = await (await page.request.get(`${origin}sw.js`)).text();
+  const match = /^self\.__PLOTWARDEN_SHELL = (\{.*\});\n/.exec(text);
+  expect(match, "the worker is stamped").not.toBeNull();
+  return JSON.parse((match as RegExpExecArray)[1] as string) as { version: string; files: string[] };
+}
+
+/** Load the site once, wait for the worker to be in charge of the page, and return the page. */
+async function warm(page: Page): Promise<void> {
+  await page.goto("/");
+  await expect(page.getByRole("heading", { level: 1, name: "Plotwarden" })).toBeVisible();
+  await page.evaluate(async () => {
+    const registration = await navigator.serviceWorker.ready;
+    if (registration.active === null) throw new Error("no active worker");
+  });
+  // The worker takes charge of a page at its next load. Reload once, then it is in charge.
+  await page.reload();
+  await expect.poll(() => page.evaluate(() => navigator.serviceWorker.controller !== null)).toBe(true);
+}
+
+// The three checks of the cache run on each host. The live host answers a page file with a redirect to a clean
+// address (`x/index.html` to `x/`, `name.html` to `name`), and a worker that refused a redirected answer never
+// installed there. The second host is the preview on port 4182, which answers as the live host does.
+for (const host of HOSTS) {
+  test.describe(`the offline cache on ${host.name}`, () => {
+    const origin = host.origin;
+    test.use({ baseURL: origin });
+
+    test("registers one worker for the whole site, caches the static shell under its version, and nothing else", async ({ page }) => {
+      await warm(page);
+      const shell = await shellOf(page, origin);
+      expect(shell.version).toMatch(/^[0-9a-f]{16}$/);
+      const state = await page.evaluate(async () => {
+        const names = await caches.keys();
+        const urls: Record<string, string[]> = {};
+        for (const name of names) urls[name] = (await (await caches.open(name)).keys()).map((r) => new URL(r.url).pathname);
+        const registration = await navigator.serviceWorker.getRegistration();
+        return { names, urls, scope: registration?.scope ?? "", script: registration?.active?.scriptURL ?? "" };
+      });
+      expect(state.scope).toBe(origin);
+      expect(state.script).toBe(`${origin}sw.js`);
+      expect(state.names).toEqual([`plotwarden-shell-${shell.version}`]);
+      expect([...(state.urls[`plotwarden-shell-${shell.version}`] as string[])].sort()).toEqual([...shell.files].sort());
+      // A worker with no stored shell is not a worker: every file of the shell is also a file of the site.
+      for (const file of shell.files) expect((await page.request.get(`${origin}${file.slice(1)}`)).status(), file).toBe(200);
+      expect(shell.files).not.toContain("/sw.js");
+      expect(shell.files).not.toContain("/_headers");
+    });
+
+    test("opens every page with the network off: both registers, the Desk, the hub, the visitor pages and a visitor file", async ({ page, context }) => {
+      const faults = trackFaults(page);
+      await warm(page);
+      await context.setOffline(true);
+      const offline = await context.newPage();
+      for (const [path, heading] of [
+        ["/", "Plotwarden"],
+        ["/churchyard/", "Churchyard Register"],
+        ["/allotments/", "Allotment Register"],
+        ["/visitor/family/", "Family map"],
+        ["/visitor/seeker/", "Plot seeker map"],
+        [`/visitor/family/${FAMILY_FILE}`, "Lantern Fold"],
+        [`/visitor/seeker/${SEEKER_FILE}`, "Thimble Beds"],
+      ] as const) {
+        const response = await offline.goto(path);
+        expect(response?.status(), path).toBe(200);
+        await expect(offline.getByRole("heading", { level: 1, name: heading }), path).toBeVisible();
+      }
+      // The Desk preview.
+      await offline.goto("/review/");
+      await expect(offline.getByText("Bring the checks from your registers to one meeting.")).toBeVisible();
+      // A folder with no slash.
+      await offline.goto("/churchyard");
+      expect(offline.url()).toBe(`${origin}churchyard/`);
+      await expect(offline.getByRole("heading", { level: 1, name: "Churchyard Register" })).toBeVisible();
+      // A page that is not there.
+      const missing = await offline.goto("/nowhere");
+      expect(missing?.status()).toBe(404);
+      await expect(offline.getByRole("heading", { level: 1, name: "Page not found" })).toBeVisible();
+      // The visitor file searches with no connection.
+      await offline.goto(`/visitor/family/${FAMILY_FILE}`);
+      await offline.getByLabel("Name or plot code").fill("Quillmoss");
+      await offline.getByRole("button", { name: "Find", exact: true }).click();
+      await expect(offline.locator("#list li:visible")).toContainText("Mirel Quillmoss");
+      await context.setOffline(false);
+      expect(faults.faults).toEqual([]);
+    });
+
+    test("works a register with the network off, and the cache gets no record from it", async ({ page, context }) => {
+      await warm(page);
+      const shell = await shellOf(page, origin);
+      await context.setOffline(true);
+      const offline = await context.newPage();
+      await offline.goto("/churchyard/");
+      await offline.getByRole("link", { name: "Start a register" }).click();
+      await offline.getByLabel("Site name").fill("Offline Orchard");
+      await offline.getByLabel("Local time zone").selectOption("Europe/London");
+      await offline.getByRole("button", { name: "Create register" }).click();
+      await expect(offline.getByRole("heading", { level: 1, name: "Offline Orchard" })).toBeVisible();
+      await offline.reload();
+      await expect(offline.getByRole("heading", { level: 1, name: "Offline Orchard" })).toBeVisible();
+      await context.setOffline(false);
+
+      const urls = await offline.evaluate(async () => {
+        const found: string[] = [];
+        for (const name of await caches.keys()) for (const r of await (await caches.open(name)).keys()) found.push(new URL(r.url).pathname + new URL(r.url).search);
+        return found;
+      });
+      expect(urls.sort()).toEqual([...shell.files].sort());
+      for (const url of urls) expect(url).not.toMatch(/Offline|Orchard|\?|blob|backup|\.zip/i);
+    });
+
+    test("answers the clean address of a page from the cache with the network off", async ({ page, context }) => {
+      await warm(page);
+      await context.setOffline(true);
+      const offline = await context.newPage();
+      const clean = `/visitor/family/${FAMILY_FILE.replace(/\.html$/, "")}`;
+      const response = await offline.goto(clean);
+      expect(response?.status(), clean).toBe(200);
+      expect(offline.url()).toBe(`${origin}${clean.slice(1)}`);
+      await expect(offline.getByRole("heading", { level: 1, name: "Lantern Fold" })).toBeVisible();
+      await context.setOffline(false);
+    });
+  });
+}
+
 test.describe("the offline cache", () => {
-  /** The shell version, as the worker's own file says it, and the files that it lists. */
-  async function shellOf(page: Page): Promise<{ version: string; files: string[] }> {
-    const text = await (await page.request.get(`${SITE}sw.js`)).text();
-    const match = /^self\.__PLOTWARDEN_SHELL = (\{.*\});\n/.exec(text);
-    expect(match, "the worker is stamped").not.toBeNull();
-    return JSON.parse((match as RegExpExecArray)[1] as string) as { version: string; files: string[] };
-  }
-
-  /** Load the site once, wait for the worker to be in charge of the page, and return the page. */
-  async function warm(page: Page): Promise<void> {
-    await page.goto("/");
-    await expect(page.getByRole("heading", { level: 1, name: "Plotwarden" })).toBeVisible();
-    await page.evaluate(async () => {
-      const registration = await navigator.serviceWorker.ready;
-      if (registration.active === null) throw new Error("no active worker");
-    });
-    // The worker takes charge of a page at its next load. Reload once, then it is in charge.
-    await page.reload();
-    await expect.poll(() => page.evaluate(() => navigator.serviceWorker.controller !== null)).toBe(true);
-  }
-
-  test("registers one worker for the whole site, caches the static shell under its version, and nothing else", async ({ page }) => {
-    await warm(page);
-    const shell = await shellOf(page);
-    expect(shell.version).toMatch(/^[0-9a-f]{16}$/);
-    const state = await page.evaluate(async () => {
-      const names = await caches.keys();
-      const urls: Record<string, string[]> = {};
-      for (const name of names) urls[name] = (await (await caches.open(name)).keys()).map((r) => new URL(r.url).pathname);
-      const registration = await navigator.serviceWorker.getRegistration();
-      return { names, urls, scope: registration?.scope ?? "", script: registration?.active?.scriptURL ?? "" };
-    });
-    expect(state.scope).toBe(SITE);
-    expect(state.script).toBe(`${SITE}sw.js`);
-    expect(state.names).toEqual([`plotwarden-shell-${shell.version}`]);
-    expect([...(state.urls[`plotwarden-shell-${shell.version}`] as string[])].sort()).toEqual([...shell.files].sort());
-    // A worker with no stored shell is not a worker: every file of the shell is also a file of the site.
-    for (const file of shell.files) expect((await page.request.get(`${SITE}${file.slice(1)}`)).status(), file).toBe(200);
-    expect(shell.files).not.toContain("/sw.js");
-    expect(shell.files).not.toContain("/_headers");
-  });
-
-  test("opens every page with the network off: both registers, the Desk, the hub, the visitor pages and a visitor file", async ({ page, context }) => {
-    const faults = trackFaults(page);
-    await warm(page);
-    await context.setOffline(true);
-    const offline = await context.newPage();
-    for (const [path, heading] of [
-      ["/", "Plotwarden"],
-      ["/churchyard/", "Churchyard Register"],
-      ["/allotments/", "Allotment Register"],
-      ["/visitor/family/", "Family map"],
-      ["/visitor/seeker/", "Plot seeker map"],
-      [`/visitor/family/${FAMILY_FILE}`, "Lantern Fold"],
-      [`/visitor/seeker/${SEEKER_FILE}`, "Thimble Beds"],
-    ] as const) {
-      const response = await offline.goto(path);
-      expect(response?.status(), path).toBe(200);
-      await expect(offline.getByRole("heading", { level: 1, name: heading }), path).toBeVisible();
-    }
-    // The Desk preview.
-    await offline.goto("/review/");
-    await expect(offline.getByText("Bring the checks from your registers to one meeting.")).toBeVisible();
-    // A folder with no slash.
-    await offline.goto("/churchyard");
-    expect(offline.url()).toBe(`${SITE}churchyard/`);
-    await expect(offline.getByRole("heading", { level: 1, name: "Churchyard Register" })).toBeVisible();
-    // A page that is not there.
-    const missing = await offline.goto("/nowhere");
-    expect(missing?.status()).toBe(404);
-    await expect(offline.getByRole("heading", { level: 1, name: "Page not found" })).toBeVisible();
-    // The visitor file searches with no connection.
-    await offline.goto(`/visitor/family/${FAMILY_FILE}`);
-    await offline.getByLabel("Name or plot code").fill("Quillmoss");
-    await offline.getByRole("button", { name: "Find", exact: true }).click();
-    await expect(offline.locator("#list li:visible")).toContainText("Mirel Quillmoss");
-    await context.setOffline(false);
-    expect(faults.faults).toEqual([]);
-  });
-
-  test("works a register with the network off, and the cache gets no record from it", async ({ page, context }) => {
-    await warm(page);
-    const shell = await shellOf(page);
-    await context.setOffline(true);
-    const offline = await context.newPage();
-    await offline.goto("/churchyard/");
-    await offline.getByRole("link", { name: "Start a register" }).click();
-    await offline.getByLabel("Site name").fill("Offline Orchard");
-    await offline.getByLabel("Local time zone").selectOption("Europe/London");
-    await offline.getByRole("button", { name: "Create register" }).click();
-    await expect(offline.getByRole("heading", { level: 1, name: "Offline Orchard" })).toBeVisible();
-    await offline.reload();
-    await expect(offline.getByRole("heading", { level: 1, name: "Offline Orchard" })).toBeVisible();
-    await context.setOffline(false);
-
-    const urls = await offline.evaluate(async () => {
-      const found: string[] = [];
-      for (const name of await caches.keys()) for (const r of await (await caches.open(name)).keys()) found.push(new URL(r.url).pathname + new URL(r.url).search);
-      return found;
-    });
-    expect(urls.sort()).toEqual([...shell.files].sort());
-    for (const url of urls) expect(url).not.toMatch(/Offline|Orchard|\?|blob|backup|\.zip/i);
-  });
-
+  // The update test rewrites one file on disk that both hosts serve, so it runs once, on the plain host.
   test("says when a new version waits, keeps the page on the old one, and keeps both caches until the old pages close", async ({ page }) => {
     await warm(page);
-    const shell = await shellOf(page);
+    const shell = await shellOf(page, SITE);
     const reversed = shell.version.split("").reverse().join("");
     const next = reversed === shell.version ? "ffffffffffffffff" : reversed;
     // Publish another version: the same files, and a worker that says another version. The browser does not let a

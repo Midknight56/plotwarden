@@ -52,6 +52,10 @@ Tests: T31 (`tests/unit/offline.test.ts`). Implements R22.1, R22.3. Built in tas
 4. When a downloaded visitor file is opened cold with the network off, it shall be readable and searchable.
 5. When a page of the site is asked for with an address that has a fragment (`#/r/<id>`), the worker shall answer it as the page without the fragment, because a host never receives a fragment.
 6. When a request has a query, a body method or a range, or is for another origin, a `blob:` address or a `data:` address, the worker shall leave it to the network and store nothing from it.
+7. When the host serves each shell file at its own address, the worker shall install. This is the case on the local preview (port 4174).
+8. When the host answers a shell file that ends in `.html` with a redirect to a clean address, the worker shall install too. The clean address of `x/index.html` is `x/`. The clean address of `name.html` is `name`. A redirect is taken only when it stays on this origin, ends in a 200, and lands on exactly that clean address. Any other redirect shall fail the whole install, as a missing file does: a redirect to another path, to another origin, one that ends in a 404 or any status but 200, and any redirect of a file that is not a page. A failed install leaves no cache of that version. This is the case on the live host (https://plotwarden.pages.dev, seen on 22 Nov 2026).
+9. When a redirected answer is taken, the stored copy shall keep its body and its headers (the content type and the content policy among them) and shall not be marked as redirected, because a browser refuses to answer a page from a response that is.
+10. When a request is for the clean address `name` of a shell file `name.html`, the worker shall answer it from the stored file. The clean address of an `index.html` is its folder, so `x/index` is not answered, and neither is `name.htm`. Both go to the network.
 
 ## Z5 Limits, the rest
 
@@ -179,6 +183,7 @@ Tests: `tests/browser/release.spec.ts`, both sizes. Built in task 08.
 3. When the hub, its About route, the 404 page and each visitor page are measured, the layout measures shall pass at both sizes, and a proof picture of each shall be saved in `docs/acceptance/layout/site/`.
 4. When the headers of each page are read, there shall be one policy, with no outside origin.
 5. When the service worker is in charge, its cache shall hold exactly the files of its manifest. Every page shall open with the network off, a register started offline shall be kept, and the cache shall hold nothing from it. When a new version is published, the page shall say so and both caches shall stay while the old page is open.
+6. When the site is served by a host that redirects `x/index.html` to `x/` and `name.html` to `name` (the preview on port 4182, which answers as the live host does), the first three checks of item 5 (one worker and its cache, every page with the network off, a register worked with the network off) shall pass there as they do on the plain preview (port 4174). The update check of item 5 runs on the plain preview only.
 
 ## Z18 The public docs
 

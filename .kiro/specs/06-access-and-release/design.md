@@ -287,7 +287,7 @@ The flows are those of Z11. Each ends with a read of the library list, to prove 
 | `site/public/_headers`, `site/public/404.html` | The headers for the host and the 404 page. Copied as they are | `release.test.ts`, `release.spec.ts` |
 | `site/vite.config.ts` | The build into `dist/apps/hub`: the three pages, `sw.js` and `sw-register.js` with fixed names | `release.spec.ts` |
 | `tools/site/visitorFiles.ts`, `scripts/build-visitor.mjs` | The two sample visitor files, made by the registers' own builders from `lantern-fold` and `thimble-beds`, with counter IDs. The script bundles the module with Vite and writes `visitor/<kind>/<file>` | T36 |
-| `tools/site/siteServer.ts`, root `vite.config.ts` | Dev (4173): maps the site's addresses onto the source folders. Preview (4174): serves `dist/site` as a static host does, with `_headers`, the folder redirect and the 404 page. It refuses to start when `dist/site` is not assembled | `release.spec.ts` |
+| `tools/site/siteServer.ts`, root `vite.config.ts` | Dev (4173): maps the site's addresses onto the source folders. Preview (4174): serves `dist/site` as a static host does, with `_headers`, the folder redirect and the 404 page. It refuses to start when `dist/site` is not assembled. A second host style, `PLOTWARDEN_HOST_STYLE=pretty`, answers as the live host does (see "The two host styles") and is served on port 4182. `previewHandler` is exported so a unit test drives it with no server | `release.spec.ts`, `hostStyle.test.ts` |
 | `scripts/lib/{files,desk,site,siteScan,headers,inventory,publicText}.mjs`, `scripts/{lock-desk,assemble-site,build-sw,check-release,check-public,check-licenses,check-links}.mjs` | The release scripts. Each takes `--root`, so a test runs it on a small tree | T36 |
 | `release/desk-preview.lock.json` | The Desk name, version, git revision, the SHA-256 of each preview file and the packages the preview bundles | T36 |
 | `tests/browser/{release,share-print,judge-guide}.spec.ts`, `tests/helpers/siteOrigin.ts` | Browser specs on the assembled site | |
@@ -296,11 +296,30 @@ The flows are those of Z11. Each ends with a read of the library list, to prove 
 
 One version has one cache, named `plotwarden-shell-<version>`. The version is the first 16 hex characters of the SHA-256 of `<path>\0<sha256 of file>\n` for every file of the site in path order, except `sw.js` and `_headers`. The manifest lists those files.
 
-- `install` fetches each file with `cache: "reload"` and keeps it only if the answer is a plain 200. One failure deletes the cache of that version and fails the install.
+- `install(caches, fetchFile, manifest, origin)` fetches each file with `cache: "reload"` and keeps it only if the answer is a plain 200. One failure deletes the cache of that version and fails the install.
+- A redirected answer is taken in one case. The file is a page (`x/index.html` or `name.html`), the answer is a 200 that is not opaque, its final address (`response.url`) is on `origin`, has no query, and its path is exactly the clean address: `x/` for `x/index.html`, `name` for `name.html`. A host that serves each file at its own address never redirects, so that case is as it was. Every other redirect fails the install: another path, another origin, a final status other than 200, a redirect of a file that is not a page (a script or a style has no clean address), or a final address that cannot be read. The final address is all a script can read of a redirect chain, so a chain that leaves the origin and comes back to the clean address is not told apart. The host here sends one hop.
+- The stored copy of a redirected answer is a new `Response` with the same body, status, status text and every header (so the content type and the content policy stay), and `redirected` false. A browser refuses to answer a page from a response that is marked as redirected. Before this change `install` refused every such answer, so the worker did not install on the live host. An answer that did not redirect is stored as it came.
 - `activate` deletes every other `plotwarden-shell-` cache and leaves a cache that is not ours.
-- `respond` answers a plain GET of this origin with no query and no range, for a path in the manifest, from the cache of its own version. A folder path is its `index.html`. A folder without its slash is a 308 to the folder. A fragment is ignored, because a host never receives one. Anything else goes to the network and is never stored. A page that is not held, asked for offline, is the stored 404 page with the status 404.
+- `respond` answers a plain GET of this origin with no query and no range, for a path in the manifest, from the cache of its own version. A folder path is its `index.html`. A folder without its slash is a 308 to the folder. The clean address `name` of a shell file `name.html` is answered from that file, but only when the last part of the path is not `index`: `x/index` is not the clean address of anything, and `name.htm` is not one either, so both go to the network. A fragment is ignored, because a host never receives one. Anything else goes to the network and is never stored. A page that is not held, asked for offline, is the stored 404 page with the status 404.
 - The worker never calls `skipWaiting` or `clients.claim`. A new worker installs, and waits until the pages of the old one close. `watchForUpdate` tells the page once, and the page shows "A new version is ready. Save your work before reopening." first in the body, in the normal flow.
 - Z4.3 reads "no visitor file". The cache holds the two sample visitor files of the site, because they are static files of the site, invented and the same for everyone. It never holds a file that a keeper made.
+
+### The two host styles
+
+The preview server answers in one of two styles. `PLOTWARDEN_HOST_STYLE` is read once when the server starts. Unset, empty or `plain` is the plain style (port 4174). `pretty` is the style of the live host (port 4182). Any other value stops the server with a sentence that names it. Everything below is the same in both styles: the headers of `_headers`, the folder redirect (`x` to `x/`), the folder served by its `index.html`, the 404 page with the status 404, `_headers` never served, and a path that holds `..` or a null byte answered with the 404 page.
+
+In the pretty style, a request for a file that exists is answered like this, in this order:
+
+| Request | Answer |
+|---|---|
+| `/index.html` or `x/index.html` | 308 to `/` or `x/`, keeping the query |
+| `name.html` | 308 to `name`, keeping the query. `/404.html` goes to `/404` |
+| `name`, where no file `name` and no folder `name` exist and `name.html` does | 200 with the file `name.html`. The headers are those that `_headers` gives the request path `name` |
+| a folder, a file that is not a page, anything else | as in the plain style |
+
+The headers of a clean address come from the address that was asked, as a host that matches `_headers` on the request path would send them. Whether the live host matches on the request path or on the file path was not observed. The file of the clean address `/404` therefore gets no policy rule of its own in this server, because the rule in `_headers` names `/404.html`.
+
+The preview is started by `npm run preview:pretty` (`vite preview --host 127.0.0.1 --port 4182 --strictPort`), and `playwright.config.ts` sets the variable for that one server and builds nothing. Ports 4173 to 4181 are taken by the other servers.
 
 ### Assembly
 
@@ -316,7 +335,7 @@ One version has one cache, named `plotwarden-shell-<version>`. The version is th
 
 ### Browser specs
 
-`release.spec.ts`, `share-print.spec.ts` and `judge-guide.spec.ts` run at both sizes on `http://127.0.0.1:4174/`. The preview server is the one webServer of `playwright.config.ts` that builds nothing, so it does not race the other servers for `dist/apps`. The update test changes `dist/site/sw.js` for one test and restores it.
+`release.spec.ts`, `share-print.spec.ts` and `judge-guide.spec.ts` run at both sizes on `http://127.0.0.1:4174/`. The preview servers (4174 and 4182) are the webServers of `playwright.config.ts` that build nothing, so they do not race the other servers for `dist/apps`. The three offline checks of `release.spec.ts` (one worker and its cache, every page with the network off, a register worked with the network off) run once against each, so a host that redirects `.html` is tried as well as one that does not. The update test runs on 4174 only. It changes `dist/site/sw.js` for one test and restores it.
 
 `share-print.spec.ts` takes each print document from the register's print frame, draws it in a clean page in print media, makes a PDF with the page size the document asks for, and reads the page boxes. For grayscale it draws in a second headless browser with `--disable-lcd-text`.
 ## Z-D12 Repairs the browser specs found (Z17)

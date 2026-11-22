@@ -11,6 +11,7 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 4173 --strictPort",
     "preview": "vite preview --host 127.0.0.1 --port 4174 --strictPort",
+    "preview:pretty": "vite preview --host 127.0.0.1 --port 4182 --strictPort",
     "host:build": "vite build --config tests/host/vite.config.ts",
     "host:preview": "vite preview --config tests/host/vite.config.ts",
     "fixtures": "node scripts/generate-fixtures.mjs",

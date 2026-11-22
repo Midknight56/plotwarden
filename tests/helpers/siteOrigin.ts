@@ -7,6 +7,18 @@ import { sizeOf } from "./routes";
 /** The assembled site, served by `npm run preview`. */
 export const SITE = "http://127.0.0.1:4174/";
 
+/**
+ * The same files, served by `npm run preview:pretty`, which answers as the live host does: `x/index.html` goes to `x/`
+ * and `name.html` goes to `name` with a 308, and the clean address gives the file. Started by `playwright.config.ts`.
+ */
+export const SITE_PRETTY = "http://127.0.0.1:4182/";
+
+/** The two hosts that the offline checks run against. */
+export const HOSTS = [
+  { name: "a host that serves each file at its own address", origin: SITE },
+  { name: "a host that redirects .html addresses to clean ones", origin: SITE_PRETTY },
+] as const;
+
 /** The two sample visitor files, as the build names them. */
 export const FAMILY_FILE = "family-map-2026-04-20.html";
 export const SEEKER_FILE = "availability-map-2026-04-20.html";

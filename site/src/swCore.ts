@@ -80,17 +80,53 @@ export function routeFor(request: RequestLike, origin: string, manifest: ShellMa
   if (path.endsWith("/")) return files.has(`${path}index.html`) ? { kind: "file", key: `${path}index.html` } : undefined;
   if (files.has(path)) return { kind: "file", key: path };
   if (files.has(`${path}/index.html`)) return { kind: "redirect", to: `${path}/` };
+  // A host that prettifies addresses sends `name.html` to `name`, so a page may be asked for by that address. The
+  // clean address of an index page is its folder, never `x/index`, so a last part of `index` is left alone.
+  if (!path.endsWith("/index") && files.has(`${path}.html`)) return { kind: "file", key: `${path}.html` };
   return undefined;
 }
 
+/**
+ * The address a host that prettifies addresses sends a page file to: `x/` for `x/index.html`, `name` for
+ * `name.html`. A file that is not a page has none.
+ */
+function cleanAddressOf(file: string): string | undefined {
+  if (file.endsWith("/index.html")) return file.slice(0, -"index.html".length);
+  if (file.endsWith(".html")) return file.slice(0, -".html".length);
+  return undefined;
+}
+
+/**
+ * Is a redirected answer one that the worker may keep? Only when it ends on this origin, with no query, in a 200
+ * that is not opaque, at exactly the clean address of the file. Any other redirect is a fault of the build or the host.
+ */
+function isCleanRedirect(response: Response, file: string, origin: string): boolean {
+  const clean = cleanAddressOf(file);
+  if (clean === undefined || response.status !== 200 || response.type === "opaque") return false;
+  let landed: URL;
+  try {
+    landed = new URL(response.url);
+  } catch {
+    return false;
+  }
+  return landed.origin === origin && landed.search === "" && landed.pathname === clean;
+}
+
 /** Fill a cache for one version. All of it or none of it. */
-export async function install(caches: CacheStorageLike, fetchFile: FetchLike, manifest: ShellManifest): Promise<void> {
+export async function install(caches: CacheStorageLike, fetchFile: FetchLike, manifest: ShellManifest, origin: string): Promise<void> {
   const name = cacheNameFor(manifest.version);
   try {
     const cache = await caches.open(name);
     for (const file of manifest.files) {
       const response = await fetchFile(file, { cache: "reload" });
-      if (response.status !== 200 || response.redirected || response.type === "opaque") throw new Error(`The shell file ${file} did not load as a plain 200`);
+      if (response.redirected) {
+        if (!isCleanRedirect(response, file, origin)) throw new Error(`The shell file ${file} was sent somewhere that is not its own clean address`);
+        // A browser never answers a page from a response that is marked as redirected. Keep the same bytes and
+        // headers in a copy that is not.
+        await cache.put(file, new Response(response.body, { status: response.status, statusText: response.statusText, headers: response.headers }));
+        continue;
+      }
+      if (response.status !== 200 || response.type === "opaque") throw new Error(`The shell file ${file} did not load as a plain 200`);
       await cache.put(file, response);
     }
   } catch (error) {

@@ -23,13 +23,14 @@ const ORIGIN = "https://plotwarden.example";
 // ---- fakes ---------------------------------------------------------------------------------------------------
 
 class FakeCache implements CacheLike {
-  readonly rows = new Map<string, { body: string; status: number; headers: [string, string][] }>();
+  readonly rows = new Map<string, { body: string; status: number; headers: [string, string][]; redirected: boolean }>();
   async match(key: string): Promise<Response | undefined> {
     const row = this.rows.get(key);
     return row === undefined ? undefined : new Response(row.body, { status: row.status, headers: row.headers });
   }
   async put(key: string, response: Response): Promise<void> {
-    this.rows.set(key, { body: await response.text(), status: response.status, headers: [...response.headers.entries()] });
+    // `redirected` is what a browser looks at: a page is never answered from a response that carries it.
+    this.rows.set(key, { body: await response.text(), status: response.status, headers: [...response.headers.entries()], redirected: response.redirected });
   }
 }
 
@@ -80,6 +81,43 @@ function networkOf(version: string, options: { missing?: string[]; offline?: boo
 
 const text = async (response: Response): Promise<string> => response.text();
 
+// A host that answers the file address of a page with a redirect to its clean address, as the live host does:
+// `x/index.html` goes to `x/` and `name.html` goes to `name`. Typed here by hand from what the lead saw on
+// 22 Nov 2026, not read from the worker or from the preview server.
+const cleanAddressOf = (file: string): string | undefined => (file.endsWith("/index.html") ? file.slice(0, -"index.html".length) : file.endsWith(".html") ? file.slice(0, -".html".length) : undefined);
+
+const PAGE_HEADERS = { "content-type": "text/html; charset=utf-8", "content-security-policy": "default-src 'self'; script-src 'self'", "x-content-type-options": "nosniff" };
+
+/** What fetch gives after a redirect: the final answer, marked as redirected, with the address it ended at. */
+function redirectedResponse(body: string, init: { url: string; status?: number; headers?: Record<string, string> }): Response {
+  const response = new Response(body, { status: init.status ?? 200, headers: init.headers });
+  Object.defineProperty(response, "redirected", { value: true });
+  Object.defineProperty(response, "url", { value: init.url });
+  return response;
+}
+
+type Landing = { url?: string; status?: number };
+
+/** Pages are redirected to their clean address and answer 200 there. `land` lets one test send a page elsewhere. */
+function prettyHostOf(version: string, land: (file: string, clean: string) => Landing = () => ({})): { fetchFile: FetchLike; asked: string[] } {
+  const asked: string[] = [];
+  const fetchFile: FetchLike = async (request) => {
+    const url = new URL(typeof request === "string" ? request : request.url, ORIGIN);
+    asked.push(url.pathname);
+    const body = `${version} ${url.pathname}`;
+    const clean = cleanAddressOf(url.pathname);
+    if (clean === undefined) {
+      const where = land(url.pathname, url.pathname);
+      if (where.url === undefined && where.status === undefined) return new Response(body, { status: 200, headers: { "content-type": "text/javascript" } });
+      return redirectedResponse(body, { url: where.url ?? `${ORIGIN}${url.pathname}`, status: where.status, headers: { "content-type": "text/javascript" } });
+    }
+    const where = land(url.pathname, clean);
+    return redirectedResponse(body, { url: where.url ?? `${ORIGIN}${clean}`, status: where.status, headers: PAGE_HEADERS });
+  };
+  return { fetchFile, asked };
+}
+
+const PAGE_FILES = FILES.filter((file) => file.endsWith(".html"));
 // ---- the cache -----------------------------------------------------------------------------------------------
 
 describe("T31 cache name and manifest", () => {
@@ -134,6 +172,40 @@ describe("T31 which requests the worker answers", () => {
     expect(routeFor(requestOf("/churchyard/?q=1#/r/0a1b2c", { mode: "navigate" }), ORIGIN, V1)).toBeUndefined();
   });
 
+  it("answers the clean address of a page file from that file, as a host that prettifies addresses does", () => {
+    expect(routeFor(requestOf("/visitor/family/family-map-2026-04-20", { mode: "navigate" }), ORIGIN, V1)).toEqual({
+      kind: "file",
+      key: "/visitor/family/family-map-2026-04-20.html",
+    });
+    expect(routeFor(requestOf("/404", { mode: "navigate" }), ORIGIN, V1)).toEqual({ kind: "file", key: "/404.html" });
+    // A fragment is never sent to a host, so it does not change the answer. A query still does.
+    expect(routeFor(requestOf("/visitor/family/family-map-2026-04-20#top", { mode: "navigate" }), ORIGIN, V1)).toEqual({
+      kind: "file",
+      key: "/visitor/family/family-map-2026-04-20.html",
+    });
+    expect(routeFor(requestOf("/visitor/family/family-map-2026-04-20?q=1", { mode: "navigate" }), ORIGIN, V1)).toBeUndefined();
+    // The folder forms are as they were.
+    expect(routeFor(requestOf("/churchyard/", { mode: "navigate" }), ORIGIN, V1)).toEqual({ kind: "file", key: "/churchyard/index.html" });
+    expect(routeFor(requestOf("/churchyard", { mode: "navigate" }), ORIGIN, V1)).toEqual({ kind: "redirect", to: "/churchyard/" });
+  });
+
+  it("leaves to the network what is not the clean address of a page file", () => {
+    // `.htm` is another extension. `index` is not the clean address of an index page: that is the folder.
+    expect(routeFor(requestOf("/visitor/family/family-map-2026-04-20.htm", { mode: "navigate" }), ORIGIN, V1)).toBeUndefined();
+    expect(routeFor(requestOf("/churchyard/index", { mode: "navigate" }), ORIGIN, V1)).toBeUndefined();
+    expect(routeFor(requestOf("/index", { mode: "navigate" }), ORIGIN, V1)).toBeUndefined();
+    expect(routeFor(requestOf("/review/index", { mode: "navigate" }), ORIGIN, V1)).toBeUndefined();
+    // A script has no clean address.
+    expect(routeFor(requestOf("/churchyard/assets/app"), ORIGIN, V1)).toBeUndefined();
+    expect(routeFor(requestOf("/sw-register"), ORIGIN, V1)).toBeUndefined();
+    // A page that the shell does not hold has none either.
+    expect(routeFor(requestOf("/visitor/family/family-map-2099-01-01", { mode: "navigate" }), ORIGIN, V1)).toBeUndefined();
+    // Other origins, other methods and ranges are left alone, as for any file.
+    expect(routeFor(requestOf("/404", { origin: "https://other.example" }), ORIGIN, V1)).toBeUndefined();
+    expect(routeFor(requestOf("/404", { method: "POST", mode: "navigate" }), ORIGIN, V1)).toBeUndefined();
+    expect(routeFor(requestOf("/404", { range: "bytes=0-10" }), ORIGIN, V1)).toBeUndefined();
+  });
+
   it("sends a folder without its slash to the folder, as a static host does", () => {
     expect(routeFor(requestOf("/churchyard", { mode: "navigate" }), ORIGIN, V1)).toEqual({ kind: "redirect", to: "/churchyard/" });
     expect(routeFor(requestOf("/review", { mode: "navigate" }), ORIGIN, V1)).toEqual({ kind: "redirect", to: "/review/" });
@@ -162,7 +234,7 @@ describe("T31 install and activate", () => {
   it("puts every file of the shell in a cache named for the version, fetched fresh, and nothing else", async () => {
     const caches = new FakeCaches();
     const net = networkOf("v1");
-    await install(caches, net.fetchFile, V1);
+    await install(caches, net.fetchFile, V1, ORIGIN);
     expect([...caches.stores.keys()]).toEqual([cacheNameFor(V1.version)]);
     const store = caches.stores.get(cacheNameFor(V1.version)) as FakeCache;
     expect([...store.rows.keys()].sort()).toEqual([...FILES].sort());
@@ -176,37 +248,131 @@ describe("T31 install and activate", () => {
       seen.push(init?.cache);
       return new Response(`x ${typeof request === "string" ? request : request.url}`);
     };
-    await install(new FakeCaches(), fetchFile, V1);
+    await install(new FakeCaches(), fetchFile, V1, ORIGIN);
     expect(seen.length).toBe(FILES.length);
     expect(new Set(seen)).toEqual(new Set(["reload"]));
   });
 
   it("fails as a whole when one file is missing, and leaves no half made cache and the old cache as it was", async () => {
     const caches = new FakeCaches();
-    await install(caches, networkOf("v1").fetchFile, V1);
+    await install(caches, networkOf("v1").fetchFile, V1, ORIGIN);
     const before = JSON.stringify([...(caches.stores.get(cacheNameFor(V1.version)) as FakeCache).rows]);
-    await expect(install(caches, networkOf("v2", { missing: ["/allotments/index.html"] }).fetchFile, V2)).rejects.toThrow();
+    await expect(install(caches, networkOf("v2", { missing: ["/allotments/index.html"] }).fetchFile, V2, ORIGIN)).rejects.toThrow();
     expect([...caches.stores.keys()]).toEqual([cacheNameFor(V1.version)]);
     expect(JSON.stringify([...(caches.stores.get(cacheNameFor(V1.version)) as FakeCache).rows])).toBe(before);
   });
 
   it("fails when the network is off at install", async () => {
     const caches = new FakeCaches();
-    await expect(install(caches, networkOf("v1", { offline: true }).fetchFile, V1)).rejects.toThrow();
+    await expect(install(caches, networkOf("v1", { offline: true }).fetchFile, V1, ORIGIN)).rejects.toThrow();
     expect([...caches.stores.keys()]).toEqual([]);
   });
 
   it("does not store a response that is not a plain success", async () => {
     const caches = new FakeCaches();
     const redirecting: FetchLike = async () => new Response("", { status: 302, headers: { location: "/elsewhere" } });
-    await expect(install(caches, redirecting, V1)).rejects.toThrow();
+    await expect(install(caches, redirecting, V1, ORIGIN)).rejects.toThrow();
     expect([...caches.stores.keys()]).toEqual([]);
+  });
+
+  describe("on a host that redirects x/index.html to x/ and name.html to name", () => {
+    it("installs every file, and keeps for each page the body, the content type and the content policy", async () => {
+      const caches = new FakeCaches();
+      const host = prettyHostOf("v1");
+      await install(caches, host.fetchFile, V1, ORIGIN);
+      expect([...caches.stores.keys()]).toEqual([cacheNameFor(V1.version)]);
+      const store = caches.stores.get(cacheNameFor(V1.version)) as FakeCache;
+      expect([...store.rows.keys()].sort()).toEqual([...FILES].sort());
+      expect([...host.asked].sort()).toEqual([...FILES].sort());
+      for (const file of PAGE_FILES) {
+        const row = store.rows.get(file);
+        expect(row?.body, file).toBe(`v1 ${file}`);
+        expect(row?.status, file).toBe(200);
+        const headers = Object.fromEntries(row?.headers ?? []);
+        expect(headers["content-type"], file).toBe("text/html; charset=utf-8");
+        expect(headers["content-security-policy"], file).toBe("default-src 'self'; script-src 'self'");
+        expect(headers["x-content-type-options"], file).toBe("nosniff");
+      }
+    });
+
+    it("stores a copy that is not marked as redirected, so a page can be answered from it", async () => {
+      const caches = new FakeCaches();
+      await install(caches, prettyHostOf("v1").fetchFile, V1, ORIGIN);
+      const store = caches.stores.get(cacheNameFor(V1.version)) as FakeCache;
+      for (const [key, row] of store.rows) expect(row.redirected, key).toBe(false);
+      // And a page is answered from it with the network off, at its folder, its file and its clean address.
+      await activate(caches, V1);
+      const offline = networkOf("down", { offline: true });
+      for (const [path, file] of [
+        ["/", "/index.html"],
+        ["/churchyard/", "/churchyard/index.html"],
+        ["/visitor/family/family-map-2026-04-20.html", "/visitor/family/family-map-2026-04-20.html"],
+        ["/visitor/family/family-map-2026-04-20", "/visitor/family/family-map-2026-04-20.html"],
+        ["/404", "/404.html"],
+      ] as const) {
+        const response = await respond(caches, requestOf(path, { mode: "navigate" }), offline.fetchFile, ORIGIN, V1);
+        expect(response.status, path).toBe(200);
+        expect(await text(response), path).toBe(`v1 ${file}`);
+      }
+      expect(offline.asked).toEqual([]);
+    });
+
+    it("still serves the stored 404 page with the status 404 for a page it does not hold", async () => {
+      const caches = new FakeCaches();
+      await install(caches, prettyHostOf("v1").fetchFile, V1, ORIGIN);
+      const response = await respond(caches, requestOf("/nowhere", { mode: "navigate" }), networkOf("down", { offline: true }).fetchFile, ORIGIN, V1);
+      expect(response.status).toBe(404);
+      expect(await text(response)).toBe("v1 /404.html");
+    });
+
+    it("keeps one version, one cache, and adds nothing after install", async () => {
+      const caches = new FakeCaches();
+      await install(caches, prettyHostOf("v1").fetchFile, V1, ORIGIN);
+      await activate(caches, V1);
+      const online = prettyHostOf("live");
+      for (const path of ["/records/1", "/churchyard/?x=1", "/visitor/family/family-map-2099-01-01", "/a", "/b/"]) {
+        await respond(caches, requestOf(path, { mode: path.endsWith("/") ? "navigate" : "no-cors" }), online.fetchFile, ORIGIN, V1);
+      }
+      expect(await caches.keys()).toEqual([cacheNameFor(V1.version)]);
+      expect([...(caches.stores.get(cacheNameFor(V1.version)) as FakeCache).rows.keys()].sort()).toEqual([...FILES].sort());
+    });
+
+    it.each([
+      ["a redirect to another path", "/churchyard/index.html", { url: `${ORIGIN}/allotments/` }],
+      ["a redirect to the same folder without its slash", "/churchyard/index.html", { url: `${ORIGIN}/churchyard` }],
+      ["a redirect to the file address itself", "/404.html", { url: `${ORIGIN}/404.html` }],
+      ["a redirect to the clean address of another file", "/404.html", { url: `${ORIGIN}/index` }],
+      ["a redirect to the clean address with a query", "/404.html", { url: `${ORIGIN}/404?from=x` }],
+      ["a redirect to another origin", "/churchyard/index.html", { url: "https://elsewhere.example/churchyard/" }],
+      ["a redirect to another port of the same host", "/404.html", { url: "https://plotwarden.example:8443/404" }],
+      ["a redirect to another scheme", "/404.html", { url: "http://plotwarden.example/404" }],
+      ["a redirect that ends in 404", "/churchyard/index.html", { status: 404 }],
+      ["a redirect that ends in 500", "/404.html", { status: 500 }],
+      ["a redirect with no readable final address", "/404.html", { url: "not an address" }],
+      ["a redirect of a file that is not a page", "/churchyard/assets/app.js", { url: `${ORIGIN}/churchyard/assets/app` }],
+      ["a redirect of a script to its own address", "/sw-register.js", { url: `${ORIGIN}/sw-register.js` }],
+    ] as const)("fails the whole install on %s, and leaves no cache", async (_name, file, where) => {
+      const caches = new FakeCaches();
+      const host = prettyHostOf("v1", (asked) => (asked === file ? where : {}));
+      await expect(install(caches, host.fetchFile, V1, ORIGIN)).rejects.toThrow();
+      expect([...caches.stores.keys()]).toEqual([]);
+    });
+
+    it("fails and leaves the cache of the version that was already there as it was", async () => {
+      const caches = new FakeCaches();
+      await install(caches, networkOf("v1").fetchFile, V1, ORIGIN);
+      const before = JSON.stringify([...(caches.stores.get(cacheNameFor(V1.version)) as FakeCache).rows]);
+      const host = prettyHostOf("v2", (file) => (file === "/allotments/index.html" ? { url: "https://elsewhere.example/allotments/" } : {}));
+      await expect(install(caches, host.fetchFile, V2, ORIGIN)).rejects.toThrow();
+      expect([...caches.stores.keys()]).toEqual([cacheNameFor(V1.version)]);
+      expect(JSON.stringify([...(caches.stores.get(cacheNameFor(V1.version)) as FakeCache).rows])).toBe(before);
+    });
   });
 
   it("activation removes the caches of other versions and keeps the current one and any cache that is not ours", async () => {
     const caches = new FakeCaches();
-    await install(caches, networkOf("v1").fetchFile, V1);
-    await install(caches, networkOf("v2").fetchFile, V2);
+    await install(caches, networkOf("v1").fetchFile, V1, ORIGIN);
+    await install(caches, networkOf("v2").fetchFile, V2, ORIGIN);
     await caches.open("someone-elses-cache");
     await activate(caches, V2);
     expect((await caches.keys()).sort()).toEqual([cacheNameFor(V2.version), "someone-elses-cache"].sort());
@@ -216,7 +382,7 @@ describe("T31 install and activate", () => {
 describe("T31 answering a request", () => {
   async function installed(version: ShellManifest = V1, label = "v1"): Promise<FakeCaches> {
     const caches = new FakeCaches();
-    await install(caches, networkOf(label).fetchFile, version);
+    await install(caches, networkOf(label).fetchFile, version, ORIGIN);
     await activate(caches, version);
     return caches;
   }
@@ -294,10 +460,10 @@ describe("T31 answering a request", () => {
 
   it("never mixes versions: a worker of one version serves only its own files while another version waits", async () => {
     const caches = new FakeCaches();
-    await install(caches, networkOf("v1").fetchFile, V1);
+    await install(caches, networkOf("v1").fetchFile, V1, ORIGIN);
     await activate(caches, V1);
     // A new version installs and waits. Its cache is there, and the old worker is still the one that answers.
-    await install(caches, networkOf("v2").fetchFile, V2);
+    await install(caches, networkOf("v2").fetchFile, V2, ORIGIN);
     const offline = networkOf("down", { offline: true });
     for (const file of FILES) {
       const response = await respond(caches, requestOf(file), offline.fetchFile, ORIGIN, V1);

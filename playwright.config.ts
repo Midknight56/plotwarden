@@ -56,6 +56,17 @@ export default defineConfig({
       stderr: "pipe",
     },
     {
+      // The same `dist/site`, answered as the live host answers: `x/index.html` goes to `x/` and `name.html` goes to
+      // `name`, with a 308, and the clean address gives the file. The style is set for this server alone.
+      command: "npm run preview:pretty",
+      url: "http://127.0.0.1:4182/",
+      env: { PLOTWARDEN_HOST_STYLE: "pretty" },
+      reuseExistingServer: false,
+      timeout: 60_000,
+      stdout: "ignore",
+      stderr: "pipe",
+    },
+    {
       command: "npm run allot:build && npm run allot:preview",
       url: "http://127.0.0.1:4178/",
       reuseExistingServer: false,
