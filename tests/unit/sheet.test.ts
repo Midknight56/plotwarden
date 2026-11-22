@@ -10,6 +10,8 @@ import { emptyMap } from "../../template/src/map/edit";
 import type { MapState } from "../../template/src/map/edit";
 import { buildSheet } from "../../template/src/map/sheet";
 import type { Label, SheetModel, SheetPlotInput } from "../../template/src/map/sheet";
+import { plotSummaryAt } from "../../template/src/status";
+import { fixture } from "../../tools/inspector/fixtures";
 
 const rect = (x0: number, y0: number, x1: number, y1: number): Point[] => [
   [x0, y0],
@@ -462,32 +464,47 @@ describe("labels keep clear (A12)", () => {
     for (const selected of ["B04", "B01", undefined]) checkSheet(buildSheet({ map: m, plots: inputs, ...(selected === undefined ? {} : { selectedPlotId: selected }) }, { width }), `narrow beds ${width} ${selected ?? "none"}`);
   });
 
-  // P19.1: a name with no clear place is written under the drawing at every width, and only then. From 700 up these two
-  // maps have a clear place for every name. Before P19 the rule read "only below 300, and none at 320 and above".
-  it("writes a name under the drawing only when no place on the drawing is clear, at every width", () => {
+  // P19.1 and P19.8 (task 18): a name with no clear place beside its feature stands outside the block, under the
+  // drawing, with a leader line, at every width, and only then. It was written in a list in the corner, at x 8, under
+  // the drawing (the rule of P19 before task 18). `captioned` is gone from the model.
+  it("stands a name outside the block with a leader line only when no place beside its feature is clear, at every width", () => {
     for (const make of [yew, beds]) {
       const { m, inputs } = make();
+      let led = 0;
       for (const width of [320, 360, 700, 1500, 148, 180]) {
         const sheet = buildSheet({ map: m, plots: inputs }, { width });
         const written = [sheet.gate?.label, ...sheet.sections.map((s) => s.label), ...sheet.paths.map((p) => p.label)].filter((l): l is Label => l !== undefined);
-        const under = written.filter((l) => l.anchor === "start" && l.x === 8 && l.y > sheet.view.height);
-        expect(under, `names under the drawing at ${width}`).toHaveLength(sheet.captioned);
+        for (const label of written) {
+          const underDrawing = label.y - 12 >= sheet.view.height;
+          expect(label.leader !== undefined, `${label.text} at ${width}: a leader line goes with a name under the drawing and with no other`).toBe(underDrawing);
+          if (label.leader !== undefined) led += 1;
+        }
       }
-      for (const width of [700, 1500]) expect(buildSheet({ map: m, plots: inputs }, { width }).captioned, `captioned at ${width}`).toBe(0);
-      for (const width of [148, 180]) expect(buildSheet({ map: m, plots: inputs }, { width }).captioned, `captioned at ${width}`).toBeGreaterThan(0);
+      expect(led, "some name needed a leader line at these widths").toBeGreaterThan(0);
+      for (const width of [148, 180]) {
+        const sheet = buildSheet({ map: m, plots: inputs }, { width });
+        const names = [sheet.gate?.label, ...sheet.sections.map((s) => s.label), ...sheet.paths.map((p) => p.label)].filter((l): l is Label => l !== undefined);
+        expect(names.some((l) => l.leader !== undefined), `a leader at ${width}`).toBe(true);
+      }
     }
   });
 
-  it("makes the sheet taller by the lines it writes under the drawing, and by nothing else", () => {
+  it("makes the sheet taller by the rows of names it writes under the drawing, and keeps those names apart", () => {
     const { m, inputs } = yew();
     const narrow = buildSheet({ map: m, plots: inputs }, { width: 148 });
-    expect(narrow.height).toBeGreaterThan(narrow.height - narrow.captioned * 18);
     const lines = [narrow.gate?.label, ...narrow.sections.map((s) => s.label), ...narrow.paths.map((p) => p.label)].filter((l): l is Label => l !== undefined);
-    const under = lines.filter((l) => l.anchor === "start" && l.x === 8 && l.y > narrow.height - narrow.captioned * 18 - 8);
-    expect(under).toHaveLength(narrow.captioned);
-    expect(new Set(under.map((l) => l.y)).size).toBe(under.length);
+    const under = lines.filter((l) => l.leader !== undefined);
+    expect(under.length).toBeGreaterThan(0);
+    expect(narrow.height).toBeGreaterThan(narrow.view.height);
+    for (const l of under) expect(l.y + 3 + 8, `${l.text} ends inside the sheet`).toBeLessThanOrEqual(narrow.height + 0.001);
+    for (let i = 0; i < under.length; i++) {
+      for (let j = i + 1; j < under.length; j++) {
+        const a = boxOf(under[i] as Label);
+        const b = boxOf(under[j] as Label);
+        expect(overlap(a, b, 1), `${(under[i] as Label).text} and ${(under[j] as Label).text} touch`).toBe(false);
+      }
+    }
   });
-
   it("names the sections, paths and gate on a narrow sheet for a reader, even where a label is left out", () => {
     const { m, inputs } = yew();
     const sheet = buildSheet({ map: m, plots: inputs }, { width: 148 });
@@ -783,5 +800,191 @@ describe("names keep clear of plots, lines and each other (P19)", () => {
     expect(chosen.view).toEqual(plain.view);
     expect(chosen.tab).toBeDefined();
     expect(chosen.height).toBeGreaterThanOrEqual((chosen.tab?.y ?? 0) + (chosen.tab?.height ?? 0));
+  });
+
+  // ---- P19.8 to P19.11 (task 18): a name beside its feature or joined to it, and the tab outside a dense block ----
+  type Pt = [number, number];
+  const HUB_WIDTH = 272;
+  const NAME_WIDTHS = [148, 180, 240, HUB_WIDTH, 312, 328, 360, 480, 700, 1120];
+
+  const pointToLine = (p: Pt, line: readonly (readonly [number, number])[]): number => gapToLine({ x0: p[0], y0: p[1], x1: p[0], y1: p[1] }, line);
+  const pointToBox = (p: Pt, b: Box): number => Math.hypot(Math.max(b.x0 - p[0], 0, p[0] - b.x1), Math.max(b.y0 - p[1], 0, p[1] - b.y1));
+
+  /** True when a segment, walked one pixel at a time, goes strictly inside a box that is shrunk by `shrink`. */
+  function walksInside(a: Pt, b: Pt, box: Box, shrink: number): boolean {
+    const steps = Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1])));
+    for (let s = 0; s <= steps; s++) {
+      const x = a[0] + ((b[0] - a[0]) * s) / steps;
+      const y = a[1] + ((b[1] - a[1]) * s) / steps;
+      if (x > box.x0 + shrink && x < box.x1 - shrink && y > box.y0 + shrink && y < box.y1 - shrink) return true;
+    }
+    return false;
+  }
+
+  /** P19.8: every name is within 24 px of its feature, or has a leader line that starts on the feature and ends at the name. */
+  function checkJoined(m: SheetModel, name: string): void {
+    const items: { what: string; label: Label; feature: (p: Pt) => number; gap: number }[] = [];
+    for (const s of m.sections) {
+      const closed: Pt[] = s.points === undefined ? [] : [...s.points, s.points[0] as Pt];
+      items.push({ what: `section ${s.name}`, label: s.label, feature: (p) => pointToLine(p, closed), gap: gapToLine(nameBox(s.label), closed) });
+    }
+    for (const p of m.paths) {
+      if (p.label !== undefined) items.push({ what: `path ${p.name}`, label: p.label, feature: (q) => pointToLine(q, p.points), gap: gapToLine(nameBox(p.label), p.points) });
+    }
+    if (m.gate !== undefined) {
+      const g = m.gate;
+      items.push({ what: `gate ${g.name}`, label: g.label, feature: (p) => Math.hypot(p[0] - g.x, p[1] - g.y), gap: pointToBox([g.x, g.y], nameBox(g.label)) });
+    }
+    for (const { what, label, feature, gap } of items) {
+      const corner = label.anchor === "start" && label.x === 8 && label.y > m.view.height;
+      if (label.leader === undefined) {
+        expect(corner, `${name}: ${what} is left in a list in the corner under the drawing`).toBe(false);
+        expect(gap, `${name}: ${what} is ${gap.toFixed(1)} px from its feature and has no leader line`).toBeLessThanOrEqual(24);
+        continue;
+      }
+      const line = label.leader;
+      expect(line.length, `${name}: the leader of ${what} has two points at least`).toBeGreaterThanOrEqual(2);
+      expect(feature(line[0] as Pt), `${name}: the leader of ${what} does not start on its feature`).toBeLessThanOrEqual(1.5);
+      expect(pointToBox(line[line.length - 1] as Pt, nameBox(label)), `${name}: the leader of ${what} does not end at its name`).toBeLessThanOrEqual(2);
+      for (let i = 0; i + 1 < line.length; i++) {
+        for (const p of m.plots) expect(walksInside(line[i] as Pt, line[i + 1] as Pt, plotBox(p), 1), `${name}: the leader of ${what} crosses plot ${p.code}`).toBe(false);
+      }
+      // The name that a leader leads to still keeps clear of everything, as in P19.1.
+    }
+  }
+
+  it.each(NAME_WIDTHS)("puts each name of Lantern Fold and Thimble Beds beside its feature or joins it by a leader line, at width %i", (width) => {
+    for (const make of [lanternFold, thimbleBeds]) {
+      const { m, inputs } = make();
+      const first = inputs[0] as SheetPlotInput;
+      const last = inputs[inputs.length - 1] as SheetPlotInput;
+      for (const selected of [first.plotId, last.plotId, undefined]) {
+        const sheet = buildSheet({ map: m, plots: inputs, ...(selected === undefined ? {} : { selectedPlotId: selected }) }, { width });
+        checkJoined(sheet, `${first.code} ${width} ${selected ?? "none"}`);
+        checkNames(sheet, `${first.code} ${width} ${selected ?? "none"}`);
+      }
+    }
+  });
+
+  it("puts each name of the two hub drawings, as the hub draws them at 272 px, beside its feature or joins it by a leader line", () => {
+    for (const id of ["lantern-fold", "thimble-beds"] as const) {
+      const built = fixture(id);
+      const state = built.state as unknown as { core: Parameters<typeof plotSummaryAt>[0]; map: MapState };
+      const plots = Object.values(state.core.plots).map((plot) => {
+        const summary = plotSummaryAt(state.core, plot.plotId, built.asOf);
+        return { plotId: plot.plotId, code: plot.code, mark: { ...(summary?.primary === undefined ? {} : { state: summary.primary }), needsChecking: summary?.needsChecking ?? false } };
+      });
+      const sheet = buildSheet({ map: state.map, plots }, { width: HUB_WIDTH, zoom: 1 });
+      checkJoined(sheet, `hub ${id}`);
+      checkNames(sheet, `hub ${id}`);
+      // The three names of Thimble Beds are on the drawing: the gate, the walk and the two rows.
+      if (id === "thimble-beds") {
+        expect(sheet.gate?.name).toBe("Main gate");
+        expect(sheet.paths.map((p) => p.label?.text)).toEqual(["Grass Walk"]);
+        expect(sheet.sections.map((s) => s.label.text).sort()).toEqual(["Shady Row", "Sunny Row"]);
+      }
+    }
+  });
+
+  it("writes no name in a list in the corner, at any width from 148 to 1200 px", () => {
+    for (const make of [lanternFold, thimbleBeds]) {
+      const { m, inputs } = make();
+      for (let width = 148; width <= 1200; width += 26) {
+        const sheet = buildSheet({ map: m, plots: inputs }, { width });
+        for (const { what, label } of names(sheet)) {
+          if (label.leader === undefined) expect(label.anchor === "start" && label.x === 8 && label.y > sheet.view.height, `${what} at ${width}`).toBe(false);
+        }
+      }
+    }
+  });
+
+  it("keeps a leader line off its own feature, and ends it within 1 px of the name", () => {
+    const { m, inputs } = thimbleBeds();
+    for (const width of [148, 180, 240, HUB_WIDTH]) {
+      const sheet = buildSheet({ map: m, plots: inputs }, { width });
+      const led = names(sheet).filter((n) => n.label.leader !== undefined);
+      expect(led.length, `leaders at ${width}`).toBeGreaterThan(0);
+      for (const { what, label } of led) {
+        const end = (label.leader as Pt[])[(label.leader as Pt[]).length - 1] as Pt;
+        expect(pointToBox(end, nameBox(label)), `${what} at ${width}`).toBeLessThanOrEqual(1.5);
+        expect(label.size).toBe(12);
+      }
+    }
+  });
+
+  /** 200 plots side by side: 20 columns and 10 rows of 40 by 30 units. */
+  function dense(): { m: MapState; inputs: SheetPlotInput[] } {
+    const shapes: Record<string, Point[]> = {};
+    const inputs: SheetPlotInput[] = [];
+    for (let i = 0; i < 200; i += 1) {
+      const x = (i % 20) * 40;
+      const y = Math.floor(i / 20) * 30;
+      shapes[`P${i}`] = rectOf(x, y, x + 40, y + 30);
+      inputs.push({ plotId: `P${i}`, code: `C${String(i + 1).padStart(3, "0")}`, mark: { needsChecking: true } });
+    }
+    return { m: map({ shapes }), inputs };
+  }
+
+  /** P19.10: the tab covers no plot. It touches its plot and has no leader, or it stands outside and has a leader from inside its plot to its edge. */
+  function checkDenseTab(m: SheetModel, selectedCode: string, name: string): void {
+    const tab = tabBox(m) as Box;
+    expect(tab, `${name}: a tab is drawn`).toBeDefined();
+    const chosen = m.plots.find((p) => p.code === selectedCode) as SheetModel["plots"][number];
+    const target = plotBox(chosen);
+    for (const p of m.plots) expect(apart(tab, plotBox(p), 0), `${name}: the tab lies over plot ${p.code}`).toBe(true);
+    expect(apart(tab, { x0: m.north.x - 14, y0: m.north.y - 18, x1: m.north.x + 14, y1: m.north.y + 12 }, 0), `${name}: the tab lies over the north arrow`).toBe(true);
+    expect(tab.x0, `${name}: tab left edge`).toBeGreaterThanOrEqual(0);
+    expect(tab.x1, `${name}: tab right edge`).toBeLessThanOrEqual(m.width);
+    expect(tab.y0, `${name}: tab top edge`).toBeGreaterThanOrEqual(0);
+    expect(tab.y1, `${name}: tab bottom edge`).toBeLessThanOrEqual(m.height);
+    const touching = Math.hypot(Math.max(0, tab.x0 - target.x1, target.x0 - tab.x1), Math.max(0, tab.y0 - target.y1, target.y0 - tab.y1)) < 0.01;
+    const leader = m.tab?.leader;
+    if (touching) {
+      expect(leader, `${name}: a tab that touches its plot has no leader`).toBeUndefined();
+      return;
+    }
+    expect(leader, `${name}: a tab away from its plot has a leader`).toBeDefined();
+    const line = leader as Pt[];
+    expect(pointToBox(line[0] as Pt, target), `${name}: the leader starts inside ${selectedCode}`).toBeLessThanOrEqual(0.01);
+    expect(pointToBox(line[line.length - 1] as Pt, tab), `${name}: the leader ends at the tab`).toBeLessThanOrEqual(1.5);
+  }
+
+  it.each([328, 360, 1120])("keeps the tab off every plot on a dense map of 200 plots, for each plot chosen, at width %i", (width) => {
+    const { m, inputs } = dense();
+    for (const input of inputs) {
+      checkDenseTab(buildSheet({ map: m, plots: inputs, selectedPlotId: input.plotId }, { width }), input.code, `${input.code} ${width}`);
+    }
+  });
+
+  it.each([328, 360, 1120])("gives a plot in the middle of a dense map a tab outside the block with a leader, at width %i", (width) => {
+    const { m, inputs } = dense();
+    // P94 is row 5, column 15: every side of it is another plot.
+    const sheet = buildSheet({ map: m, plots: inputs, selectedPlotId: "P94" }, { width });
+    expect(sheet.tab?.code).toBe("C095");
+    expect(sheet.tab?.leader).toBeDefined();
+    const tab = tabBox(sheet) as Box;
+    const everyPlot = sheet.plots.map(plotBox);
+    const top = Math.min(...everyPlot.map((b) => b.y0));
+    const bottom = Math.max(...everyPlot.map((b) => b.y1));
+    // Outside the block: wholly above the top of the plots or wholly below the bottom of them.
+    expect(tab.y1 <= top || tab.y0 >= bottom, `the tab ${tab.y0} to ${tab.y1} is outside the block ${top} to ${bottom}`).toBe(true);
+    checkDenseTab(sheet, "C095", `middle ${width}`);
+  });
+
+  it("gives a plot on the edge of a dense map a tab beside it, with no leader", () => {
+    const { m, inputs } = dense();
+    for (const id of ["P0", "P19", "P180"]) {
+      const sheet = buildSheet({ map: m, plots: inputs, selectedPlotId: id }, { width: 360 });
+      expect(sheet.tab?.leader, id).toBeUndefined();
+    }
+  });
+
+  it("gives the plot under the north arrow a tab outside the block, because the places beside it are taken or leave the sheet", () => {
+    // P199 is the top right plot. Above it lies the north arrow, to its right the edge of the sheet, to its left P198
+    // and below it P179. A hand count at 360 px found no free place beside it, so it is the one corner with a leader.
+    const { m, inputs } = dense();
+    const sheet = buildSheet({ map: m, plots: inputs, selectedPlotId: "P199" }, { width: 360 });
+    expect(sheet.tab?.leader).toBeDefined();
+    checkDenseTab(sheet, "C200", "top right 360");
   });
 });

@@ -393,3 +393,171 @@ test.describe("the map from paper", () => {
     await noViolations(page);
   });
 });
+
+// Task 18, P22: making 200 plots fits one screen and shows the result while the keeper types. Written in the run
+// that made it, and not run there (the machine was busy). The lead runs it at 360 by 640 and 1920 by 1080.
+test.describe("map setup shows the plots while the keeper types (P22)", () => {
+  const WIDE = 1024;
+
+  /** The width of 12 characters of body text at 16 px, read from the page, plus the padding and border of a field. */
+  const numberFieldLimit = (page: import("@playwright/test").Page) =>
+    page.evaluate(() => {
+      const probe = document.createElement("span");
+      probe.style.cssText = "position:absolute;visibility:hidden;width:12ch;font-size:16px";
+      document.body.append(probe);
+      const twelve = probe.getBoundingClientRect().width;
+      probe.remove();
+      // 8 px and 12 px of padding, and a 2 px border on each side, as register.css sets for a field.
+      return twelve + 2 * 12 + 2 * 2;
+    });
+
+  const NUMBER_FIELDS = ["First number", "Digits", "Rows", "Columns", "Plot width", "Plot height", "Start east", "Start north", "Row spacing", "Column spacing", "Rotation"];
+
+  test("says 200 plots to add, First C001 and Last C200 as soon as 10 and 20 are typed, and saves nothing", async ({ page }) => {
+    const requests = trackRequests(page);
+    await startRegister(page, "Paper Book");
+    await openMapEditor(page);
+
+    // Nothing typed: a prompt, no count and no drawing.
+    await expect(page.getByText("Enter rows and columns to see the plots.")).toBeVisible();
+    await expect(page.getByText(/plots to add/)).toHaveCount(0);
+
+    await page.getByLabel("Prefix", { exact: true }).fill("C");
+    await page.getByLabel("Rows", { exact: true }).fill("10");
+    await page.getByLabel("Columns", { exact: true }).fill("20");
+    // No button was pressed, and no size or position was typed.
+    await expect(page.getByText("200 plots to add")).toBeVisible();
+    await expect(page.getByText("First C001")).toBeVisible();
+    await expect(page.getByText("Last C200")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Apply layout" })).toHaveCount(0);
+    await expect(page.getByText("Map saved.")).toHaveCount(0);
+    await expect(page.getByText("Saved on this device.")).toHaveCount(0);
+
+    // The small drawing marks the first and the last code.
+    const drawing = page.getByRole("img", { name: "Rows of plots, with the first and the last code marked." });
+    await expect(drawing).toBeVisible();
+    await expect(drawing.locator("text", { hasText: "C001" })).toBeVisible();
+    await expect(drawing.locator("text", { hasText: "C200" })).toBeVisible();
+
+    // It follows each keystroke: fewer rows, a skipped place, a reversed row.
+    await page.getByLabel("Rows", { exact: true }).fill("5");
+    await expect(page.getByText("100 plots to add")).toBeVisible();
+    await expect(page.getByText("Last C100")).toBeVisible();
+    await page.getByLabel("Skip places", { exact: true }).fill("1/1");
+    await expect(page.getByText("99 plots to add")).toBeVisible();
+    await expect(page.getByText("First C002")).toBeVisible();
+    await expect(page.getByText("1 skipped")).toBeVisible();
+    await page.getByLabel("Skip places", { exact: true }).fill("5/20");
+    await expect(page.getByText("First C001")).toBeVisible();
+    await expect(page.getByText("Last C099")).toBeVisible();
+    // A skip that cannot be read gives the prompt again, with no error written.
+    await page.getByLabel("Skip places", { exact: true }).fill("9/9");
+    await expect(page.getByText("Enter rows and columns to see the plots.")).toBeVisible();
+    await expect(page.getByRole("alert")).toHaveCount(0);
+    await page.getByLabel("Skip places", { exact: true }).fill("");
+    await page.getByLabel("Rows", { exact: true }).fill("10");
+    await expect(page.getByText("200 plots to add")).toBeVisible();
+
+    // Typing wrote nothing: the plot list of this register is still empty.
+    await page.getByRole("link", { name: "Back to register" }).click();
+    await expect(page.getByRole("link", { name: "Add your map" })).toBeVisible();
+
+    // The words of the count, first and last are written once on the screen after "Preview plots" too.
+    await openMapEditor(page);
+    await fillGrid(page, BOOK_GRID);
+    await page.getByRole("button", { name: "Preview plots" }).click();
+    await expect(page.getByText("200 plots to add")).toHaveCount(1);
+    await expect(page.getByText("First C001")).toHaveCount(1);
+    await expect(page.getByText("Last C200")).toHaveCount(1);
+    await expect(page.getByRole("heading", { level: 2, name: "Review changes" })).toBeVisible();
+    await expect(requests.external).toEqual([]);
+  });
+
+  test("lays the form out for the size of the screen, with four groups and the preview beside or above", async ({ page }) => {
+    const viewport = page.viewportSize();
+    expect(viewport).not.toBeNull();
+    const { width, height } = viewport as { width: number; height: number };
+    await startRegister(page, "Paper Book");
+    await openMapEditor(page);
+
+    const groups = ["Name and codes", "Size", "Position", "Numbering"];
+    for (const name of groups) await expect(page.getByRole("group", { name, exact: true })).toBeVisible();
+    // The three choices of order sit inside the Numbering group, and its legend is not repeated.
+    const numbering = page.getByRole("group", { name: "Numbering", exact: true });
+    await expect(numbering.getByRole("group", { name: "Number order", exact: true })).toBeVisible();
+    await expect(numbering.getByRole("group", { name: "First row is", exact: true })).toBeVisible();
+    await expect(numbering.getByRole("group", { name: "First column is", exact: true })).toBeVisible();
+    await expect(page.getByRole("group", { name: "Numbering", exact: true })).toHaveCount(1);
+
+    await page.getByLabel("Prefix", { exact: true }).fill("C");
+    await page.getByLabel("Rows", { exact: true }).fill("10");
+    await page.getByLabel("Columns", { exact: true }).fill("20");
+    await expect(page.getByText("200 plots to add")).toBeVisible();
+
+    const panel = page.getByRole("region", { name: "Preview", exact: true });
+    await expect(panel).toBeVisible();
+    const button = page.getByRole("button", { name: "Preview plots" });
+    await page.evaluate(() => window.scrollTo(0, 0));
+    const buttonBox = await button.boundingBox();
+    const panelBox = await panel.boundingBox();
+    const sizeBox = await page.getByRole("group", { name: "Size", exact: true }).boundingBox();
+    const nameBox = await page.getByRole("group", { name: "Name and codes", exact: true }).boundingBox();
+    expect(buttonBox && panelBox && sizeBox && nameBox).toBeTruthy();
+    const b = buttonBox as NonNullable<typeof buttonBox>;
+    const p = panelBox as NonNullable<typeof panelBox>;
+    const s = sizeBox as NonNullable<typeof sizeBox>;
+    const n = nameBox as NonNullable<typeof nameBox>;
+
+    if (width >= WIDE) {
+      // One view: with the page at its top, the whole form and its button end inside the window.
+      expect(b.y + b.height, "the button ends inside the view").toBeLessThanOrEqual(height);
+      for (const name of groups) {
+        const g = await page.getByRole("group", { name, exact: true }).boundingBox();
+        expect((g?.y ?? 0) + (g?.height ?? 0), `${name} ends inside the view`).toBeLessThanOrEqual(height);
+      }
+      expect(p.y + p.height, "the preview ends inside the view").toBeLessThanOrEqual(height);
+      // The preview stands beside the groups, not under them, and its top is level with the first group.
+      expect(p.x, "the preview is right of the Size group").toBeGreaterThanOrEqual(s.x + s.width);
+      expect(Math.abs(p.y - n.y), "the preview starts level with the first group").toBeLessThanOrEqual(4);
+      expect(p.y, "the preview is above the button").toBeLessThan(b.y);
+      // Four named groups, each a row of short fields: the Size group holds its four fields side by side.
+      const rows = await page.getByLabel("Rows", { exact: true }).boundingBox();
+      const columns = await page.getByLabel("Columns", { exact: true }).boundingBox();
+      expect(Math.abs((rows?.y ?? 0) - (columns?.y ?? 99))).toBeLessThanOrEqual(1);
+    } else {
+      // One column: the groups, then the preview, then the button.
+      expect(n.y).toBeLessThan(s.y);
+      expect(s.y + s.height).toBeLessThanOrEqual(p.y + 1);
+      expect(p.y + p.height, "the preview is above the button").toBeLessThanOrEqual(b.y);
+      expect(p.x).toBeLessThanOrEqual(s.x + 1);
+    }
+
+    // Nothing scrolls sideways, and every layout rule holds with the preview shown.
+    const scroll = await page.evaluate(() => ({ scroll: document.documentElement.scrollWidth, client: document.documentElement.clientWidth }));
+    expect(scroll.scroll).toBeLessThanOrEqual(scroll.client);
+    await noViolations(page);
+  });
+
+  test("keeps every number field at most 12 characters wide", async ({ page }) => {
+    await startRegister(page, "Paper Book");
+    await openMapEditor(page);
+    const limit = await numberFieldLimit(page);
+    for (const label of NUMBER_FIELDS) {
+      const box = await page.getByLabel(label, { exact: true }).boundingBox();
+      expect(box, label).not.toBeNull();
+      expect(box?.width ?? 999, `${label} is ${box?.width} px wide, the limit is ${limit}`).toBeLessThanOrEqual(limit + 0.5);
+      expect(box?.height ?? 0, `${label} keeps a 44 px target`).toBeGreaterThanOrEqual(44);
+    }
+  });
+
+  test("keeps a preview error where it was: Preview plots still names the first invalid field and moves focus there", async ({ page }) => {
+    await startRegister(page, "Paper Book");
+    await openMapEditor(page);
+    await page.getByLabel("Rows", { exact: true }).fill("10");
+    await page.getByLabel("Columns", { exact: true }).fill("20");
+    await page.getByRole("button", { name: "Preview plots" }).click();
+    await expect(page.getByLabel("Section name", { exact: true })).toBeFocused();
+    await expect(page.getByRole("alert").first()).toBeVisible();
+    await expect(page.getByRole("button", { name: "Apply layout" })).toHaveCount(0);
+  });
+});

@@ -78,6 +78,18 @@ function hatchPath(box: { x: number; y: number; width: number; height: number })
   return strokes.join("");
 }
 
+/** The thin line from a name or a tab to what it names, with a small dot on the feature. Presentation attributes make it draw alone in print and on the hub. */
+function Leader({ line }: { line: readonly (readonly [number, number])[] | undefined }) {
+  if (line === undefined || line.length < 2) return null;
+  const first = line[0] as readonly [number, number];
+  return (
+    <g className="leader-group">
+      <polyline className="leader" points={pointsOf(line)} fill="none" stroke="currentColor" strokeWidth={1} />
+      <circle className="leader-dot" cx={first[0]} cy={first[1]} r={2.5} fill="currentColor" />
+    </g>
+  );
+}
+
 /** Draw a sheet model. The screen and the print page use this one drawing. */
 export function SheetSvg({
   model,
@@ -164,6 +176,10 @@ export function SheetSvg({
           )}
         </g>
       ))}
+      {model.sections.map((s) => (s.points === undefined ? null : <Leader key={`lead-${s.sectionId}`} line={s.label.leader} />))}
+      {model.paths.map((p) => (p.label === undefined ? null : <Leader key={`lead-${p.pathId}`} line={p.label.leader} />))}
+      {model.gate === undefined ? null : <Leader line={model.gate.label.leader} />}
+      {model.tab === undefined ? null : <Leader line={model.tab.leader} />}
       {model.gate === undefined ? null : (
         <g>
           <rect className="gate" x={model.gate.x - 6} y={model.gate.y - 6} width={12} height={12} />

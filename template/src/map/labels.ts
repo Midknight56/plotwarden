@@ -204,3 +204,84 @@ export function spotsAlongLine(points: readonly (readonly [number, number])[]): 
   }
   return spots;
 }
+
+// ---- Leader lines (spec 02, P19.8 to P19.10) -------------------------------------------------------------------------
+// A name that has no clear place beside its feature stands outside the block, and a thin line joins it to the feature.
+// These are the exact tests the sheet uses to choose a route. All of them are pure.
+
+export type Pt = [number, number];
+
+/** True when the open segment from `a` to `b` has a part inside the box (touching its edge does not count). */
+export function segmentHitsBox(a: Pt, b: Pt, box: Box): boolean {
+  let t0 = 0;
+  let t1 = 1;
+  const dx = b[0] - a[0];
+  const dy = b[1] - a[1];
+  const clip = (p: number, q: number): boolean => {
+    if (p === 0) return q > 0;
+    const r = q / p;
+    if (p < 0) {
+      if (r > t1) return false;
+      if (r > t0) t0 = r;
+    } else {
+      if (r < t0) return false;
+      if (r < t1) t1 = r;
+    }
+    return true;
+  };
+  return clip(-dx, a[0] - box.x0) && clip(dx, box.x1 - a[0]) && clip(-dy, a[1] - box.y0) && clip(dy, box.y1 - a[1]) && t0 < t1;
+}
+
+const orient = (a: Pt, b: Pt, c: Pt): number => (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]);
+
+/** True when two segments cross at one point that is inside both of them. */
+export function segmentsCross(a: Pt, b: Pt, c: Pt, d: Pt): boolean {
+  const o1 = orient(a, b, c);
+  const o2 = orient(a, b, d);
+  const o3 = orient(c, d, a);
+  const o4 = orient(c, d, b);
+  return o1 * o2 < 0 && o3 * o4 < 0;
+}
+
+/** How many times a polyline crosses another. */
+export function polylineCrossings(line: readonly Pt[], other: readonly (readonly [number, number])[]): number {
+  let count = 0;
+  for (let i = 0; i + 1 < line.length; i++) {
+    for (let j = 0; j + 1 < other.length; j++) {
+      if (segmentsCross(line[i] as Pt, line[i + 1] as Pt, other[j] as Pt, other[j + 1] as Pt)) count += 1;
+    }
+  }
+  return count;
+}
+
+export function polylineLength(line: readonly Pt[]): number {
+  let total = 0;
+  for (let i = 0; i + 1 < line.length; i++) total += Math.hypot((line[i + 1] as Pt)[0] - (line[i] as Pt)[0], (line[i + 1] as Pt)[1] - (line[i] as Pt)[1]);
+  return total;
+}
+
+/** True when a point is inside a box that is grown by `pad`. */
+export function pointInBox(p: Pt, box: Box, pad = 0): boolean {
+  return p[0] >= box.x0 - pad && p[0] <= box.x1 + pad && p[1] >= box.y0 - pad && p[1] <= box.y1 + pad;
+}
+
+/** How many sample points of a polyline, one every 3 px and not counting the first 6 px, lie within `clear` of a line. */
+export function samplesNear(line: readonly Pt[], other: readonly (readonly [number, number])[], clear: number): number {
+  if (other.length < 2) return 0;
+  let near = 0;
+  let walked = 0;
+  for (let i = 0; i + 1 < line.length; i++) {
+    const a = line[i] as Pt;
+    const b = line[i + 1] as Pt;
+    const length = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    const steps = Math.max(1, Math.ceil(length / 3));
+    for (let s = 0; s <= steps; s++) {
+      if (walked + (length * s) / steps < 6) continue;
+      const x = a[0] + ((b[0] - a[0]) * s) / steps;
+      const y = a[1] + ((b[1] - a[1]) * s) / steps;
+      if (distanceToLine({ x0: x, y0: y, x1: x, y1: y }, other) < clear) near += 1;
+    }
+    walked += length;
+  }
+  return near;
+}

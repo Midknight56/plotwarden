@@ -93,6 +93,13 @@ const EXACT: [string, string][] = [
   ["keepExistingPlot", "Keep existing plot"],
   ["moveLinkedPlot", "Move linked plot"],
   ["reviewChanges", "Review changes"],
+  ["groupNameCodes", "Name and codes"],
+  ["groupSize", "Size"],
+  ["groupPosition", "Position"],
+  ["groupNumbering", "Numbering"],
+  ["gridNumbering", "Number order"],
+  ["previewPrompt", "Enter rows and columns to see the plots."],
+  ["gridDrawingLabel", "Rows of plots, with the first and the last code marked."],
   ["cancel", "Cancel"],
   // Trace and revise
   ["referencePlan", "Reference plan"],

@@ -75,6 +75,31 @@ export interface RenameStep {
   to: string;
 }
 
+/** What the live preview of the form needs. No size, position or spacing. */
+export interface GridPreviewInput {
+  prefix: string;
+  firstNumber: number;
+  digits: number;
+  rows: number;
+  columns: number;
+  numbering: "across" | "down";
+  startRow: "north" | "south";
+  startColumn: "west" | "east";
+  reverseAlternate: boolean;
+  skip: { row: number; column: number }[];
+}
+
+export interface GridPreview {
+  /** Planned codes that no plot of the site holds. */
+  count: number;
+  /** The first and the last planned code in numbering order. Absent when every place is skipped. */
+  first?: string;
+  last?: string;
+  skipped: number;
+  /** Every place, for the small drawing. One based, counted from the start corner. */
+  cells: { row: number; column: number; number: number; skipped: boolean }[];
+}
+
 /** `prefix` then the number padded to `digits`. A longer number is written whole. */
 export function formatCode(prefix: string, n: number, digits: number): string {
   return `${prefix}${String(n).padStart(digits, "0")}`;
@@ -299,4 +324,40 @@ export function planRenumber(
     if (to !== plot.code) steps.push({ plotId: plot.plotId, from: plot.code, to });
   }
   return ok(steps);
+}
+
+/**
+ * The count, first code and last code of a form, while it is typed. Pure, and it needs no size or position.
+ * `taken` holds the normalised codes (current and prior) that the site already holds.
+ */
+export function previewGrid(input: GridPreviewInput, taken: ReadonlySet<string> = new Set()): Result<GridPreview> {
+  const size = checkGridSize(input.rows, input.columns, 0);
+  if (!size.ok) return size;
+  if (!Number.isInteger(input.firstNumber) || input.firstNumber < 0) return err("bad_value", { item: "firstNumber", value: input.firstNumber });
+  if (!Number.isInteger(input.digits) || input.digits < 0 || input.digits > 12) return err("bad_value", { item: "digits", value: input.digits });
+  for (const place of input.skip) {
+    if (place.row < 1 || place.row > input.rows || place.column < 1 || place.column > input.columns) {
+      return err("bad_skip", { item: `${place.row}/${place.column}` });
+    }
+  }
+  const skipKeys = new Set(input.skip.map((s) => `${s.row}/${s.column}`));
+  // The order is the one planGrid uses, so the two never differ.
+  const order = numberingOrder({ ...input, origin: [0, 0], cellWidth: 1, cellHeight: 1, columnSpacing: 0, rowSpacing: 0, rotation: 0 });
+  const preview: GridPreview = { count: 0, skipped: 0, cells: [] };
+  for (const [index, place] of order.entries()) {
+    const number = input.firstNumber + index;
+    const skipped = skipKeys.has(`${place.row}/${place.column}`);
+    preview.cells.push({ row: place.row, column: place.column, number, skipped });
+    if (skipped) {
+      preview.skipped += 1;
+      continue;
+    }
+    const code = formatCode(input.prefix, number, input.digits);
+    const length = checkText("plotCodeChars", code, { ref: code });
+    if (!length.ok) return length;
+    if (preview.first === undefined) preview.first = code;
+    preview.last = code;
+    if (!taken.has(normalizeCode(code))) preview.count += 1;
+  }
+  return ok(preview);
 }

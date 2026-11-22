@@ -2,7 +2,9 @@
 // Corner values are worked by hand from the grid rules in the design:
 // origin (100, 100), cells 40 wide and 30 high, no spacing.
 import { beforeAll, describe, expect, it } from "vitest";
-import { formatCode, gridCommand, parseSkips, planGrid, planRenumber } from "../../template/src/map/generate";
+import { formatCode, gridCommand, parseSkips, planGrid, planRenumber, previewGrid } from "../../template/src/map/generate";
+import type { GridPreviewInput } from "../../template/src/map/generate";
+import { normalizeCode } from "../../template/src/plot";
 import type { ExistingPlot, GridSpec } from "../../template/src/map/generate";
 
 const SECTION = { sectionId: "s1", name: "Paper" };
@@ -368,5 +370,138 @@ describe("bulk renumber", () => {
 
   it("refuses a new code longer than 24 characters", () => {
     expect(planRenumber([{ plotId: "a", code: "C1" }], { prefix: "A".repeat(23), firstNumber: 1, digits: 3 }).ok).toBe(false);
+  });
+});
+
+// P22 (task 18): the live preview of the form. Expected values are worked by hand from the numbering rules.
+// A 10 by 20 grid has 200 places numbered 1 to 200. With numbering across and no reversal, place 200 is row 10,
+// column 20. With reverse alternate rows, row 10 is a second line (an even row), so it runs east to west and
+// number 200 sits at column 1. With numbering down, column 20 is the 20th line (even): with reversal it runs
+// from the south up, so number 200 sits at row 1.
+describe("previewGrid (P22)", () => {
+  function input(patch: Partial<GridPreviewInput> = {}): GridPreviewInput {
+    return {
+      prefix: "C",
+      firstNumber: 1,
+      digits: 3,
+      rows: 10,
+      columns: 20,
+      numbering: "across",
+      startRow: "south",
+      startColumn: "west",
+      reverseAlternate: false,
+      skip: [],
+      ...patch,
+    };
+  }
+
+  function preview(patch: Partial<GridPreviewInput> = {}, taken?: ReadonlySet<string>) {
+    const result = previewGrid(input(patch), taken);
+    if (!result.ok) throw new Error(`previewGrid refused: ${JSON.stringify(result.error)}`);
+    return result.value;
+  }
+
+  it("gives 200, C001 and C200 for 10 by 20 with prefix C", () => {
+    const p = preview();
+    expect(p.count).toBe(200);
+    expect(p.first).toBe("C001");
+    expect(p.last).toBe("C200");
+    expect(p.skipped).toBe(0);
+    expect(p.cells).toHaveLength(200);
+  });
+
+  it("needs no size, position or spacing, so only the rows, columns and prefix make the three lines", () => {
+    const p = preview({ firstNumber: 1, digits: 3, rows: 10, columns: 20, prefix: "C" });
+    expect([p.count, p.first, p.last]).toEqual([200, "C001", "C200"]);
+  });
+
+  it("numbers down: 3 rows by 4 columns from 5 with 2 digits and prefix P gives P05 to P16", () => {
+    const p = preview({ prefix: "P", firstNumber: 5, digits: 2, rows: 3, columns: 4, numbering: "down" });
+    expect([p.count, p.first, p.last]).toEqual([12, "P05", "P16"]);
+    // Down: the first line is column 1, from the start row. The south start row is row 1, so row 1 column 1 is 5,
+    // row 2 column 1 is 6, row 3 column 1 is 7, and row 1 column 2 is 8.
+    const at = (row: number, column: number) => p.cells.find((c) => c.row === row && c.column === column)?.number;
+    expect([at(1, 1), at(2, 1), at(3, 1), at(1, 2)]).toEqual([5, 6, 7, 8]);
+  });
+
+  it("numbers across: row 1 column 20 is 20 and row 2 column 1 is 21", () => {
+    const p = preview();
+    const at = (row: number, column: number) => p.cells.find((c) => c.row === row && c.column === column)?.number;
+    expect([at(1, 1), at(1, 20), at(2, 1)]).toEqual([1, 20, 21]);
+  });
+
+  it("reverses the second row, so row 2 column 20 is 21 and row 2 column 1 is 40", () => {
+    const p = preview({ reverseAlternate: true });
+    const at = (row: number, column: number) => p.cells.find((c) => c.row === row && c.column === column)?.number;
+    expect([at(2, 20), at(2, 1), at(3, 1)]).toEqual([21, 40, 41]);
+    expect([p.count, p.first, p.last]).toEqual([200, "C001", "C200"]);
+  });
+
+  it("leaves the first number gap when the first place is skipped", () => {
+    const p = preview({ skip: [{ row: 1, column: 1 }] });
+    expect([p.count, p.first, p.last, p.skipped]).toEqual([199, "C002", "C200", 1]);
+  });
+
+  it("gives C199 as the last code when place 10/20 is skipped across", () => {
+    const p = preview({ skip: [{ row: 10, column: 20 }] });
+    expect([p.count, p.first, p.last]).toEqual([199, "C001", "C199"]);
+  });
+
+  it("keeps C200 as the last code when 10/1 is skipped across, and gives C199 when the rows reverse", () => {
+    const skip = [{ row: 10, column: 1 }];
+    expect(preview({ skip }).last).toBe("C200");
+    expect(preview({ skip, reverseAlternate: true }).last).toBe("C199");
+  });
+
+  it("follows numbering down: 10/20 gives C199, 1/20 keeps C200, and 1/20 with reversal gives C199", () => {
+    expect(preview({ numbering: "down", skip: [{ row: 10, column: 20 }] }).last).toBe("C199");
+    expect(preview({ numbering: "down", skip: [{ row: 1, column: 20 }] }).last).toBe("C200");
+    expect(preview({ numbering: "down", reverseAlternate: true, skip: [{ row: 1, column: 20 }] }).last).toBe("C199");
+  });
+
+  it("gives no first or last code when every place is skipped", () => {
+    const skips = parseSkips("*/*", 10, 20);
+    if (!skips.ok) throw new Error("skips refused");
+    const p = preview({ skip: skips.value });
+    expect(p.count).toBe(0);
+    expect(p.first).toBeUndefined();
+    expect(p.last).toBeUndefined();
+    expect(p.skipped).toBe(200);
+  });
+
+  it("counts only codes that no plot holds, by the normalised code, and still names the first and last planned code", () => {
+    const taken = new Set([normalizeCode("C001"), normalizeCode("c002"), normalizeCode("C200")]);
+    const p = preview({}, taken);
+    expect(p.count).toBe(197);
+    expect([p.first, p.last]).toEqual(["C001", "C200"]);
+  });
+
+  it("writes the whole number when it needs more digits", () => {
+    const p = preview({ firstNumber: 950, digits: 3, rows: 10, columns: 20 });
+    expect([p.first, p.last]).toEqual(["C950", "C1149"]);
+  });
+
+  it("refuses a size outside 1 to 100 and a code longer than 24 characters, naming the item", () => {
+    const zero = previewGrid(input({ rows: 0 }));
+    expect(zero.ok).toBe(false);
+    const wide = previewGrid(input({ columns: 101 }));
+    expect(wide.ok).toBe(false);
+    const long = previewGrid(input({ prefix: "A".repeat(22) }));
+    expect(long).toMatchObject({ ok: false, error: { code: "over_limit" } });
+  });
+
+  it("gives the same count, first and last as planGrid for the same form", () => {
+    const cases: { patch: Partial<GridSpec>; form: Partial<GridPreviewInput> }[] = [
+      { patch: {}, form: {} },
+      { patch: { numbering: "down" }, form: { numbering: "down" } },
+      { patch: { reverseAlternate: true, skip: [{ row: 10, column: 1 }] }, form: { reverseAlternate: true, skip: [{ row: 10, column: 1 }] } },
+      { patch: { numbering: "down", reverseAlternate: true, startRow: "north", startColumn: "east", skip: [{ row: 1, column: 20 }, { row: 5, column: 5 }] }, form: { numbering: "down", reverseAlternate: true, startRow: "north", startColumn: "east", skip: [{ row: 1, column: 20 }, { row: 5, column: 5 }] } },
+      { patch: { firstNumber: 40, digits: 2, prefix: "Q", rows: 4, columns: 7 }, form: { firstNumber: 40, digits: 2, prefix: "Q", rows: 4, columns: 7 } },
+    ];
+    for (const { patch, form } of cases) {
+      const planned = plan(patch);
+      const p = preview(form);
+      expect([p.count, p.first, p.last], JSON.stringify(form)).toEqual([planned.count, planned.first, planned.last]);
+    }
   });
 });

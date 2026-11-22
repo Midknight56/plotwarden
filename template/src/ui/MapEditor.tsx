@@ -1,7 +1,8 @@
 // Map setup: generate rows of plots, or bring in a finished layout. Nothing is written until Apply.
-import { useRef, useState } from "react";
-import { planGrid, parseSkips, gridCommand } from "../map/generate";
-import type { ExistingPlot, GridPlan, GridSpec } from "../map/generate";
+import { useMemo, useRef, useState } from "react";
+import { planGrid, parseSkips, gridCommand, previewGrid } from "../map/generate";
+import type { ExistingPlot, GridPlan, GridPreview, GridSpec } from "../map/generate";
+import { textWidth } from "../map/labels";
 import { buildLayoutFile, LAYOUT_FILENAME, layoutFileText, parseLayoutFile, planLayoutImport } from "../map/layoutFile";
 import type { LayoutConflict } from "../map/layoutFile";
 import type { LayoutCommand } from "../map/edit";
@@ -15,6 +16,7 @@ import { useRegister, useShell } from "./shellContext";
 import { DraftOffer, useScreenDraft } from "./screenDraft";
 import { Status } from "./Status";
 import type { StatusState } from "./Status";
+import { useElementWidth } from "./SiteMap";
 
 interface Fields {
   section: string;
@@ -103,6 +105,111 @@ interface Pending {
   skipped: number;
 }
 
+/**
+ * The count, first code and last code of the form as it stands, or nothing while a field that the codes need cannot
+ * be read. The size, position and spacing are not needed. It writes nothing and shows no error (P22.3, P22.4).
+ */
+function livePreview(f: Fields, taken: ReadonlySet<string>): GridPreview | undefined {
+  const firstNumber = whole(f.first);
+  const digits = whole(f.digits);
+  const rows = whole(f.rows);
+  const columns = whole(f.columns);
+  if (firstNumber === undefined || digits === undefined || rows === undefined || columns === undefined) return undefined;
+  if (firstNumber < 0 || digits < 0 || rows < 1 || columns < 1 || rows > 100 || columns > 100) return undefined;
+  const skips = parseSkips(f.skip, rows, columns);
+  if (!skips.ok) return undefined;
+  const result = previewGrid(
+    {
+      prefix: f.prefix.trim(),
+      firstNumber,
+      digits,
+      rows,
+      columns,
+      numbering: f.numbering,
+      startRow: f.startRow,
+      startColumn: f.startColumn,
+      reverseAlternate: f.reverse,
+      skip: skips.value,
+    },
+    taken,
+  );
+  return result.ok ? result.value : undefined;
+}
+
+const DRAWING_MAX_WIDTH = 280;
+const DRAWING_FRAME_HEIGHT = 120;
+const DRAWING_TOP = 24;
+const DRAWING_BOTTOM = 26;
+
+/** A small drawing of the rows, with the first and the last planned place marked and their codes written beside it. */
+function GridDrawing({ preview, fields, label, width }: { preview: GridPreview; fields: Fields; label: string; width: number }) {
+  const rows = Number(fields.rows.trim());
+  const columns = Number(fields.columns.trim());
+  const side = 8;
+  const drawWidth = Math.min(DRAWING_MAX_WIDTH, Math.max(120, width));
+  const cell = Math.min((drawWidth - 2 * side) / columns, DRAWING_FRAME_HEIGHT / rows);
+  const frameW = cell * columns;
+  const frameH = cell * rows;
+  const x0 = (drawWidth - frameW) / 2;
+  const y0 = DRAWING_TOP;
+  const height = y0 + frameH + DRAWING_BOTTOM;
+  const centre = (c: { row: number; column: number }): [number, number] => {
+    const across = fields.startColumn === "west" ? c.column - 1 : columns - c.column;
+    const down = fields.startRow === "north" ? c.row - 1 : rows - c.row;
+    return [x0 + (across + 0.5) * cell, y0 + (down + 0.5) * cell];
+  };
+  const placed = preview.cells.filter((c) => !c.skipped);
+  const first = placed[0];
+  const last = placed[placed.length - 1];
+  const mark = Math.max(6, Math.min(cell, 12));
+  const clampX = (x: number, text: string): number => {
+    const half = textWidth(text, 12) / 2;
+    return Math.max(2 + half, Math.min(x, drawWidth - 2 - half));
+  };
+  const lines: number[] = [];
+  if (cell >= 3) {
+    for (let r = 0; r <= rows; r += 1) lines.push(r);
+  }
+  return (
+    <svg className="grid-drawing" role="img" aria-label={label} width={drawWidth} height={height} viewBox={`0 0 ${drawWidth} ${height}`}>
+      <rect className="grid-frame" x={x0} y={y0} width={frameW} height={frameH} />
+      {cell >= 3
+        ? lines.map((r) => <line key={`r${r}`} className="grid-line" x1={x0} y1={y0 + r * cell} x2={x0 + frameW} y2={y0 + r * cell} />)
+        : null}
+      {cell >= 3
+        ? Array.from({ length: columns + 1 }, (_, c) => <line key={`c${c}`} className="grid-line" x1={x0 + c * cell} y1={y0} x2={x0 + c * cell} y2={y0 + frameH} />)
+        : null}
+      {cell >= 6
+        ? preview.cells
+            .filter((c) => c.skipped)
+            .map((c) => {
+              const [x, y] = centre(c);
+              const h = cell / 4;
+              return <path key={`s${c.row}/${c.column}`} className="grid-skip" d={`M${x - h} ${y - h}L${x + h} ${y + h}M${x - h} ${y + h}L${x + h} ${y - h}`} />;
+            })
+        : null}
+      {first === undefined || preview.first === undefined ? null : (
+        <g>
+          <line className="grid-guide" x1={centre(first)[0]} y1={y0 - 4} x2={centre(first)[0]} y2={centre(first)[1]} />
+          <rect className="grid-first" x={centre(first)[0] - mark / 2} y={centre(first)[1] - mark / 2} width={mark} height={mark} />
+          <text className="grid-code" x={clampX(centre(first)[0], preview.first)} y={y0 - 8} fontSize={12} textAnchor="middle">
+            {preview.first}
+          </text>
+        </g>
+      )}
+      {last === undefined || preview.last === undefined ? null : (
+        <g>
+          <line className="grid-guide" x1={centre(last)[0]} y1={y0 + frameH + 4} x2={centre(last)[0]} y2={centre(last)[1]} />
+          <rect className="grid-last" x={centre(last)[0] - mark / 2} y={centre(last)[1] - mark / 2} width={mark} height={mark} />
+          <text className="grid-code" x={clampX(centre(last)[0], preview.last)} y={y0 + frameH + 20} fontSize={12} textAnchor="middle">
+            {preview.last}
+          </text>
+        </g>
+      )}
+    </svg>
+  );
+}
+
 export function MapEditor() {
   const { t, newId } = useShell();
   const open = useRegister();
@@ -120,6 +227,18 @@ export function MapEditor() {
   const form = useRef<HTMLFormElement>(null);
   const opId = useRef<string | undefined>(undefined);
   const gridParts = useRef<{ plan: GridPlan; section: { sectionId: string; name: string } } | undefined>(undefined);
+  const drawingHolder = useRef<HTMLDivElement>(null);
+  const drawingWidth = useElementWidth(drawingHolder, DRAWING_MAX_WIDTH);
+  // Every code the site holds, current or prior, so the preview counts only the plots that would be new (P22.3).
+  const taken = useMemo(() => {
+    const codes = new Set<string>();
+    for (const p of Object.values(open.state.core.plots)) {
+      codes.add(normalizeCode(p.code));
+      for (const prior of p.priorCodes) codes.add(normalizeCode(prior));
+    }
+    return codes;
+  }, [open.state.core.plots]);
+  const live = useMemo(() => livePreview(fields, taken), [fields, taken]);
 
   const set = <K extends FieldKey>(key: K, value: Fields[K]) => {
     setFields((f) => ({ ...f, [key]: value }));
@@ -348,96 +467,115 @@ export function MapEditor() {
       <DraftOffer draft={draft} onResume={(saved) => setFields(fieldsFromText(saved))} />
       {added !== undefined ? <Notice tone="good">{t("plotsAdded", { count: added })}</Notice> : null}
 
-      <section className="stack" aria-label={t("tracingHeading")}>
-        <h2>{t("tracingHeading")}</h2>
-        <ul className="actions plain">
-          <li>
-            <ButtonLink href={`${base}/map/trace?target=section`}>{t("traceSection")}</ButtonLink>
-          </li>
-          <li>
-            <ButtonLink href={`${base}/map/trace?target=plot`}>{t("tracePlot")}</ButtonLink>
-          </li>
-          <li>
-            <ButtonLink href={`${base}/map/trace?target=path`}>{t("addPath")}</ButtonLink>
-          </li>
-          <li>
-            <ButtonLink href={`${base}/map/trace?target=gate`}>{t("addGate")}</ButtonLink>
-          </li>
-        </ul>
-      </section>
-
       <form
         ref={form}
-        className="stack"
+        className="map-setup"
         noValidate
         onSubmit={(event) => {
           event.preventDefault();
           preview();
         }}
       >
-        <h2>{t("generateRows")}</h2>
-        <TextField label={t("sectionName")} value={fields.section} onChange={(v) => set("section", v)} error={err("section")} autoComplete="off" />
-        <TextField label={t("prefix")} value={fields.prefix} onChange={(v) => set("prefix", v)} autoComplete="off" />
-        <TextField label={t("firstNumber")} value={fields.first} onChange={(v) => set("first", v)} error={err("first")} inputMode="numeric" />
-        <TextField label={t("digits")} value={fields.digits} onChange={(v) => set("digits", v)} error={err("digits")} inputMode="numeric" />
-        <TextField label={t("rows")} value={fields.rows} onChange={(v) => set("rows", v)} error={err("rows")} inputMode="numeric" />
-        <TextField label={t("columns")} value={fields.columns} onChange={(v) => set("columns", v)} error={err("columns")} inputMode="numeric" />
-        <TextField label={t("plotWidth")} value={fields.width} onChange={(v) => set("width", v)} error={err("width")} inputMode="numeric" />
-        <TextField label={t("plotHeight")} value={fields.height} onChange={(v) => set("height", v)} error={err("height")} inputMode="numeric" />
-        <TextField label={t("startEast")} value={fields.east} onChange={(v) => set("east", v)} error={err("east")} inputMode="numeric" />
-        <TextField label={t("startNorth")} value={fields.north} onChange={(v) => set("north", v)} error={err("north")} inputMode="numeric" />
-        <TextField label={t("rowSpacing")} value={fields.rowSpacing} onChange={(v) => set("rowSpacing", v)} error={err("rowSpacing")} inputMode="numeric" />
-        <TextField label={t("columnSpacing")} value={fields.columnSpacing} onChange={(v) => set("columnSpacing", v)} error={err("columnSpacing")} inputMode="numeric" />
-        <TextField label={t("rotation")} value={fields.rotation} onChange={(v) => set("rotation", v)} error={err("rotation")} inputMode="numeric" />
-        <TextField label={t("skipPlaces")} value={fields.skip} onChange={(v) => set("skip", v)} error={err("skip")} hint={t("skipHint")} autoComplete="off" />
-        <RadioGroup
-          legend={t("gridNumbering")}
-          name="numbering"
-          value={fields.numbering}
-          onChange={(v) => set("numbering", v === "down" ? "down" : "across")}
-          options={[
-            { value: "across", label: t("numberAcross") },
-            { value: "down", label: t("numberDown") },
-          ]}
-        />
-        <RadioGroup
-          legend={t("firstRowIs")}
-          name="startRow"
-          value={fields.startRow}
-          onChange={(v) => set("startRow", v === "south" ? "south" : "north")}
-          options={[
-            { value: "north", label: t("northSide") },
-            { value: "south", label: t("southSide") },
-          ]}
-        />
-        <RadioGroup
-          legend={t("firstColumnIs")}
-          name="startColumn"
-          value={fields.startColumn}
-          onChange={(v) => set("startColumn", v === "east" ? "east" : "west")}
-          options={[
-            { value: "west", label: t("westSide") },
-            { value: "east", label: t("eastSide") },
-          ]}
-        />
-        <CheckField label={t("reverseAlternate")} checked={fields.reverse} onChange={(v) => set("reverse", v)} />
-        <div className="actions">
+        <h2 className="map-setup-title">{t("generateRows")}</h2>
+        <div className="map-groups">
+          <fieldset className="group">
+            <legend>{t("groupNameCodes")}</legend>
+            <div className="field-row">
+              <TextField className="medium" label={t("sectionName")} value={fields.section} onChange={(v) => set("section", v)} error={err("section")} autoComplete="off" />
+              <TextField className="narrow" label={t("prefix")} value={fields.prefix} onChange={(v) => set("prefix", v)} autoComplete="off" />
+              <TextField className="number" label={t("firstNumber")} value={fields.first} onChange={(v) => set("first", v)} error={err("first")} inputMode="numeric" />
+              <TextField className="number" label={t("digits")} value={fields.digits} onChange={(v) => set("digits", v)} error={err("digits")} inputMode="numeric" />
+            </div>
+          </fieldset>
+          <fieldset className="group">
+            <legend>{t("groupSize")}</legend>
+            <div className="field-row">
+              <TextField className="number" label={t("rows")} value={fields.rows} onChange={(v) => set("rows", v)} error={err("rows")} inputMode="numeric" />
+              <TextField className="number" label={t("columns")} value={fields.columns} onChange={(v) => set("columns", v)} error={err("columns")} inputMode="numeric" />
+              <TextField className="number" label={t("plotWidth")} value={fields.width} onChange={(v) => set("width", v)} error={err("width")} inputMode="numeric" />
+              <TextField className="number" label={t("plotHeight")} value={fields.height} onChange={(v) => set("height", v)} error={err("height")} inputMode="numeric" />
+            </div>
+          </fieldset>
+          <fieldset className="group">
+            <legend>{t("groupPosition")}</legend>
+            <div className="field-row">
+              <TextField className="number" label={t("startEast")} value={fields.east} onChange={(v) => set("east", v)} error={err("east")} inputMode="numeric" />
+              <TextField className="number" label={t("startNorth")} value={fields.north} onChange={(v) => set("north", v)} error={err("north")} inputMode="numeric" />
+              <TextField className="number" label={t("rowSpacing")} value={fields.rowSpacing} onChange={(v) => set("rowSpacing", v)} error={err("rowSpacing")} inputMode="numeric" />
+              <TextField className="number" label={t("columnSpacing")} value={fields.columnSpacing} onChange={(v) => set("columnSpacing", v)} error={err("columnSpacing")} inputMode="numeric" />
+              <TextField className="number" label={t("rotation")} value={fields.rotation} onChange={(v) => set("rotation", v)} error={err("rotation")} inputMode="numeric" />
+            </div>
+          </fieldset>
+          <fieldset className="group">
+            <legend>{t("groupNumbering")}</legend>
+            <div className="field-row choices">
+              <RadioGroup
+                legend={t("gridNumbering")}
+                name="numbering"
+                value={fields.numbering}
+                onChange={(v) => set("numbering", v === "down" ? "down" : "across")}
+                options={[
+                  { value: "across", label: t("numberAcross") },
+                  { value: "down", label: t("numberDown") },
+                ]}
+              />
+              <RadioGroup
+                legend={t("firstRowIs")}
+                name="startRow"
+                value={fields.startRow}
+                onChange={(v) => set("startRow", v === "south" ? "south" : "north")}
+                options={[
+                  { value: "north", label: t("northSide") },
+                  { value: "south", label: t("southSide") },
+                ]}
+              />
+              <RadioGroup
+                legend={t("firstColumnIs")}
+                name="startColumn"
+                value={fields.startColumn}
+                onChange={(v) => set("startColumn", v === "east" ? "east" : "west")}
+                options={[
+                  { value: "west", label: t("westSide") },
+                  { value: "east", label: t("eastSide") },
+                ]}
+              />
+            </div>
+            <div className="field-row">
+              <CheckField label={t("reverseAlternate")} checked={fields.reverse} onChange={(v) => set("reverse", v)} />
+              <TextField className="wide" label={t("skipPlaces")} value={fields.skip} onChange={(v) => set("skip", v)} error={err("skip")} hint={t("skipHint")} autoComplete="off" />
+            </div>
+          </fieldset>
+        </div>
+        <section className="preview-panel stack" aria-labelledby="grid-preview-heading">
+          <h2 id="grid-preview-heading">{t("previewHeading")}</h2>
+          {live === undefined ? (
+            <p>{t("previewPrompt")}</p>
+          ) : (
+            <>
+              <p>{t("plotsToAdd", { count: live.count })}</p>
+              {live.first === undefined ? null : <p>{t("firstCode", { code: live.first })}</p>}
+              {live.last === undefined ? null : <p>{t("lastCode", { code: live.last })}</p>}
+              {live.skipped === 0 ? null : <p>{t("skippedCount", { count: live.skipped })}</p>}
+            </>
+          )}
+          <div ref={drawingHolder} className="grid-drawing-holder">
+            {live === undefined ? null : <GridDrawing preview={live} fields={fields} label={t("gridDrawingLabel")} width={drawingWidth} />}
+          </div>
+        </section>
+        <div className="actions map-setup-actions">
           <button type="submit" className="button primary">
             {t("previewPlots")}
           </button>
         </div>
       </form>
-
       {pending === undefined && !none ? null : (
-        <section className="stack" aria-label={t("previewHeading")}>
-          <h2>{t("previewHeading")}</h2>
+        <section className="stack" aria-label={t("reviewChanges")}>
+          <h2>{t("reviewChanges")}</h2>
           {none ? <p>{t("nothingNewToAdd")}</p> : null}
           {pending === undefined ? null : (
             <>
-              {pending.count > 0 ? <p>{t("plotsToAdd", { count: pending.count })}</p> : null}
-              {pending.first === undefined ? null : <p>{t("firstCode", { code: pending.first })}</p>}
-              {pending.last === undefined ? null : <p>{t("lastCode", { code: pending.last })}</p>}
-              {pending.skipped === 0 ? null : <p>{t("skippedCount", { count: pending.skipped })}</p>}
+              {/* A grid shows its count, first code and last code in the live preview, once. A layout file has no form to read them from. */}
+              {pending.source === "file" && pending.count > 0 ? <p>{t("plotsToAdd", { count: pending.count })}</p> : null}
               {pending.retained === 0 ? null : <p>{t("retainedCount", { count: pending.retained })}</p>}
               {pending.collisions.length === 0 ? null : (
                 <div className="stack">
@@ -507,6 +645,24 @@ export function MapEditor() {
         <div className="actions">
           <Button onClick={downloadLayout}>{t("downloadSiteLayout")}</Button>
         </div>
+      </section>
+
+      <section className="stack" aria-label={t("tracingHeading")}>
+        <h2>{t("tracingHeading")}</h2>
+        <ul className="actions plain">
+          <li>
+            <ButtonLink href={`${base}/map/trace?target=section`}>{t("traceSection")}</ButtonLink>
+          </li>
+          <li>
+            <ButtonLink href={`${base}/map/trace?target=plot`}>{t("tracePlot")}</ButtonLink>
+          </li>
+          <li>
+            <ButtonLink href={`${base}/map/trace?target=path`}>{t("addPath")}</ButtonLink>
+          </li>
+          <li>
+            <ButtonLink href={`${base}/map/trace?target=gate`}>{t("addGate")}</ButtonLink>
+          </li>
+        </ul>
       </section>
 
       <section className="stack" aria-label={t("sectionsHeading")}>

@@ -198,14 +198,15 @@ test.describe("the 200 record book on the Churchyard Register", () => {
     await expect(card).toBeVisible();
     await expect(page.locator(".summary-line")).toContainText("C117 · Paper · Taken");
     await expect(map).toContainText("C117");
-    // Every rule of the layout measure holds, with one known exception on this dense map: 200 plots stand side by side,
-    // so the code tab of a plot in the middle of the grid has no free place and lies over its neighbours (the cheapest
-    // place wins, spec 02 H19). The measure still reports it, so it is filtered here by name and listed as not settled
-    // in `.kiro/specs/03-churchyard/tasks.md`. Before the search, the same map passes with no exception.
+    // Every rule of the layout measure holds, with no exception. On this dense map 200 plots stand side by side, so the
+    // code tab of a plot in the middle of the grid has no free place beside it. It stands outside the block, above or
+    // below the plots, and a thin leader line joins it to its plot (spec 02, P19.10, task 18). Before task 18 this step
+    // filtered the one rule `label_on_plot` by name, because the tab lay over its neighbours.
     const found = await measureLayout(page);
-    const unsettled = found.filter((v) => v.rule === "label_on_plot" && v.element === 'sheet label "tab"');
-    const rest = found.filter((v) => !unsettled.includes(v));
-    expect(rest, JSON.stringify(rest, null, 1)).toEqual([]);
+    expect(found, JSON.stringify(found, null, 1)).toEqual([]);
+    // The tab and its leader are drawn: the plot is in the middle, so the leader line is there.
+    await expect(map.locator("polyline.leader")).toHaveCount(1);
+    await expect(map.locator("text.tab-text")).toHaveText("C117");
 
     // The record that was placed last is found at its new plot.
     await search(page, "Sorrel Larkspur");
