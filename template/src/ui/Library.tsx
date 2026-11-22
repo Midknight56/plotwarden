@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { localDateOf } from "../calendar";
 import { readEvents, listSites, saveNewSite } from "../data/transaction";
+import { restartWalkthrough, seedWalkthrough } from "../data/seed";
 import { createSite, mintId, siteLibrary } from "../site";
 import type { Currency, Site } from "../types";
 import { ButtonLink, Button, Notice, SelectField, TextField, focusFirstInvalid } from "./controls";
@@ -15,8 +16,29 @@ interface Card {
 }
 
 export function Library() {
-  const { app, db, t, register, route, sitesVersion } = useShell();
+  const { app, db, t, register, route, sitesVersion, navigate, newId, bumpSites } = useShell();
   const [cards, setCards] = useState<Card[] | null>(null);
+  const [practice, setPractice] = useState<"idle" | "busy" | "failed">("idle");
+  const guard = useRef(false);
+
+  /** Open or restart the practice register. A second press while one is running does nothing. */
+  const openPractice = async (restart: boolean) => {
+    const walkthrough = app.walkthrough;
+    if (walkthrough === undefined || guard.current) return;
+    guard.current = true;
+    setPractice("busy");
+    const made = restart
+      ? await restartWalkthrough(db, register as never, walkthrough, { newId })
+      : await seedWalkthrough(db, register as never, walkthrough, { newId });
+    guard.current = false;
+    if (!made.ok) {
+      setPractice("failed");
+      return;
+    }
+    setPractice("idle");
+    bumpSites();
+    navigate(`/r/${made.value.id}${restart ? "?restarted=1" : ""}`);
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -45,12 +67,28 @@ export function Library() {
       <h1>{app.title}</h1>
       <p>{app.adapter.labels["libraryPrompt"] ?? t("libraryPrompt")}</p>
       {route.query.get("removed") === "1" ? <Notice tone="good">{t("registerRemoved")}</Notice> : null}
+      {practice === "failed" ? <Notice tone="error">{t("storageUnavailable")}</Notice> : null}
       <div className="actions">
-        <ButtonLink href="#/new" primary>
+        {app.walkthrough === undefined ? null : (
+          <Button primary={cards !== null && cards.length === 0} onClick={() => void openPractice(false)} disabled={practice === "busy"}>
+            {t("openWalkthrough")}
+          </Button>
+        )}
+        <ButtonLink href="#/new" primary={app.walkthrough === undefined || (cards !== null && cards.length > 0)}>
           {t("startRegister")}
         </ButtonLink>
         <ButtonLink href="#/restore">{t("restoreBackup")}</ButtonLink>
       </div>
+      {app.walkthrough === undefined ? null : (
+        <div className="stack">
+          <p>{t("walkthroughNote")}</p>
+          <div className="actions">
+            <Button onClick={() => void openPractice(true)} disabled={practice === "busy"}>
+              {t("restartWalkthrough")}
+            </Button>
+          </div>
+        </div>
+      )}
       <h2>{t("myRegisters")}</h2>
       {cards === null ? (
         <p role="status">{t("openingRegister")}</p>

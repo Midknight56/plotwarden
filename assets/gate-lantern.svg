@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 128" width="96" height="128" role="img" aria-hidden="true" focusable="false">
+  <title>Gate lantern cutout</title>
+  <defs>
+    <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#F8DC8E" stop-opacity="0.95"/>
+      <stop offset="1" stop-color="#F2C96B" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <circle cx="44" cy="66" r="38" fill="url(#glow)"/>
+  <path d="M96 8H58C47 8 40 13 40 22" fill="none" stroke="#FAF5E9" stroke-width="5" stroke-linecap="round"/>
+  <path d="M40 22V34" stroke="#FAF5E9" stroke-width="3" stroke-dasharray="4 2"/>
+  <circle cx="44" cy="28" r="4" fill="#FAF5E9"/>
+  <path d="M32 44L38 34H50L56 44Z" fill="#FAF5E9"/>
+  <path d="M44 24V16" stroke="#FAF5E9" stroke-width="3" stroke-linecap="round"/>
+  <path d="M30 100L33 44H55L58 100Z" fill="#FAF5E9"/>
+  <path d="M35 52H53L55 96H33Z" fill="#F2C96B"/>
+  <path d="M44 52V96M34 74H54" stroke="#232A5C" stroke-width="2"/>
+  <path d="M27 100H61L58 108H30Z" fill="#FAF5E9"/>
+  <path d="M44 108V120" stroke="#FAF5E9" stroke-width="3" stroke-linecap="round"/>
+  <path d="M33 44L30 100M55 44L58 100" fill="none" stroke="#232A5C" stroke-width="1.5" opacity="0.5"/>
+</svg>

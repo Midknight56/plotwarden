@@ -16,6 +16,8 @@ export interface ImportOptions {
   dateOrder?: DateOrder;
   /** Mints the IDs of new records, once, at staging. */
   newId: () => Uuid;
+  /** The stored events, so a correction can name the event it corrects. */
+  events?: readonly StoredEvent[];
 }
 
 export interface ExistingRow {

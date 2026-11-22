@@ -129,6 +129,12 @@ function RegisterFrame({ siteId, children }: { siteId: string; children: ReactNo
   const [stale, setStale] = useState(false);
   const latest = useRef<Loaded | null>(null);
 
+  /** A practice register is read at its own fixed date. Every other register is read today. */
+  const todayFor = useCallback(
+    (site: Site) => (site.workspace === "walkthrough" && app.walkthrough !== undefined ? app.walkthrough.today : localDateOf(writeTime(shell.now()), site.zone)),
+    [app, shell],
+  );
+
   const load = useCallback(async () => {
     const row = (await readSite(db, siteId)) as SiteRow | undefined;
     if (row === undefined) {
@@ -170,7 +176,7 @@ function RegisterFrame({ siteId, children }: { siteId: string; children: ReactNo
     async (commands: AnyCommand[], options?: RunOptions): Promise<RunOutcome> => {
       const current = latest.current;
       if (current === null) return { ok: false, code: "site_missing" };
-      const on = options?.on ?? localDateOf(writeTime(shell.now()), current.site.zone);
+      const on = options?.on ?? todayFor(current.site);
       let state = current.state;
       const drafts: DraftEvent[] = [];
       for (const command of commands) {
@@ -197,7 +203,7 @@ function RegisterFrame({ siteId, children }: { siteId: string; children: ReactNo
       await load();
       return { ok: true, revision: result.revision, replayed: result.replayed };
     },
-    [app, db, load, register, shell, siteId],
+    [app, db, load, register, shell, siteId, todayFor],
   );
 
   const value = useMemo<OpenRegister | null>(() => {
@@ -207,12 +213,12 @@ function RegisterFrame({ siteId, children }: { siteId: string; children: ReactNo
       state: loaded.state,
       events: loaded.events,
       revision: loaded.revision,
-      today: localDateOf(writeTime(shell.now()), loaded.site.zone),
+      today: todayFor(loaded.site),
       stale,
       run,
       reload: load,
     };
-  }, [loaded, stale, run, load, shell]);
+  }, [loaded, stale, run, load, shell, todayFor]);
 
   if (loaded === "missing") return <NotFound />;
   if (loaded === "failed") {
@@ -240,10 +246,11 @@ function RegisterFrame({ siteId, children }: { siteId: string; children: ReactNo
 }
 
 function RegisterRoutes({ route }: { route: Route }) {
+  const { app } = useShell();
   const [, , area, arg] = route.path;
   switch (area) {
     case undefined:
-      return <RegisterHome />;
+      return app.home === undefined ? <RegisterHome /> : <app.home />;
     case "map":
       if (arg === undefined) return <SiteMap />;
       if (arg === "edit") return <MapEditor />;
@@ -267,8 +274,10 @@ function RegisterRoutes({ route }: { route: Route }) {
       return <SettingsScreen />;
     case "help":
       return <Help section="help" />;
-    default:
-      return <NotFound />;
+    default: {
+      const Own = app.routes?.[area];
+      return Own === undefined ? <NotFound /> : <Own {...(arg === undefined ? {} : { arg })} />;
+    }
   }
 }
 

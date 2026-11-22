@@ -47,6 +47,8 @@ export interface ThemeTokens {
   ink: string;
   paper: string;
   accent?: string;
+  /** How a plot is drawn on the sheet. Absent means the footprint as it is. */
+  plotShape?: "arch";
 }
 
 /** Design D3. An app supplies one of these. */

@@ -1,10 +1,12 @@
 // What the screens share: the app, the database, the route, the words and the open register.
 // No JSX here, so every screen can import it without a loop.
+import type { ComponentType } from "react";
 import { createContext, useContext } from "react";
 import type { Register, RegisterAdapter } from "../adapter";
 import type { BaseState } from "../base";
 import type { LocalDate } from "../calendar";
 import type { SheetImporter } from "../data/importBatch";
+import type { Walkthrough } from "../data/seed";
 import type { BlobWrite, CommitError } from "../data/transaction";
 import type { StoredEvent } from "../events";
 import type { SearchName } from "../search";
@@ -22,6 +24,14 @@ export interface RegisterApp<S extends BaseState, C extends { type: string }, E 
   now?: () => Date;
   newId?: () => string;
   version?: string;
+  /** Replaces the shared register home. */
+  home?: ComponentType;
+  /** Screens under a register, by the area of the route: `#/r/<site>/<area>/<arg>`. */
+  routes?: Readonly<Record<string, ComponentType<{ arg?: string }>>>;
+  /** Shown inside the plot screen, under its heading. */
+  plotExtras?: ComponentType<{ plotId: string }>;
+  /** A practice register that opens in its own workspace. */
+  walkthrough?: Walkthrough;
 }
 
 export type AnyApp = RegisterApp<BaseState, { type: string }, { type: string }>;

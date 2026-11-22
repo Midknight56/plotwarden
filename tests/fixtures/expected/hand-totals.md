@@ -213,3 +213,86 @@ Check: 199 + 1 = 200.
 | Unchecked plots | 2 | 1 (C200) |
 | Taken plots | 198 | 199 |
 | `placement_missing` issues | 2 | 1 |
+
+## 4 Lantern Fold fixture detail and period reports (added for spec 03, worked before the churchyard code)
+
+Section 1 fixes the totals. This section fixes the dates and names the fixture needs for the period report and the family file. Everything here is **Assumed** and invented. The fixed review date is 2026-04-20.
+
+### 4.1 Burials
+
+| Source ref | Place | Name | Date as recorded |
+|---|---|---|---|
+| LF-01 | Y01 | Edda Thornwick | 1871 (year only) |
+| LF-04 | Y04 | Harlan Mossgrove | March 1902 (month and year) |
+| LF-05 | Y05 | Name unknown | Date unknown |
+| LF-06 | Y06 | Ysolde Fenwick | 14 November 1938 |
+| LF-07A | Y07 space 1 | Mirel Quillmoss | 2 June 1889 |
+| LF-07B | Y07 space 2 | Torin Pellwick | 1921 (year only) |
+| LF-09 | Y09 | Corwin Aldersey | 1955 (year only) |
+| LF-H1 | no place | Perrin Gladwyn | 1790 (year only) |
+
+Check: 7 placed (LF-01, 04, 05, 06, 07A, 07B, 09) plus 1 unplaced = 8, as in section 1.
+
+Reservations: Y02 held by Odalys Fennimore from 2025-09-01 (LF-R1). Y11 held by Wren Ashgrove from 2026-02-14 (LF-R2). Y12 is unusable from 2026-01-05. Y03, Y08 and Y10 are confirmed empty.
+
+### 4.2 Period A: from 1880-01-01 through 1950-12-31
+
+| Source ref | Days it could mean | Result |
+|---|---|---|
+| LF-01 | 1871-01-01 to 1871-12-31, all before 1880 | outside |
+| LF-04 | 1902-03-01 to 1902-03-31 | inside |
+| LF-05 | any day | Date incomplete |
+| LF-06 | 1938-11-14 | inside |
+| LF-07A | 1889-06-02 | inside |
+| LF-07B | 1921-01-01 to 1921-12-31 | inside |
+| LF-09 | 1955, all after 1950 | outside |
+| LF-H1 | 1790, all before 1880 | outside |
+
+Burials inside 4. Date incomplete 1. Outside 3. Check: 4 + 1 + 3 = 8.
+
+### 4.3 Period B: from 1938-06-01 through 1955-06-30
+
+| Source ref | Days it could mean | Result |
+|---|---|---|
+| LF-01 | 1871 | outside |
+| LF-04 | March 1902 | outside |
+| LF-05 | any day | Date incomplete |
+| LF-06 | 1938-11-14 | inside |
+| LF-07A | 1889-06-02 | outside |
+| LF-07B | 1921 | outside |
+| LF-09 | 1955-01-01 to 1955-12-31, only the first half is inside | Date incomplete |
+| LF-H1 | 1790 | outside |
+
+Burials inside 1. Date incomplete 2. Outside 5. Check: 1 + 2 + 5 = 8.
+
+### 4.4 Reservations in a period
+
+| Period | Made | Released |
+|---|---|---|
+| 2025-09-01 to 2026-02-28 | 2 (LF-R1 on 2025-09-01, LF-R2 on 2026-02-14) | 0 |
+| 2026-01-01 to 2026-12-31 | 1 (LF-R2) | 0 |
+| 2025-01-01 to 2025-08-31 | 0 | 0 |
+
+For 2025-01-01 to 2025-08-31 every dated burial is outside, so burials inside 0 and outside 7. LF-05 has no date at all, so Date incomplete is 1. Check: 0 + 1 + 7 = 8. Because LF-05 is always incomplete, "No events in this period." appears for Lantern Fold never, and is checked on an empty register: inside 0, incomplete 0, made 0, released 0.
+
+If Y02 is released on 2026-03-01 with a reason, then period 2026-03-01 to 2026-03-31 has made 0 and released 1, and at 2026-04-20 the states are Free 4 (Y02, Y03, Y08, Y10), Reserved 1 (Y11), Taken 6, Unusable 1. Check: 4 + 1 + 6 + 1 = 12.
+
+### 4.5 Family file
+
+| Item | Value |
+|---|---|
+| Burials in the file with the name approved and the year not approved | 1, name "Mirel Quillmoss", no year |
+| The same with the year approved | 1, year 1889 |
+| Plots in the file | 1 (Y07) |
+| Paths in the file | 1 (Yew Walk) |
+| Gate name in the file | "Lantern Gate" |
+| Rows withheld in the private preview | 1 (Torin Pellwick at Y07) |
+| After the name is corrected to "Mirel Quillmoss Jr", burials in the file | 0 until approved again, preview says "Review again" |
+
+### 4.6 Placing the unplaced burial
+
+Place LF-H1 (Perrin Gladwyn) in Y03. Then: Taken plots 7, Free plots 2 (Y08, Y10), unplaced burials 0, `placement_missing` issues 0, `reading_unclear` issues 1. Check: 7 + 2 + 2 reserved + 1 unusable = 12.
+
+### 4.7 Part occupied plot
+
+A plot Z01 with two spaces and one burial in space 1: summary "Taken · 1 of 2 spaces used", available spaces 1, free plots 0. The report line reads "Z01, space 2 is free. Space 1 holds a burial."

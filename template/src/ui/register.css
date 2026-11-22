@@ -492,6 +492,11 @@ svg.sheet text {
   stroke-width: 3;
 }
 
+/* A second line along a path. An app that wants a gravel walk turns it on. */
+.sheet .path-line {
+  display: none;
+}
+
 .sheet .gate {
   fill: var(--paper);
   stroke: var(--ink);

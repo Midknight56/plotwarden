@@ -30,7 +30,10 @@ const STATUS_WORD: Record<string, string> = {
 
 /** The words of one cell problem: "Check Source ref in row 117. Enter a value." */
 export function cellErrorText(t: ReturnType<typeof useShell>["t"], error: CellError, label?: string): string {
-  return t("checkField", { field: label ?? error.heading, n: error.row, reason: reasonText(error.code) });
+  // An app may give its own words for a code with a `reason_{code}` entry in its catalog.
+  const key = `reason_${error.code}`;
+  const own = t(key);
+  return t("checkField", { field: label ?? error.heading, n: error.row, reason: own === key ? reasonText(error.code) : own });
 }
 
 function FixForm({ row, fields, onSave }: { row: Row; fields: readonly FieldDef[]; onSave: (cells: Record<string, string>) => void }) {

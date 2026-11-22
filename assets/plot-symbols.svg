@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 28 28" width="28" height="28" role="img" focusable="false">
+  <title>The five marks of the map key</title>
+  <symbol id="symbol-free" viewBox="0 0 28 28">
+    <title>Free</title>
+    <path d="M5 25V13a9 9 0 0 1 18 0V25Z" fill="none" stroke="#22252C" stroke-width="2"/>
+  </symbol>
+  <symbol id="symbol-reserved" viewBox="0 0 28 28">
+    <title>Reserved</title>
+    <path d="M5 25V13a9 9 0 0 1 18 0V25Z" fill="none" stroke="#22252C" stroke-width="2"/>
+    <path d="M8 22L20 10" stroke="#22252C" stroke-width="2"/>
+  </symbol>
+  <symbol id="symbol-taken" viewBox="0 0 28 28">
+    <title>Taken</title>
+    <path d="M5 25V13a9 9 0 0 1 18 0V25Z" fill="none" stroke="#22252C" stroke-width="2"/>
+    <circle cx="14" cy="17" r="4.5" fill="#22252C"/>
+  </symbol>
+  <symbol id="symbol-unusable" viewBox="0 0 28 28">
+    <title>Unusable</title>
+    <path d="M5 25V13a9 9 0 0 1 18 0V25Z" fill="none" stroke="#22252C" stroke-width="2"/>
+    <path d="M9 12L19 22M19 12L9 22" stroke="#22252C" stroke-width="2"/>
+  </symbol>
+  <symbol id="symbol-checking" viewBox="0 0 28 28">
+    <title>Needs checking</title>
+    <path d="M5 25V13a9 9 0 0 1 18 0V25Z" fill="none" stroke="#22252C" stroke-width="2" stroke-dasharray="2 3"/>
+  </symbol>
+</svg>

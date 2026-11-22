@@ -523,6 +523,9 @@ export const SCREEN_COPY: Readonly<Record<string, string>> = {
   aboutTitle: "About Plotwarden",
   aboutInvented:
     "Lantern Fold and Thimble Beds are invented places. The people, plots, inscriptions and payments in their walkthroughs were made for this project.",
+  openWalkthrough: "Open the practice register",
+  restartWalkthrough: "Restart walkthrough",
+  walkthroughNote: "A practice register is separate from your own registers.",
   recordsStay: "Records stay in this browser until you choose to export them.",
   backupVisitorNote: "A backup includes private records. A visitor copy includes only the fields you approve.",
   releaseVersion: "Version {version}",

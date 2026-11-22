@@ -210,12 +210,12 @@ export async function focusRingContrast(page: Page, selector: string): Promise<n
 }
 
 /** Every request that is not for the host's own files. There must be none. */
-export function trackRequests(page: Page): { external: string[]; all: string[] } {
+export function trackRequests(page: Page, origin = "http://127.0.0.1:4175/"): { external: string[]; all: string[] } {
   const log = { external: [] as string[], all: [] as string[] };
   page.on("request", (request) => {
     const url = request.url();
     log.all.push(url);
-    if (!url.startsWith("http://127.0.0.1:4175/") && !url.startsWith("blob:") && !url.startsWith("data:") && !url.startsWith("about:")) {
+    if (!url.startsWith(origin) && !url.startsWith("blob:") && !url.startsWith("data:") && !url.startsWith("about:")) {
       log.external.push(url);
     }
   });

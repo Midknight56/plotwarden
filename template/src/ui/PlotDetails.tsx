@@ -41,6 +41,15 @@ const EVENT_KEYS: Readonly<Record<string, string>> = {
   photo_removed: "eventPhotoRemoved",
 };
 
+/** The words for an event. An app may name its own events with `event_{type}` in its catalog. */
+function eventWord(t: (key: string) => string, type: string): string {
+  const shared = EVENT_KEYS[type];
+  if (shared !== undefined) return t(shared);
+  const own = `event_${type}`;
+  const text = t(own);
+  return text === own ? t("eventOther") : text;
+}
+
 function PhotoImage({ blobId, alt }: { blobId: string; alt: string }) {
   const open = useRegister();
   const url = useBlobUrl(open.site.id, blobId);
@@ -50,7 +59,7 @@ function PhotoImage({ blobId, alt }: { blobId: string; alt: string }) {
 type Action = "check" | "free" | "unusable" | "return";
 
 export function PlotDetails({ plotId }: { plotId: string }) {
-  const { t, newId } = useShell();
+  const { t, newId, app } = useShell();
   const open = useRegister();
   const base = `#/r/${open.site.id}`;
   const plot = open.state.core.plots[plotId];
@@ -291,6 +300,7 @@ export function PlotDetails({ plotId }: { plotId: string }) {
         <ButtonLink href={base}>{t("backToRegister")}</ButtonLink>
         <ButtonLink href={`${base}/map?plot=${plotId}`}>{t("showOnMap")}</ButtonLink>
       </div>
+      {app.plotExtras === undefined ? null : <app.plotExtras plotId={plotId} />}
       <Status status={status} actions={{ tryAgain: () => setStatus({ phase: "idle" }), keepEditing: () => setStatus({ phase: "idle" }), openLatest: () => void open.reload() }} />
       {needsCorrection ? (
         <div className="actions">
@@ -403,7 +413,7 @@ export function PlotDetails({ plotId }: { plotId: string }) {
               const ref = h.sourceRef === undefined ? "" : ` · ${t("sourceOf", { ref: h.sourceRef })}`;
               return (
                 <li key={h.eventId}>
-                  {t("historyLine", { what: t(EVENT_KEYS[event?.type ?? ""] ?? "eventOther"), date: when })}
+                  {t("historyLine", { what: eventWord(t, event?.type ?? ""), date: when })}
                   {ref}
                 </li>
               );

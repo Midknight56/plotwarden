@@ -18,12 +18,22 @@ export default defineConfig({
     { name: "phone", use: { viewport: { width: 360, height: 640 } } },
     { name: "desktop", use: { viewport: { width: 1920, height: 1080 } } },
   ],
-  webServer: {
-    command: "npm run host:build && npm run host:preview",
-    url: "http://127.0.0.1:4175/",
-    reuseExistingServer: false,
-    timeout: 180_000,
-    stdout: "ignore",
-    stderr: "pipe",
-  },
+  webServer: [
+    {
+      command: "npm run host:build && npm run host:preview",
+      url: "http://127.0.0.1:4175/",
+      reuseExistingServer: false,
+      timeout: 180_000,
+      stdout: "ignore",
+      stderr: "pipe",
+    },
+    {
+      command: "npm run church:build && npm run church:preview",
+      url: "http://127.0.0.1:4176/",
+      reuseExistingServer: false,
+      timeout: 180_000,
+      stdout: "ignore",
+      stderr: "pipe",
+    },
+  ],
 });

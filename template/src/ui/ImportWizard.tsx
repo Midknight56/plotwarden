@@ -138,7 +138,7 @@ export function ImportWizard() {
         siteId: open.site.id,
         baseRevision: open.revision,
         effectiveOn: open.today,
-        options: { newId, ...(dateOrder === undefined ? {} : { dateOrder }) },
+        options: { newId, events: open.events, ...(dateOrder === undefined ? {} : { dateOrder }) },
       }),
     );
   };

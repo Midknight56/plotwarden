@@ -22,7 +22,10 @@
     "test:oracle": "vitest run tests/oracle",
     "test:browser": "playwright test --pass-with-no-tests",
     "check:imports": "node scripts/check-imports.mjs",
-    "check:changed": "npm run typecheck && node scripts/check-imports.mjs && node scripts/changed-tests.mjs --git"
+    "check:changed": "npm run typecheck && node scripts/check-imports.mjs && node scripts/changed-tests.mjs --git",
+    "church:build": "vite build --config apps/churchyard-register/vite.config.ts",
+    "church:preview": "vite preview --config apps/churchyard-register/vite.config.ts",
+    "church:dev": "vite --config apps/churchyard-register/vite.config.ts"
   },
   "dependencies": {
     "fflate": "0.8.3",

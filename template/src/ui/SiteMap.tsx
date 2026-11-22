@@ -51,6 +51,18 @@ function Mark({ plot }: { plot: SheetPlot }) {
 
 const pointsOf = (points: readonly (readonly [number, number])[]): string => points.map((p) => `${p[0]},${p[1]}`).join(" ");
 
+/** A small arch inside a box: a rounded top and a flat base. The box is kept at least 6 px wide. */
+function archPath(box: { x: number; y: number; width: number; height: number }, grow = 0): string {
+  const w = Math.max(6, box.width) + grow * 2;
+  const x0 = box.x - (w - box.width) / 2;
+  const x1 = x0 + w;
+  const y0 = box.y - grow;
+  const y1 = box.y + box.height + grow;
+  const r = Math.min(w / 2, (y1 - y0) * 0.6);
+  const f = (n: number): number => Math.round(n * 10) / 10;
+  return `M${f(x0)} ${f(y1)}L${f(x0)} ${f(y0 + r)}A${f(w / 2)} ${f(r)} 0 0 1 ${f(x1)} ${f(y0 + r)}L${f(x1)} ${f(y1)}Z`;
+}
+
 /** Draw a sheet model. The screen and the print page use this one drawing. */
 export function SheetSvg({
   model,
@@ -66,6 +78,8 @@ export function SheetSvg({
   extra?: ReactNode;
 }) {
   const { north } = model;
+  const { app } = useShell();
+  const arched = app.adapter.theme.plotShape === "arch";
   return (
     <svg
       className="sheet"
@@ -98,6 +112,7 @@ export function SheetSvg({
       {model.paths.map((p) => (
         <g key={p.pathId}>
           <polyline className="path" points={pointsOf(p.points)} />
+          <polyline className="path-line" points={pointsOf(p.points)} />
           <text className="label" x={p.label.x} y={p.label.y} fontSize={p.label.size} textAnchor={p.label.anchor}>
             {p.label.text}
           </text>
@@ -105,9 +120,20 @@ export function SheetSvg({
       ))}
       {model.plots.map((plot) => (
         <g key={plot.plotId}>
-          {plot.selected ? <polygon className="plot-selected-outer" points={pointsOf(plot.points)} /> : null}
-          <polygon className={`plot${plot.mark.needsChecking ? " checking" : ""}${plot.selected ? " selected" : ""}`} points={pointsOf(plot.points)} />
-          {plot.selected ? <polygon className="plot-selected-inner" points={pointsOf(plot.points)} /> : null}
+          {arched ? (
+            <>
+              {plot.selected ? <path className="plot-selected-outer" d={archPath(plot.box, 3)} /> : null}
+              <path className={`plot${plot.mark.needsChecking ? " checking" : ""}${plot.selected ? " selected" : ""}`} d={archPath(plot.box)} />
+              {plot.box.width >= 22 ? <path className="arch-inner" d={archPath({ x: plot.box.x + 3, y: plot.box.y + 3, width: plot.box.width - 6, height: plot.box.height - 4 })} /> : null}
+              {plot.selected ? <path className="plot-selected-inner" d={archPath(plot.box, 1)} /> : null}
+            </>
+          ) : (
+            <>
+              {plot.selected ? <polygon className="plot-selected-outer" points={pointsOf(plot.points)} /> : null}
+              <polygon className={`plot${plot.mark.needsChecking ? " checking" : ""}${plot.selected ? " selected" : ""}`} points={pointsOf(plot.points)} />
+              {plot.selected ? <polygon className="plot-selected-inner" points={pointsOf(plot.points)} /> : null}
+            </>
+          )}
           <Mark plot={plot} />
           {plot.label === undefined || (plot.selected && model.tab !== undefined) ? null : (
             <text className="label" x={plot.label.x} y={plot.label.y} fontSize={plot.label.size} textAnchor={plot.label.anchor}>
@@ -150,14 +176,19 @@ const KEY_WORDS: Record<KeyState, { word: string; shape: string }> = {
 
 /** A small drawing of each mark, beside its word. The word always appears with its symbol. */
 export function MapKey() {
-  const { t } = useShell();
+  const { t, app } = useShell();
+  const arched = app.adapter.theme.plotShape === "arch";
   const order: KeyState[] = ["free", "reserved", "taken", "unusable", "checking"];
   return (
     <ul className="map-key plain" aria-label={t("mapKey")}>
       {order.map((state) => (
         <li key={state}>
           <svg width="28" height="28" aria-hidden="true" className="swatch">
-            <rect className={`plot${state === "checking" ? " checking" : ""}`} x="3" y="3" width="22" height="22" />
+            {arched ? (
+              <path className={`plot${state === "checking" ? " checking" : ""}`} d={archPath({ x: 5, y: 3, width: 18, height: 22 })} />
+            ) : (
+              <rect className={`plot${state === "checking" ? " checking" : ""}`} x="3" y="3" width="22" height="22" />
+            )}
             {state === "reserved" ? <line className="mark" x1="7" y1="21" x2="21" y2="7" /> : null}
             {state === "taken" ? <circle className="mark solid" cx="14" cy="14" r="5" /> : null}
             {state === "unusable" ? (
