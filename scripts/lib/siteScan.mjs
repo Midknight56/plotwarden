@@ -30,6 +30,14 @@ const BILLING_PATHS = /\/api\/(?:checkout|billing|payments?|charges?|subscri[a-z
 
 const sealedVisitorFile = (rel) => /^visitor\/(?:family\/family-map-|seeker\/availability-map-)[^/]*\.html$/.test(rel);
 
+/** A policy with its spaces and its trailing semicolons made plain, so two copies of one policy compare equal. */
+const normalPolicy = (policy) =>
+  policy
+    .split(";")
+    .map((part) => part.trim().replace(/\s+/g, " "))
+    .filter((part) => part !== "")
+    .join("; ");
+
 /** The `src` and `href` values that a page loads: scripts, styles, images, icons. Links to other pages are not loads. */
 function loadsOf(html) {
   const loads = [];
@@ -134,6 +142,18 @@ export function siteProblems(root, siteDir) {
         } else {
           for (const problem of policyProblems(policies[0])) add(rel, "csp", `${path}: ${problem}`);
         }
+      }
+    }
+
+    // The 404 page holds its own policy, because the live host matches each rule on the address that was asked and so
+    // never gives this page the rule for `/404.html`. It is the site policy of `/` without `frame-ancestors`.
+    if (fileSet.has("404.html")) {
+      const site = valuesOf("/", rules, "Content-Security-Policy")[0];
+      const tags = [...readFileSync(join(siteDir, "404.html"), "utf8").matchAll(/<meta http-equiv="Content-Security-Policy" content="([^"]*)"/g)].map((m) => normalPolicy(m[1]));
+      if (site !== undefined) {
+        const wanted = normalPolicy(site.split(";").filter((part) => !/^\s*frame-ancestors(\s|$)/.test(part)).join(";"));
+        if (tags.length !== 1) add("404.html", "csp", `the 404 page holds ${tags.length} policy tags, and it needs one, because the host does not send it the rule for /404.html`);
+        else if (tags[0] !== wanted) add("404.html", "csp", "the 404 page's policy tag is not the site policy of / without frame-ancestors");
       }
     }
   }

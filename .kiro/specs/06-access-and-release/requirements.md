@@ -119,6 +119,7 @@ Tests: T36 (`tests/unit/release.test.ts`), browser `release.spec.ts`. Implements
 3. When an app build is scanned, it shall hold no billing endpoint and no remote asset.
 4. When `assemble:site` runs, it shall read `release/desk-preview.lock.json` and never write it. The lock is written by `lock:desk` alone, and not replaced without `--replace`.
 5. When a page of the built site is checked, exactly one content policy shall match it, and it shall name no outside origin and allow no inline or eval script. The two sample visitor files shall carry the policy that they hold for themselves.
+   - The 404 page shall hold its own content policy in a `<meta http-equiv="Content-Security-Policy">` tag, with the rules of the site policy except `frame-ancestors`, which a meta tag cannot set. It shall do so wherever the host sends it, with no help from the host. `check:release` shall fail a built 404 page whose tag is missing or differs.
 6. When the site is checked, it shall hold fewer than 500 files and under 5 MiB, and no folder or file that a host would run.
 7. When the release is checked, every route of both registers shall have a phone proof picture, every page of the site a phone and a desktop picture, and each shall be a picture as wide as its viewport.
 8. When the repository is checked, public text shall hold no dash between words, no name of a model or its maker, no word about entering or winning and no local path, every shipped package shall have its row in the notices, and every link of the README and `docs/` shall resolve.
@@ -184,6 +185,7 @@ Tests: `tests/browser/release.spec.ts`, both sizes. Built in task 08.
 4. When the headers of each page are read, there shall be one policy, with no outside origin.
 5. When the service worker is in charge, its cache shall hold exactly the files of its manifest. Every page shall open with the network off, a register started offline shall be kept, and the cache shall hold nothing from it. When a new version is published, the page shall say so and both caches shall stay while the old page is open.
 6. When the site is served by a host that redirects `x/index.html` to `x/` and `name.html` to `name` (the preview on port 4182, which answers as the live host does), the first three checks of item 5 (one worker and its cache, every page with the network off, a register worked with the network off) shall pass there as they do on the plain preview (port 4174). The update check of item 5 runs on the plain preview only.
+7. When an address that is not a page is asked on either preview (ports 4174 and 4182), the answer shall be the 404 page with the status 404, and the page shall carry a content policy that refuses an inline script, whether the host sent it as a header or the page holds it. The live host matches each `_headers` rule on the address that was asked, not on the file that it sends, so the rule for `/404.html` never reaches the 404 page there. The preview on port 4182 matches the same way, so the 404 page must hold its policy itself.
 
 ## Z18 The public docs
 

@@ -15,6 +15,7 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { compileBanned, loadBannedWords, scanText } from "../../scripts/lib/publicText.mjs";
+import { parseHeaders, parsePolicy, policyProblems, valuesOf } from "../../scripts/lib/headers.mjs";
 import { paperBookCsv } from "../../scripts/lib/paperBook.mjs";
 import { buildVisitorFiles } from "../../tools/site/visitorFiles";
 
@@ -735,6 +736,34 @@ function writeProofs(root: string, skip: string[] = []): string[] {
   return written;
 }
 
+/** The site policy of the `/` rule, and the same without `frame-ancestors`, which a meta tag cannot set. */
+const SITE_POLICY = valuesOf("/", parseHeaders(REAL_HEADERS), "Content-Security-Policy")[0] as string;
+const META_POLICY = SITE_POLICY.split(";")
+  .map((part) => part.trim())
+  .filter((part) => part !== "" && !part.startsWith("frame-ancestors"))
+  .join("; ");
+const POLICY_TAG = /<meta http-equiv="Content-Security-Policy" content="([^"]*)"\s*\/?>/g;
+
+describe("T36 the 404 page holds its own content policy", () => {
+  // The live host matches each `_headers` rule on the address that was asked, so the `/404.html` rule never reaches this page there.
+  it("has one meta policy, equal to the site policy without frame-ancestors", () => {
+    expect(SITE_POLICY).toContain("frame-ancestors 'none'");
+    const tags = [...REAL_404.matchAll(POLICY_TAG)];
+    expect(tags.length).toBe(1);
+    expect(tags[0]?.[1]).toBe(META_POLICY);
+    expect(META_POLICY).not.toContain("frame-ancestors");
+  });
+
+  it("holds the tag in the head before any style or script, and refuses inline script", () => {
+    const head = REAL_404.slice(0, REAL_404.indexOf("</head>"));
+    expect(head.indexOf('http-equiv="Content-Security-Policy"')).toBeGreaterThan(-1);
+    expect(head.indexOf('http-equiv="Content-Security-Policy"')).toBeLessThan(head.indexOf("<style"));
+    expect(REAL_404).not.toMatch(/<script/i);
+    expect(parsePolicy(META_POLICY)["script-src"]).toEqual(["'self'"]);
+    expect(policyProblems(META_POLICY)).toEqual([]);
+  });
+});
+
 describe("T36 check:release", () => {
   /** An assembled tree that passes. Each case then breaks one thing. */
   function assembled(): { root: string; out: string; desk: Desk } {
@@ -888,6 +917,36 @@ describe("T36 check:release", () => {
       const result = check(root);
       expect(result.code).toBe(1);
       expect(result.err).toContain("_headers");
+    });
+
+    describe("the 404 page's own policy", () => {
+      const with404 = (edit: (html: string) => string): Ran => {
+        const { root, out } = assembled();
+        put(out, "404.html", edit(read(out, "404.html")));
+        restamp(out);
+        return check(root);
+      };
+
+      it("fails a 404 page that has no policy tag", () => {
+        const result = with404((html) => html.replace(/\s*<meta http-equiv="Content-Security-Policy"[^>]*>/, ""));
+        expect(result.code).toBe(1);
+        expect(result.err).toContain("404.html");
+        expect(result.err).toContain("csp");
+      });
+
+      it("fails a 404 page whose tag is not the site policy without frame-ancestors", () => {
+        for (const edit of [
+          (html: string) => html.replace("script-src 'self'", "script-src 'self' 'unsafe-inline'"),
+          (html: string) => html.replace("connect-src 'self'", "connect-src 'self' https://api.example.net"),
+          (html: string) => html.replace("object-src 'none'; ", ""),
+          (html: string) => html.replace(/(content="[^"]*)"/, "$1; frame-ancestors 'none'\""),
+        ]) {
+          const result = with404(edit);
+          expect(result.code).toBe(1);
+          expect(result.err).toContain("404.html");
+          expect(result.err).toContain("csp");
+        }
+      });
     });
   });
 

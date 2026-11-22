@@ -8,12 +8,15 @@
 //
 // Preview (`npm run preview`, port 4174). Serves `dist/site` the way the static host does: a folder with no
 // slash goes to the folder, a folder is served by its index.html, an unknown path is the 404 page with status
-// 404, and each path gets the headers that `_headers` gives it (rules joined as the host joins them).
+// 404, and each path gets the headers that `_headers` gives it (rules joined as the host joins them). The 404 page
+// gets the headers of `/404.html`.
 // It starts only when `dist/site` has been assembled.
 //
 // Pretty preview (`npm run preview:pretty`, port 4182, `PLOTWARDEN_HOST_STYLE=pretty`). The same, and also as the
 // live host (https://plotwarden.pages.dev) answers a page: `x/index.html` goes to `x/` and `name.html` goes to
-// `name` with a 308, and the clean address answers 200 with the file.
+// `name` with a 308, and the clean address answers 200 with the file. Every rule of `_headers` is matched on the
+// address that was asked, as the live host does, so the 404 page there gets the rules of that address and holds its
+// own content policy in a meta tag.
 import { existsSync, readFileSync, statSync } from "node:fs";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { extname, join, normalize, sep } from "node:path";
@@ -72,7 +75,10 @@ export function answerPreview(options: { siteDir: string; rules: Rules; style: H
   const answer = (status: number, headers: [string, string][], body: Buffer | string): Answer => ({ status, headers, body });
   const notFound = (): Answer => {
     const page = join(siteDir, "404.html");
-    return answer(404, [["Content-Type", TYPES[".html"] as string], ...headersOf("/404.html")], existsSync(page) ? readFileSync(page) : "Page not found");
+    // The live host matches `_headers` on the address that was asked, so in the pretty style the 404 page gets the rules of that
+    // address and not those of `/404.html`. The plain style serves the file at its own address, as it always did.
+    const headers = options.style === "pretty" ? headersOf(path) : headersOf("/404.html");
+    return answer(404, [["Content-Type", TYPES[".html"] as string], ...headers], existsSync(page) ? readFileSync(page) : "Page not found");
   };
   if (path.includes("\0") || path.split("/").includes("..") || options.method !== "GET" && options.method !== "HEAD") return notFound();
 

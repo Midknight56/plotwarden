@@ -160,17 +160,46 @@ describe("T31 both styles are the same for everything else", () => {
       const plain = ask("plain", path);
       const pretty = ask("pretty", path);
       expect(pretty.status).toBe(plain.status);
-      expect(pretty.headers).toEqual(plain.headers);
+      // The headers of an answer that is not the 404 page are the same. The 404 page is matched on the request path in the pretty
+      // style, as on the live host, so its headers are told apart in the next test.
+      if (plain.status !== 404) expect(pretty.headers).toEqual(plain.headers);
       expect(bodyOf(pretty)).toBe(bodyOf(plain));
     },
   );
 
-  it("never serves the headers file as a page, and gives the 404 page its own headers and the status 404", () => {
+  it("never serves the headers file as a page, and answers it with the 404 page and the status 404", () => {
     for (const style of ["plain", "pretty"] as const) {
       const hidden = ask(style, "/_headers");
       expect(hidden.status).toBe(404);
       expect(bodyOf(hidden)).toBe("not found page");
-      expect(header(hidden, "content-security-policy")).toBe("default-src 'self'");
+    }
+  });
+});
+
+describe("T31 the 404 page gets the headers of the address that was asked, in the pretty style", () => {
+  // The live host matches each rule on the address that was asked (curl, 22 Nov 2026), so the `/404.html` rule never reaches an unknown address.
+  it("gives an unknown address only the rules that match that address", () => {
+    for (const path of ["/nowhere", "/no-such-page", "/_headers", "/churchyard/index"]) {
+      const answer = ask("pretty", path);
+      expect(answer.status, path).toBe(404);
+      expect(bodyOf(answer), path).toBe("not found page");
+      expect(header(answer, "content-security-policy"), path).toBeUndefined();
+      expect(header(answer, "x-content-type-options"), path).toBe("nosniff");
+    }
+  });
+
+  it("gives an unknown address under a rule that ends in a star the policy of that rule", () => {
+    const answer = ask("pretty", "/visitor/family/family-map-nope");
+    expect(answer.status).toBe(404);
+    expect(header(answer, "content-security-policy")).toBe("default-src 'none'");
+  });
+
+  it("keeps the headers of /404.html for the 404 page in the plain style", () => {
+    for (const path of ["/nowhere", "/_headers", "/404"]) {
+      const answer = ask("plain", path);
+      expect(answer.status, path).toBe(404);
+      expect(header(answer, "content-security-policy"), path).toBe("default-src 'self'");
+      expect(header(answer, "x-content-type-options"), path).toBe("nosniff");
     }
   });
 });

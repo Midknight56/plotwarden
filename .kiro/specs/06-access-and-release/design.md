@@ -317,7 +317,7 @@ In the pretty style, a request for a file that exists is answered like this, in 
 | `name`, where no file `name` and no folder `name` exist and `name.html` does | 200 with the file `name.html`. The headers are those that `_headers` gives the request path `name` |
 | a folder, a file that is not a page, anything else | as in the plain style |
 
-The headers of a clean address come from the address that was asked, as a host that matches `_headers` on the request path would send them. Whether the live host matches on the request path or on the file path was not observed. The file of the clean address `/404` therefore gets no policy rule of its own in this server, because the rule in `_headers` names `/404.html`.
+The headers of a clean address come from the address that was asked, as a host that matches `_headers` on the request path sends them. The live host was seen to do so on 22 Nov 2026. The clean address `/404` gets no policy rule of its own, because the rule in `_headers` names `/404.html`. For the same reason, in the pretty style an address that is answered with the 404 page gets the headers that match that address, not those of `/404.html`. In the plain style the 404 page gets the headers of `/404.html`. The 404 page holds its own policy in a meta tag (see "The policy"), so it has one in both styles.
 
 The preview is started by `npm run preview:pretty` (`vite preview --host 127.0.0.1 --port 4182 --strictPort`), and `playwright.config.ts` sets the variable for that one server and builds nothing. Ports 4173 to 4181 are taken by the other servers.
 
@@ -328,6 +328,10 @@ The preview is started by `npm run preview:pretty` (`vite preview --host 127.0.0
 ### The policy
 
 `_headers` has one content policy for each page and no rule that matches a page twice, because a host sends both and the browser enforces the stricter. Pages of the site: `default-src 'self'`, `script-src 'self'`, `style-src 'self' 'unsafe-inline'` (the print documents carry their own style), images from the site, `data:` and `blob:`, no object, no outside origin. The two sample visitor files get the policy that they hold for themselves, word for word. `check-release` compares them with the file's own meta tag.
+
+The 404 page holds its own policy too. The live host matches each `_headers` rule on the address that was asked, not on the file that it sends (read with curl on 22 Nov 2026: `/no-such-page` answers 404 and `/404` answers 200, both with the 404 page and only the `/*` headers). So the rule for `/404.html` never reaches the 404 page there, and a rule that ends in `*`, such as `/visitor/family/family-map-*`, is the only kind that does. `site/public/404.html` therefore has a `<meta http-equiv="Content-Security-Policy">` tag, first in the head after the charset, with the same directives as the site policy of the `/` rule except `frame-ancestors`. A meta tag cannot set `frame-ancestors`, so the tag does not keep the page out of a frame. Only the `/404.html` rule does that, on a host that matches it, and the live host does not. The page has no form and no script, so a frame can do little with it. The rule for `/404.html` stays in `_headers` for a host that matches on the file. Header and tag then hold the same rules, and a browser enforces both without any change in effect. `check-release` reads the built 404 page, finds the tag, and fails when it is missing or is not the `/` policy without `frame-ancestors` (`csp`). The text of the tag is the only copy of the policy outside `_headers`. `release.test.ts` compares the source page with the `/` rule, and `check-release` compares the built page, so the two cannot drift.
+
+The preview on port 4182 matches `_headers` on the request path for the 404 page as well. An unknown address gets the rules that match that address, as on the live host, and not the rules of `/404.html`. On port 4174 the 404 page keeps the headers of `/404.html`, as before.
 
 ### The release check
 

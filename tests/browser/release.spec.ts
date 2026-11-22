@@ -110,6 +110,55 @@ test.describe("direct entry and refresh", () => {
   });
 });
 
+// The live host matches each `_headers` rule on the address that was asked, so the rule for `/404.html` never reaches
+// the 404 page there (curl, 22 Nov 2026). The preview on port 4182 matches the same way. The page therefore holds its own
+// policy in a meta tag. A policy counts when it comes from the header or from that tag, and it must refuse an inline script.
+for (const host of HOSTS) {
+  test.describe(`the 404 page on ${host.name}`, () => {
+    test.use({ baseURL: host.origin });
+
+    for (const path of ["/no-such-page", "/churchyard/nope.html", "/visitor/family/nope", "/_headers"]) {
+      test(`${path} answers 404 with the 404 page, and the page holds a policy that refuses an inline script`, async ({ page }) => {
+        const response = await page.goto(path);
+        expect(response?.status(), path).toBe(404);
+        await expect(page.getByRole("heading", { level: 1, name: "Page not found" })).toBeVisible();
+        const header = response?.headers()["content-security-policy"] ?? "";
+        const meta = await page.locator('meta[http-equiv="Content-Security-Policy"]').evaluateAll((tags) => tags.map((tag) => tag.getAttribute("content") ?? ""));
+        const policies = [header, ...meta].filter((policy) => policy !== "");
+        expect(policies.length, `${path} has no content policy`).toBeGreaterThan(0);
+        for (const policy of policies) expect(policy).not.toMatch(/script-src[^;]*'unsafe-inline'|https?:|\*|unsafe-eval/);
+        // The browser itself says it: an inline script that is added to the page does not run, and the policy reports it.
+        const outcome = await page.evaluate(
+          () =>
+            new Promise<{ ran: boolean; blocked: string[] }>((resolve) => {
+              const blocked: string[] = [];
+              document.addEventListener("securitypolicyviolation", (event) => blocked.push(event.violatedDirective));
+              const script = document.createElement("script");
+              script.textContent = "window.__plotwardenInline = true;";
+              document.head.appendChild(script);
+              setTimeout(() => resolve({ ran: (window as unknown as Record<string, unknown>)["__plotwardenInline"] === true, blocked }), 100);
+            }),
+        );
+        expect(outcome.ran, `${path} ran an inline script`).toBe(false);
+        expect(outcome.blocked.some((directive) => directive.startsWith("script-src")), `${path} reported no script-src violation: ${outcome.blocked.join(",")}`).toBe(true);
+      });
+    }
+
+    test("the clean address /404 answers 200 on a host that redirects .html, and holds the policy too", async ({ page }) => {
+      const response = await page.goto("/404");
+      if (host.origin.endsWith(":4174/")) {
+        expect(response?.status()).toBe(404);
+        return;
+      }
+      expect(response?.status()).toBe(200);
+      const meta = await page.locator('meta[http-equiv="Content-Security-Policy"]').evaluateAll((tags) => tags.map((tag) => tag.getAttribute("content") ?? ""));
+      expect(meta.length).toBe(1);
+      expect(meta[0]).toContain("script-src 'self'");
+      expect(meta[0]).not.toContain("frame-ancestors");
+    });
+  });
+}
+
 test.describe("the hub", () => {
   test("says the job first, then what Plotwarden is, and offers each register two buttons and the Desk preview one link", async ({ page }) => {
     const requests = trackRequests(page, SITE);

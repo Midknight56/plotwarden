@@ -2,6 +2,9 @@
 # One content policy per page, never two: a path that two rules match would send both, and the browser
 # would enforce the stricter of them. `scripts/check-release.mjs` checks that no path matches two policies.
 # No policy names an outside origin. Styles may be inline because the print documents carry their own style.
+# The live host matches each rule on the address that was asked, not on the file it sends, so the rule for /404.html
+# does not reach the 404 page there. That page holds its own policy in a meta tag (the rules below without
+# frame-ancestors, which a meta tag cannot set). `scripts/check-release.mjs` keeps the two the same.
 
 /*
   X-Content-Type-Options: nosniff

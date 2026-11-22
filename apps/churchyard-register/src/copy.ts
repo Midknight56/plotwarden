@@ -398,8 +398,11 @@ export function churchError(t: T, error: DomainError): string {
 /**
  * The line of one reservation. A reservation that holds its space "is reserved". A released one "was reserved",
  * with the day it was released and the reason, so the line never says a space is held when it is not.
+ * The line ends with one full stop. A reason typed without a final ".", "!" or "?" gets one, and one that has it is left alone.
  */
 export function reservationLine(t: T, reservation: { plot: string; space: string; released?: { on: string; reason: string } }): string {
   if (reservation.released === undefined) return t("spaceIsReserved", { plot: reservation.plot, space: reservation.space });
-  return t("reservationWasReleased", { plot: reservation.plot, space: reservation.space, date: reservation.released.on, reason: reservation.released.reason });
+  const reason = reservation.released.reason.trimEnd();
+  const ended = reason === "" || /[.!?]$/.test(reason) ? reason : `${reason}.`;
+  return t("reservationWasReleased", { plot: reservation.plot, space: reservation.space, date: reservation.released.on, reason: ended });
 }

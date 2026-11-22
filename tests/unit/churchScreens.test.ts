@@ -117,7 +117,7 @@ describe("the plot screen says what the plot holds (C12)", () => {
 
   it("says a released reservation was reserved, with the date and the reason", () => {
     const text = textOf(plotExtras({ released: { on: "2026-03-01", reason: "Family moved away" } }));
-    expect(text).toContain("Y02, space 1 was reserved. Released 2026-03-01. Family moved away");
+    expect(text).toContain("Y02, space 1 was reserved. Released 2026-03-01. Family moved away.");
     expect(text).not.toContain("is reserved");
   });
 
@@ -135,9 +135,35 @@ describe("the line of a reservation tells the truth about it (C12.2)", () => {
   });
 
   it("says was reserved, then Released {date}. {reason}, once it is released", () => {
-    expect(reservationLine(t, { plot: "Y02", space: "1", released: { on: "2026-03-01", reason: "Family moved away" } })).toBe(
-      "Y02, space 1 was reserved. Released 2026-03-01. Family moved away",
+    expect(reservationLine(t, { plot: "Y02", space: "1", released: { on: "2026-03-01", reason: "Family moved away." } })).toBe(
+      "Y02, space 1 was reserved. Released 2026-03-01. Family moved away.",
     );
+  });
+
+  it("ends the released line with one full stop when the reason was typed without one", () => {
+    expect(reservationLine(t, { plot: "Y02", space: "1", released: { on: "2026-03-01", reason: "Family moved away" } })).toBe(
+      "Y02, space 1 was reserved. Released 2026-03-01. Family moved away.",
+    );
+    expect(reservationLine(t, { plot: "Y02", space: "1", released: { on: "2026-03-01", reason: "Family moved away  " } })).toBe(
+      "Y02, space 1 was reserved. Released 2026-03-01. Family moved away.",
+    );
+  });
+
+  it("does not double the full stop when the reason has one, and adds none after ! or ?", () => {
+    for (const [reason, line] of [
+      ["Family moved away.", "Family moved away."],
+      ["Family moved away. ", "Family moved away."],
+      ["Gone!", "Gone!"],
+      ["Who knows?", "Who knows?"],
+    ] as const) {
+      expect(reservationLine(t, { plot: "Y02", space: "1", released: { on: "2026-03-01", reason } })).toBe(`Y02, space 1 was reserved. Released 2026-03-01. ${line}`);
+    }
+  });
+
+  it("shows the same line, with its one full stop, on the plot screen", () => {
+    const text = textOf(plotExtras({ released: { on: "2026-03-01", reason: "Family moved away" } }));
+    expect(text).toContain("Y02, space 1 was reserved. Released 2026-03-01. Family moved away.");
+    expect(text).not.toContain("Family moved away..");
   });
 
   it("is the line of the reservations screen too", () => {
