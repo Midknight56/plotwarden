@@ -2,7 +2,7 @@
 
 Plotwarden keeps plot registers on the keeper's own device. There is no server, no login and no sync. Everything runs in the browser and is saved in that browser's own storage.
 
-**Live site:** PLACEHOLDER. The person who publishes the site fills in its address here. It is not live yet.
+**Live site:** https://plotwarden.pages.dev
 
 **Film:** PLACEHOLDER. The person who publishes the film fills in its address here. There is no film yet.
 
