@@ -1,0 +1,8 @@
+{
+  "name": "@plotwarden/template",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The plot foundation shared by both registers.",
+  "license": "MIT",
+  "type": "module"
+}
