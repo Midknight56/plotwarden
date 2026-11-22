@@ -7,6 +7,7 @@ export type T = (key: string, values?: Readonly<Record<string, string | number>>
 
 const ITEM_WORDS: Readonly<Record<string, string>> = {
   plotsPerSite: "limitPlots",
+  domainRecordsPerSite: "limitRecords",
   sectionsPerSite: "limitSections",
   gridRows: "limitRows",
   gridColumns: "limitColumns",

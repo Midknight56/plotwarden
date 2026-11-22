@@ -337,9 +337,10 @@ describe("labels keep clear (A12)", () => {
 
   function checkSheet(m: SheetModel, name: string): void {
     const labels: { what: string; label: Label }[] = [];
-    for (const s of m.sections) labels.push({ what: `section ${s.name}`, label: s.label });
-    for (const p of m.paths) labels.push({ what: `path ${p.name}`, label: p.label });
-    if (m.gate !== undefined) labels.push({ what: "gate", label: m.gate.label });
+    // A label with no clear place is left out on a narrow sheet, so only the labels that are drawn are checked.
+    for (const s of m.sections) if (s.label !== undefined) labels.push({ what: `section ${s.name}`, label: s.label });
+    for (const p of m.paths) if (p.label !== undefined) labels.push({ what: `path ${p.name}`, label: p.label });
+    if (m.gate?.label !== undefined) labels.push({ what: "gate", label: m.gate.label });
     for (const p of m.plots) if (p.label !== undefined) labels.push({ what: `plot ${p.code}`, label: p.label });
     for (const { what, label } of labels) {
       const b = boxOf(label);
@@ -372,7 +373,7 @@ describe("labels keep clear (A12)", () => {
         expect(overlap(boxOf(a.label), boxOf(c.label), 1), `${name}: ${a.what} touches ${c.what}`).toBe(false);
       }
     }
-    if (m.gate !== undefined) {
+    if (m.gate?.label !== undefined) {
       const gate = boxOf(m.gate.label);
       expect(overlap(gate, { x0: m.gate.x - 8, y0: m.gate.y - 8, x1: m.gate.x + 8, y1: m.gate.y + 8 }, 3), `${name}: the gate label touches the gate mark`).toBe(false);
     }
@@ -445,12 +446,52 @@ describe("labels keep clear (A12)", () => {
     }
   });
 
+  // 200 percent zoom of a phone is 180 pixels wide. Below 300 a name that cannot find a clear place on the drawing
+  // is written under it, one to a line, so it is never dropped and never lies on a line.
+  const NARROW = [148, 180, 240, 280];
+
+  it.each(NARROW)("keeps every label that is drawn clear on a narrow churchyard map, width %i", (width) => {
+    const { m, inputs } = yew();
+    for (const selected of ["Y07", "Y01", undefined]) checkSheet(buildSheet({ map: m, plots: inputs, ...(selected === undefined ? {} : { selectedPlotId: selected }) }, { width }), `narrow yew ${width} ${selected ?? "none"}`);
+  });
+
+  it.each(NARROW)("keeps every label that is drawn clear on a narrow bed plan, width %i", (width) => {
+    const { m, inputs } = beds();
+    for (const selected of ["B04", "B01", undefined]) checkSheet(buildSheet({ map: m, plots: inputs, ...(selected === undefined ? {} : { selectedPlotId: selected }) }, { width }), `narrow beds ${width} ${selected ?? "none"}`);
+  });
+
+  it("writes a name under the drawing only below 300, and keeps every name in place at 320 and above", () => {
+    for (const make of [yew, beds]) {
+      const { m, inputs } = make();
+      for (const width of [320, 360, 700, 1500]) expect(buildSheet({ map: m, plots: inputs }, { width }).captioned, `captioned at ${width}`).toBe(0);
+      for (const width of [148, 180]) expect(buildSheet({ map: m, plots: inputs }, { width }).captioned, `captioned at ${width}`).toBeGreaterThan(0);
+    }
+  });
+
+  it("makes the sheet taller by the lines it writes under the drawing, and by nothing else", () => {
+    const { m, inputs } = yew();
+    const narrow = buildSheet({ map: m, plots: inputs }, { width: 148 });
+    expect(narrow.height).toBeGreaterThan(narrow.height - narrow.captioned * 18);
+    const lines = [narrow.gate?.label, ...narrow.sections.map((s) => s.label), ...narrow.paths.map((p) => p.label)].filter((l): l is Label => l !== undefined);
+    const under = lines.filter((l) => l.anchor === "start" && l.x === 8 && l.y > narrow.height - narrow.captioned * 18 - 8);
+    expect(under).toHaveLength(narrow.captioned);
+    expect(new Set(under.map((l) => l.y)).size).toBe(under.length);
+  });
+
+  it("names the sections, paths and gate on a narrow sheet for a reader, even where a label is left out", () => {
+    const { m, inputs } = yew();
+    const sheet = buildSheet({ map: m, plots: inputs }, { width: 148 });
+    expect(sheet.sections.map((s) => s.name)).toEqual(["Yew Walk"]);
+    expect(sheet.paths.map((p) => p.name)).toEqual(["Yew Walk"]);
+    expect(sheet.gate?.name).toBe("Main gate");
+  });
+
   it("moves the gate label off the dots of the path it stands on", () => {
     const { m, inputs } = yew();
     const sheet = buildSheet({ map: m, plots: inputs }, { width: 360 });
     const gate = sheet.gate as NonNullable<SheetModel["gate"]>;
     const walk = sheet.paths[0] as NonNullable<SheetModel["paths"][number]>;
-    expect(distance(boxOf(gate.label), walk.points)).toBeGreaterThanOrEqual(8);
+    expect(distance(boxOf(gate.label as Label), walk.points)).toBeGreaterThanOrEqual(8);
   });
 
   it("moves a section label off the paper tab of the selected plot", () => {

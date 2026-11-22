@@ -95,6 +95,7 @@ export async function seedWalkthrough(
       blobs: [],
       uniqueKeys: uniqueKeysFor(batch.drafts.map(keySourceOfDraft), sectionNames),
       now: () => new Date(fixed.getTime()),
+      newId: options.newId,
     });
     if (!result.ok) {
       // A failed commit leaves a half built practice site. Remove only that site.

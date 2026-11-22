@@ -1,0 +1,18 @@
+/* The look of the market stall register: warm paper in dark brown ink. Ink #2B2118 on paper #F6EFE3.
+   High contrast replaces both colours. Nothing here moves. */
+
+:root {
+  --awning: #8a4b1f;
+  --awning-ink: #f6efe3;
+}
+
+h1,
+h2,
+h3,
+header.app .brand {
+  font-family: Georgia, "Times New Roman", serif;
+}
+
+header.app {
+  border-bottom: 4px solid var(--awning);
+}

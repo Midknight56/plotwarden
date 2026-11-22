@@ -204,7 +204,7 @@ export function ChurchyardHome() {
               </li>
             </ul>
           </nav>
-          <nav aria-label={t("mainNavigation")}>
+          <nav aria-label={t("registerLinks")}>
             <ul className="actions plain">
               <li>
                 <ButtonLink href={`${base}/map`}>{t("mapLink")}</ButtonLink>

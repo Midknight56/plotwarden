@@ -138,12 +138,8 @@ html[data-contrast="high"] .mist {
   display: none;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  html[data-motion="follow"] .mist {
-    display: none;
-  }
-}
-
+/* The shell sets data-motion to the resolved motion (reduce or allow) from the app setting and the system. */
+html[data-motion="reduce"],
 html[data-motion="reduce"] *,
 html[data-motion="reduce"] *::before,
 html[data-motion="reduce"] *::after {
@@ -152,10 +148,16 @@ html[data-motion="reduce"] *::after {
   scroll-behavior: auto !important;
 }
 
+/* Before the shell has run, the system request alone is honoured. */
 @media (prefers-reduced-motion: reduce) {
-  html[data-motion="follow"] *,
-  html[data-motion="follow"] *::before,
-  html[data-motion="follow"] *::after {
+  html:not([data-motion]) .mist {
+    display: none;
+  }
+
+  html:not([data-motion]),
+  html:not([data-motion]) *,
+  html:not([data-motion]) *::before,
+  html:not([data-motion]) *::after {
     animation: none !important;
     transition: none !important;
     scroll-behavior: auto !important;
@@ -620,6 +622,13 @@ svg.sheet text {
 
   header.app[data-library] .brand {
     display: none;
+  }
+}
+
+/* Under 336 px, as on a phone at 200 percent zoom, four menu buttons cannot share one row. They wrap. */
+@media (max-width: 20.9375rem) {
+  header.app nav ul {
+    flex-wrap: wrap;
   }
 }
 

@@ -8,7 +8,7 @@ import { decideCore } from "../../../template/src/commands";
 import type { CoreCommand } from "../../../template/src/commands";
 import { CORE_PAYLOAD_VERSION, applyCore } from "../../../template/src/events";
 import type { CoreEvent, DraftEvent } from "../../../template/src/events";
-import { LIMITS, checkText } from "../../../template/src/limits";
+import { LIMITS, checkRecordRoom, checkText } from "../../../template/src/limits";
 import { err, ok } from "../../../template/src/types";
 import type { DomainError, FieldError, Result, Uuid } from "../../../template/src/types";
 import { CHURCH_COMMAND_TYPES } from "./types";
@@ -267,9 +267,28 @@ function namingReservation(state: ChurchState, error: DomainError, code: string)
   return { ...error, code, detail: { ...error.detail, reservationId: reservation.reservationId } };
 }
 
+/** The commands that make a new record of the register. */
+const MAKES_RECORD: ReadonlySet<string> = new Set(["record_burial", "record_reservation", "add_request", "save_reading"]);
+
+/** Every record the site holds, archived and voided included. */
+function recordCount(state: ChurchState): number {
+  return (
+    Object.keys(state.people).length +
+    Object.keys(state.burials).length +
+    Object.keys(state.reservations).length +
+    Object.keys(state.requests).length +
+    Object.keys(state.memorials).length
+  );
+}
+
 export function decideChurch(state: ChurchState, command: ChurchCommand, on: LocalDate): Result<Drafts> {
   if (isBase(command.type)) return decideBase(state, command as BaseCommand, on, CHURCH_CTX) as Result<Drafts>;
   if (!CHURCH_NAMES.has(command.type)) return err("unknown_command", { type: command.type });
+  if (MAKES_RECORD.has(command.type)) {
+    // D12: a site holds at most 20,000 records, voided ones included.
+    const room = checkRecordRoom(recordCount(state));
+    if (!room.ok) return room;
+  }
   const c = command as Own;
   switch (c.type) {
     case "record_burial":

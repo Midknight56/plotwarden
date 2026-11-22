@@ -53,6 +53,21 @@ npm run allot:build && npm run allot:preview      # http://127.0.0.1:4178/
 
 The servers listen on `127.0.0.1` only, on fixed ports. Stop one with Ctrl+C.
 
+## Make your own register
+
+`docs/make-your-own.md` makes a third register, a market stall register, from the same template, with no change to the template:
+
+```
+npm run create:app -- --kind market --out .local/market
+npx vite --config .local/market/vite.config.ts     # http://127.0.0.1:4181/
+```
+
+The folder must not exist yet. The example it copies is `examples/market/`, which also runs on its own with `npm run market:dev` (4181) and `npm run market:build && npm run market:preview` (4180).
+
+## Local inspector
+
+`npm run build:inspector` writes `dist/inspector/server.mjs`, a small local server that speaks the Model Context Protocol on standard streams, and `dist/inspector/cli.mjs`, the same three tools on the command line. The tools (`explain_plot`, `audit_projection`, `check_adapter`) work on three invented in memory fixtures only. They read no file, open no address and run no command from an argument. `powers/plot-checks/` holds a skills only power that uses them to review an adapter. The inspector is registered, switched off, in `.kiro/settings/mcp.json`. Switching it on is a step for a person.
+
 ## How to test
 
 ```
@@ -66,7 +81,7 @@ npm run test:browser
 ```
 
 - The unit, property, conformance and oracle tests run in Vitest. Fees, queue order and tenure at a date are also checked against `scripts/oracle.py`, which uses only the Python standard library.
-- The browser tests run headless with Playwright, one worker, at 360 by 640 and 1920 by 1080. They start their own servers on `127.0.0.1` and stop them. This repository does not install a browser, so a Chromium that Playwright can find must already be present.
+- The browser tests run headless with Playwright, one worker, at 360 by 640 and 1920 by 1080. They start their own servers on `127.0.0.1` and stop them. This repository does not install a browser, so a Chromium that Playwright can find must already be present. They cover both registers (entry, layout of every route and at 200 percent zoom, accessibility with axe and the keyboard alone, recovery from two tabs, a full store, a cancelled import and a broken backup) and the market example.
 - `node scripts/check-imports.mjs` fails the build when a layer imports something it must not. For example, the template never imports an app.
 - No test makes a network request.
 
@@ -80,7 +95,10 @@ Records stay in the keeper's browser. The app makes no network call while it run
 |---|---|
 | `template/` | The shared foundation: records, dates, status, storage, files and screens |
 | `apps/` | The two registers |
-| `scripts/` | Import checks, the oracle and the export of the committee files |
+| `examples/` | The market stall example that the generator copies |
+| `tools/`, `powers/` | The local inspector and its skills only power |
+| `scripts/` | Import checks, the oracle, the export of the committee files and the app generator |
+| `docs/` | The build log, the guide to a third register and the proof pictures |
 | `tests/` | Unit, property, conformance, oracle and browser tests |
 | `.kiro/specs/` | The requirements, design and tasks of each part |
 

@@ -72,8 +72,8 @@ export function BurialReport() {
             ))}
           </ul>
           {table.sections.map((section) => (
-            <section key={section.heading} className="stack" aria-labelledby={`part-${section.heading.replace(/\s+/g, "-")}`}>
-              <h2 id={`part-${section.heading.replace(/\s+/g, "-")}`}>{section.heading}</h2>
+            <section key={section.heading} className="stack">
+              <h2>{section.heading}</h2>
               {section.rows.length === 0 ? (
                 <p>{section.emptyText}</p>
               ) : (

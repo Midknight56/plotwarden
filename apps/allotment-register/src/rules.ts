@@ -8,7 +8,7 @@ import { decideCore } from "../../../template/src/commands";
 import type { CoreCommand } from "../../../template/src/commands";
 import { CORE_PAYLOAD_VERSION, applyCore } from "../../../template/src/events";
 import type { CoreEvent, DraftEvent } from "../../../template/src/events";
-import { checkLimit, checkText } from "../../../template/src/limits";
+import { checkLimit, checkRecordRoom, checkText } from "../../../template/src/limits";
 import { formatMoney } from "../../../template/src/money";
 import { orderQueue } from "../../../template/src/queue";
 import { err, ok } from "../../../template/src/types";
@@ -191,9 +191,30 @@ function draft(
   return out;
 }
 
+/** The commands that make a new record of the register. */
+const MAKES_RECORD: ReadonlySet<string> = new Set(["add_applicant", "make_offer", "record_tenancy", "hand_over", "new_season", "apply_charges", "record_receipt"]);
+
+/** Every record the site holds, archived and voided included. */
+function recordCount(state: AllotState): number {
+  return (
+    Object.keys(state.people).length +
+    Object.keys(state.applications).length +
+    Object.keys(state.offers).length +
+    Object.keys(state.tenancies).length +
+    Object.keys(state.seasons).length +
+    Object.keys(state.ledger).length
+  );
+}
+
 export function decideAllot(state: AllotState, command: AllotCommand, on: LocalDate): Result<Drafts> {
   if (isBase(command.type)) return decideBase(state, command as BaseCommand, on, ALLOT_CTX) as Result<Drafts>;
   if (!OWN_NAMES.has(command.type)) return err("unknown_command", { type: command.type });
+  if (MAKES_RECORD.has(command.type)) {
+    // D12: a site holds at most 20,000 records, voided ones included.
+    const adding = command.type === "apply_charges" ? Math.max(1, (command as Extract<Own, { type: "apply_charges" }>).items.length) : 1;
+    const room = checkRecordRoom(recordCount(state), adding);
+    if (!room.ok) return room;
+  }
   const c = command as Own;
   switch (c.type) {
     case "add_applicant":

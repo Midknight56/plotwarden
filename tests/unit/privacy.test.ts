@@ -1,10 +1,28 @@
 // T28 (foundation part): the visitor types are separate from the private
 // types, the visitor schemas are closed at every depth, and canaries are found.
 // The full file and log scan is spec 06.
-import { readFileSync } from "node:fs";
+import { IDBFactory } from "fake-indexeddb";
+import { readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { allotAdapter, allotRegister } from "../../apps/allotment-register/src/adapter";
+import { buildAvailabilityFile } from "../../apps/allotment-register/src/projection";
+import { thimbleBeds } from "../../apps/allotment-register/src/walkthrough";
+import { churchAdapter, churchRegister } from "../../apps/churchyard-register/src/adapter";
+import { buildFamilyFile } from "../../apps/churchyard-register/src/projection";
+import { lanternFold } from "../../apps/churchyard-register/src/walkthrough";
+import { backupFilename, exportBackup } from "../../template/src/data/backup";
+import { openRegisterDb } from "../../template/src/data/db";
+import { seedWalkthrough } from "../../template/src/data/seed";
+import { readEvents } from "../../template/src/data/transaction";
+import { buildSlip, encodeSlip, slipFileName } from "../../template/src/exchange/slip";
+import { reviewFileName } from "../../template/src/exchange/packet";
+import { availabilityFileName, buildAvailabilityHtml } from "../../template/src/output/availabilityHtml";
+import { buildAvailabilityPrint, buildFamilyPrint } from "../../template/src/output/print";
+import { buildFamilyHtml, visitorFileName } from "../../template/src/output/visitorHtml";
+import { DEFAULT_SETTINGS, SETTINGS_KEY, saveSettings } from "../../template/src/preferences";
+import { planExchange } from "../../template/src/ui/exchangeFlow";
 import {
   flagPrivateStrings,
   parseAvailability,
@@ -24,9 +42,13 @@ import {
   OTHER_OCCUPANT,
   PAGE_IMAGE_FILENAME,
   PERSON_KEYS,
+  REVIEW_CANARIES as CHURCH_REVIEW_CANARIES,
   VISITOR_CANARIES,
 } from "../helpers/privacyCanaries";
 import { FIXED_NOW } from "../helpers/clock";
+import { AVAILABILITY_WORDS } from "../helpers/availabilityWords";
+import { FAMILY_WORDS } from "../helpers/familyWords";
+import { AVAILABILITY_CANARIES, REVIEW_CANARIES as GARDEN_REVIEW_CANARIES } from "../helpers/gardenCanaries";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -369,5 +391,304 @@ describe("T28 private strings in a public label", () => {
 
   it("ignores an empty known string", () => {
     expect(flagPrivateStrings("anything", [""])).toEqual([]);
+  });
+});
+
+// ===================================================================================================
+// Spec 06, task 6.5 (Z1): the full file and log scan. Every public file of both fixtures is built by the
+// real code from a practice register in a fake database, then read for every canary, in its bytes, its
+// head, its address strings and its file name. The local database, the device key and the console are
+// read too, and the source is scanned for any way out of the device.
+// ===================================================================================================
+
+const SCAN_ON = "2026-04-20";
+const A4_PORTRAIT = { paper: "A4", orientation: "portrait" } as const;
+
+function counterOf(start: number): () => string {
+  let n = 0;
+  return () => `00000000-0000-4000-8000-${(start * 0x1000 + ++n).toString(16).padStart(12, "0")}`;
+}
+
+/** A practice register of each app, in one fake database, with every public and committee file built from it. */
+async function builtFiles() {
+  const opened = await openRegisterDb(new IDBFactory());
+  if (!opened.ok) throw new Error("storage");
+  const db = opened.value;
+  const newId = counterOf(0x91);
+  const fold = await seedWalkthrough(db, churchRegister() as never, lanternFold, { newId });
+  const beds = await seedWalkthrough(db, allotRegister() as never, thimbleBeds, { newId });
+  if (!fold.ok || !beds.ok) throw new Error("seed");
+  const foldState = churchRegister().replay(fold.value, await readEvents(db, fold.value.id));
+  const bedsState = allotRegister().replay(beds.value, await readEvents(db, beds.value.id));
+  if (!foldState.ok || !bedsState.ok) throw new Error("replay");
+
+  let p = 0;
+  const publicId = () => `p${++p}`;
+  const family = buildFamilyFile(foldState.value, { asOf: SCAN_ON, revision: 3, newPublicId: publicId });
+  const availability = buildAvailabilityFile(bedsState.value, { asOf: SCAN_ON, revision: 6, newPublicId: publicId });
+  if (!family.ok || !availability.ok) throw new Error("build");
+
+  const mint = counterOf(0x92);
+  const plans = {
+    church: planExchange({ site: fold.value, state: foldState.value, revision: 3, adapter: churchAdapter as never, asOf: SCAN_ON, alias: "Site 1", labels: {}, mint }),
+    garden: planExchange({ site: beds.value, state: bedsState.value, revision: 6, adapter: allotAdapter as never, asOf: SCAN_ON, alias: "Site 2", labels: {}, mint }),
+  };
+  if (!plans.church.ok || !plans.garden.ok) throw new Error("plan");
+  const slipText = (plan: typeof plans.church, site: typeof fold.value): string => {
+    if (!plan.ok) throw new Error("plan");
+    const built = buildSlip({
+      siteKey: site.siteKey,
+      lineageId: site.lineageId,
+      packetRevision: plan.plan.packetRevision,
+      packetAsOf: SCAN_ON,
+      decisions: plan.plan.issues.map((issue, i) => ({ actionId: `00000000-0000-4000-8000-${(0x99000 + i).toString(16).padStart(12, "0")}`, issueKey: issue.issueKey, factVersion: issue.factVersion, disposition: "checked" as const, reviewedOn: SCAN_ON })),
+    });
+    if (!built.ok) throw new Error("slip");
+    const encoded = encodeSlip(built.slip);
+    if (!encoded.ok) throw new Error("slip size");
+    return encoded.text;
+  };
+  const backups = {
+    church: await exportBackup(db, fold.value.id, "2026-04-20T09:30:00.000+00:00"),
+    garden: await exportBackup(db, beds.value.id, "2026-04-20T09:30:00.000+00:00"),
+  };
+  if (!backups.church.ok || !backups.garden.ok) throw new Error("backup");
+
+  return {
+    db,
+    sites: { church: fold.value, garden: beds.value },
+    familyFile: family.file,
+    availabilityFile: availability.file,
+    familyHtml: buildFamilyHtml(family.file, FAMILY_WORDS),
+    familyPrint: buildFamilyPrint(family.file, FAMILY_WORDS, A4_PORTRAIT),
+    availabilityHtml: buildAvailabilityHtml(availability.file, AVAILABILITY_WORDS),
+    availabilityPrint: buildAvailabilityPrint(availability.file, AVAILABILITY_WORDS, A4_PORTRAIT),
+    packets: { church: plans.church.plan.text, garden: plans.garden.plan.text },
+    slips: { church: slipText(plans.church, fold.value), garden: slipText(plans.garden, beds.value) },
+    backupBytes: { church: backups.church.value.bytes, garden: backups.garden.value.bytes },
+  };
+}
+
+const utf8 = (text: string): Uint8Array => new TextEncoder().encode(text);
+
+describe("T28 every public and committee file, in its bytes, holds no canary", () => {
+  it("the family file, its page and its print hold no living person, no other occupant, no contact, no inscription word, no page image", async () => {
+    const f = await builtFiles();
+    for (const [name, text] of [
+      ["file", JSON.stringify(f.familyFile)],
+      ["page", f.familyHtml],
+      ["print", f.familyPrint],
+    ] as const) {
+      expect(scanForCanaries(text, VISITOR_CANARIES), `family ${name} text`).toEqual([]);
+      expect(scanForCanaries(utf8(text), VISITOR_CANARIES), `family ${name} bytes`).toEqual([]);
+    }
+    // The one approved name is where it should be, and is in no other file.
+    expect(scanForCanaries(f.familyHtml, [APPROVED_NAME])).toEqual([APPROVED_NAME]);
+    expect(scanForCanaries(f.familyPrint, [APPROVED_NAME])).toEqual([APPROVED_NAME]);
+  });
+
+  it("the availability file, its page and its print hold no applicant, tenant, contact, receipt or amount", async () => {
+    const f = await builtFiles();
+    for (const [name, text] of [
+      ["file", JSON.stringify(f.availabilityFile)],
+      ["page", f.availabilityHtml],
+      ["print", f.availabilityPrint],
+    ] as const) {
+      expect(scanForCanaries(text, AVAILABILITY_CANARIES), `availability ${name} text`).toEqual([]);
+      expect(scanForCanaries(utf8(text), AVAILABILITY_CANARIES), `availability ${name} bytes`).toEqual([]);
+    }
+  });
+
+  it("the review files and the return slips of both fixtures hold no name, contact, amount, note or approved name", async () => {
+    const f = await builtFiles();
+    for (const [name, text, canaries] of [
+      ["church packet", f.packets.church, CHURCH_REVIEW_CANARIES],
+      ["church slip", f.slips.church, CHURCH_REVIEW_CANARIES],
+      ["garden packet", f.packets.garden, GARDEN_REVIEW_CANARIES],
+      ["garden slip", f.slips.garden, GARDEN_REVIEW_CANARIES],
+    ] as const) {
+      expect(scanForCanaries(text, canaries), name).toEqual([]);
+      expect(scanForCanaries(utf8(text), canaries), `${name} bytes`).toEqual([]);
+    }
+    // Neither fixture's private site title nor a plot code is in a packet.
+    expect(f.packets.church).not.toContain("Lantern Fold");
+    expect(f.packets.garden).not.toContain("Thimble Beds");
+    for (const code of ["Y07", "B02", "B03"]) expect([f.packets.church, f.packets.garden].some((t) => t.includes(code))).toBe(false);
+  });
+
+  it("the scan can see: a private backup of each fixture holds its canaries", async () => {
+    const f = await builtFiles();
+    // A backup is zipped with no compression, so a name is still readable in its bytes. This proves the scan above would find one.
+    expect(scanForCanaries(f.backupBytes.church, [APPROVED_NAME])).toEqual([APPROVED_NAME]);
+    expect(scanForCanaries(f.backupBytes.garden, ["Tavi Bramblequill"])).toEqual(["Tavi Bramblequill"]);
+  });
+});
+
+describe("T28 the head, the addresses and the file names of a public file", () => {
+  const docs = async () => {
+    const f = await builtFiles();
+    return [
+      ["family page", f.familyHtml, f.familyFile.siteTitle],
+      ["family print", f.familyPrint, f.familyFile.siteTitle],
+      ["availability page", f.availabilityHtml, f.availabilityFile.siteTitle],
+      ["availability print", f.availabilityPrint, f.availabilityFile.siteTitle],
+    ] as const;
+  };
+
+  it("has a title of the public site title and one public word, and no generator or author", async () => {
+    for (const [name, html, siteTitle] of await docs()) {
+      const title = /<title>([^<]*)<\/title>/.exec(html)?.[1] ?? "";
+      expect(title.includes(siteTitle), `${name}: ${title}`).toBe(true);
+      expect(title.length, name).toBeLessThanOrEqual(siteTitle.length + 40);
+      const metas = [...html.matchAll(/<meta\s+([^>]*)>/g)].map((m) => m[1] as string);
+      for (const meta of metas) {
+        const named = /name="([^"]+)"/.exec(meta)?.[1];
+        if (named !== undefined) expect(["viewport", "color-scheme"], `${name} meta ${named}`).toContain(named);
+        else expect(/^(charset="utf-8"|http-equiv="Content-Security-Policy")/.test(meta), `${name} meta ${meta}`).toBe(true);
+      }
+      expect(/generator|author|creator|producer|keywords|description/i.test(metas.join("\n")), name).toBe(false);
+    }
+  });
+
+  it("holds no address, no remote asset, no form, no frame and no link tag, only the drawing namespace", async () => {
+    for (const [name, html] of await docs()) {
+      const noCsp = html.replace(/<meta http-equiv="Content-Security-Policy"[^>]*>/, "").replace(/http:\/\/www\.w3\.org\/2000\/svg/g, "");
+      expect(/(https?:)?\/\/[a-z0-9]/i.test(noCsp), `${name} has an address`).toBe(false);
+      expect(/\b(src|href|action|poster|data)=["']?(https?:|\/\/|data:)/i.test(noCsp), `${name} has a remote asset`).toBe(false);
+      expect(/<(link|base|form|iframe|object|embed|img|video|audio|source|script[^>]*\ssrc=)/i.test(noCsp), `${name} has a forbidden tag`).toBe(false);
+      expect(/url\(\s*["']?(https?:|\/\/)/i.test(noCsp), `${name} has a remote style`).toBe(false);
+      expect(/@import/i.test(noCsp), name).toBe(false);
+    }
+  });
+
+  it("names every file by its kind and a date, and nothing else", () => {
+    const names = [
+      visitorFileName("family", SCAN_ON),
+      availabilityFileName(SCAN_ON),
+      reviewFileName(SCAN_ON),
+      slipFileName(SCAN_ON),
+      backupFilename(SCAN_ON),
+    ];
+    expect(names).toEqual(["family-map-2026-04-20.html", "availability-map-2026-04-20.html", "committee-review-2026-04-20.json", "committee-return-2026-04-20.json", "register-backup-2026-04-20.pkr.zip"]);
+    for (const name of names) {
+      expect(scanForCanaries(name, [...VISITOR_CANARIES, ...AVAILABILITY_CANARIES, APPROVED_NAME, "Lantern", "Thimble", "Quillmoss"]), name).toEqual([]);
+      expect(/^[a-z]+(-[a-z]+)*-\d{4}-\d{2}-\d{2}\.(html|json|pkr\.zip)$/.test(name), name).toBe(true);
+    }
+  });
+
+  it("refuses a file name that is given anything but a date", () => {
+    for (const bad of ["Mirel Quillmoss", "2026-04-20/../x", "2026-4-2", ""]) {
+      expect(() => visitorFileName("family", bad)).toThrow();
+      expect(() => availabilityFileName(bad)).toThrow();
+    }
+  });
+});
+
+describe("T28 the local database and the device key", () => {
+  const PRIVATE = [...VISITOR_CANARIES, ...AVAILABILITY_CANARIES, APPROVED_NAME, "Lantern Fold", "Thimble Beds", "Quillmoss", "Bramblequill"];
+
+  it("holds no private value in a database name, a store name, an index name, any primary key or any index key", async () => {
+    const f = await builtFiles();
+    const db = f.db;
+    const seen: string[] = [db.name];
+    for (const name of Array.from(db.objectStoreNames)) {
+      seen.push(name);
+      const tx = db.transaction(name, "readonly");
+      const store = tx.objectStore(name);
+      seen.push(...Array.from(store.indexNames));
+      const keys = await new Promise<IDBValidKey[]>((resolve, reject) => {
+        const request = store.getAllKeys();
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+      for (const key of keys) seen.push(JSON.stringify(key));
+      const indexKeys: IDBValidKey[] = [];
+      for (const indexName of Array.from(store.indexNames)) {
+        const rows = await new Promise<IDBValidKey[]>((resolve, reject) => {
+          const request = store.index(indexName).getAllKeys();
+          request.onsuccess = () => resolve(request.result);
+          request.onerror = () => reject(request.error);
+        });
+        indexKeys.push(...rows);
+      }
+      for (const key of indexKeys) seen.push(JSON.stringify(key));
+    }
+    expect(seen.length).toBeGreaterThan(20);
+    expect(scanForCanaries(seen, PRIVATE)).toEqual([]);
+    // A name of a person is not a key. A plot code and a source ref are keys by design (R7, `source:{sheet}:{ref}`):
+    // they name a place and a page of the paper book, never a person, and they stay inside the local database.
+    for (const text of seen) expect(/Quillmoss|Fennimore|Ashgrove|Bramblequill|Stonecrop|Burrowby|Fennick|Pennywort|Pellwick|example\.invalid/i.test(text), text).toBe(false);
+  });
+
+  it("writes the device key with the three choices only", () => {
+    const written: Record<string, string> = {};
+    saveSettings({ getItem: () => null, setItem: (k, v) => void (written[k] = v) }, { ...DEFAULT_SETTINGS, motion: "reduce" });
+    expect(Object.keys(written)).toEqual([SETTINGS_KEY]);
+    expect(Object.keys(JSON.parse(written[SETTINGS_KEY] as string) as object).sort()).toEqual(["contrast", "motion", "paper"]);
+  });
+});
+
+describe("T28 the logs", () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it("write nothing to the console while the data layer seeds, backs up, builds a visitor file and builds a review file", async () => {
+    const spies = (["log", "info", "warn", "error", "debug", "trace"] as const).map((level) => vi.spyOn(console, level).mockImplementation(() => undefined));
+    const f = await builtFiles();
+    expect(f.familyHtml.length).toBeGreaterThan(1000);
+    const calls = spies.flatMap((spy) => spy.mock.calls);
+    expect(calls).toEqual([]);
+  });
+});
+
+describe("T28 the source has no way out of the device", () => {
+  const source = (): { rel: string; code: string }[] => {
+    const out: { rel: string; code: string }[] = [];
+    const walk = (dir: string) => {
+      for (const name of readdirSync(join(ROOT, dir))) {
+        const rel = `${dir}/${name}`;
+        if (statSync(join(ROOT, rel)).isDirectory()) walk(rel);
+        else if (/\.tsx?$/.test(name)) out.push({ rel, code: scanSource(readFileSync(join(ROOT, rel), "utf8")).code });
+      }
+    };
+    walk("template/src");
+    for (const app of readdirSync(join(ROOT, "apps"))) walk(`apps/${app}/src`);
+    return out;
+  };
+
+  it("holds no console call, no network call, no beacon, no clipboard write and no cookie", () => {
+    const files = source();
+    expect(files.length).toBeGreaterThan(100);
+    const FORBIDDEN: [string, RegExp][] = [
+      ["console", /\bconsole\s*\./],
+      ["fetch", /\bfetch\s*\(/],
+      ["XMLHttpRequest", /\bXMLHttpRequest\b/],
+      ["WebSocket", /\bWebSocket\b/],
+      ["EventSource", /\bEventSource\b/],
+      ["sendBeacon", /\bsendBeacon\b/],
+      ["clipboard write", /\bnavigator\s*\.\s*clipboard\b|\.writeText\s*\(|\bexecCommand\s*\(\s*["']copy["']/],
+      ["cookie", /\bdocument\s*\.\s*cookie\b/],
+      ["worker or service worker", /\bnavigator\s*\.\s*serviceWorker\b|\bnew\s+(Shared)?Worker\s*\(|\bimportScripts\b/],
+      ["session storage", /\bsessionStorage\b/],
+      ["eval", /\beval\s*\(|\bnew\s+Function\s*\(/],
+    ];
+    const found: string[] = [];
+    for (const { rel, code } of files) for (const [name, pattern] of FORBIDDEN) if (pattern.test(code)) found.push(`${rel}: ${name}`);
+    expect(found).toEqual([]);
+  });
+
+  it("uses local storage in one place only, and writes one key, through the settings module", () => {
+    const files = source();
+    const users = files.filter(({ code }) => /\blocalStorage\b/.test(code)).map(({ rel }) => rel);
+    expect(users).toEqual(["template/src/ui/RegisterShell.tsx"]);
+    const setters = files.filter(({ code }) => /\.setItem\s*\(/.test(code)).map(({ rel }) => rel);
+    expect(setters).toEqual(["template/src/preferences.ts"]);
+    const prefs = files.find(({ rel }) => rel === "template/src/preferences.ts")?.code ?? "";
+    expect(prefs.match(/\.setItem\s*\(\s*([A-Z_]+)/)?.[1]).toBe("SETTINGS_KEY");
+  });
+
+  it("puts nothing private in an address: the register writes the hash and history state only through the shell", () => {
+    const files = source();
+    const pushes = files.filter(({ code }) => /\bhistory\s*\.\s*(pushState|replaceState)\b/.test(code)).map(({ rel }) => rel);
+    expect(pushes).toEqual(["template/src/ui/RegisterShell.tsx"]);
   });
 });

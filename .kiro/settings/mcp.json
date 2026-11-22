@@ -3,7 +3,7 @@
     "plot-inspector": {
       "command": "node",
       "args": ["dist/inspector/server.mjs"],
-      "disabled": true,
+      "disabled": false,
       "autoApprove": []
     }
   }

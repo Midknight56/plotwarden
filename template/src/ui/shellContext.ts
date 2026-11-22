@@ -9,6 +9,7 @@ import type { SheetImporter } from "../data/importBatch";
 import type { Walkthrough } from "../data/seed";
 import type { BlobWrite, CommitError } from "../data/transaction";
 import type { StoredEvent } from "../events";
+import type { Settings } from "../preferences";
 import type { SearchName } from "../search";
 import type { DomainError, Site, Uuid } from "../types";
 
@@ -47,13 +48,8 @@ export interface Route {
   search: string;
 }
 
-export interface Settings {
-  motion: "follow" | "reduce";
-  contrast: "standard" | "high";
-  paper: "A4" | "Letter";
-}
-
-export const DEFAULT_SETTINGS: Settings = { motion: "follow", contrast: "standard", paper: "A4" };
+export type { Settings } from "../preferences";
+export { DEFAULT_SETTINGS } from "../preferences";
 
 export interface ShellValue {
   app: AnyApp;

@@ -311,6 +311,8 @@ describe("T01 import direction check", () => {
     ["exchange importing events", { "template/src/exchange/schema.ts": 'import { applyCore } from "../events";\nexport const s = applyCore;\n' }, "template/src/exchange/schema.ts", "template/src/events", "public-layer"],
     ["an app importing another app", { "apps/a/src/main.tsx": 'import { z } from "../../b/src/z";\nexport const m = z;\n', "apps/b/src/z.ts": "export const z = 1;\n" }, "apps/a/src/main.tsx", "apps/b/src/z", "app-layer"],
     ["an app importing the site", { "apps/a/src/main.tsx": 'import { h } from "../../../site/src/Home";\nexport const m = h;\n' }, "apps/a/src/main.tsx", "site/src/Home", "app-layer"],
+    ["an example importing an app", { "examples/m/src/main.tsx": 'import { x } from "../../../apps/a/src/main";\nexport const m = x;\n', "apps/a/src/main.tsx": "export const x = 1;\n" }, "examples/m/src/main.tsx", "apps/a/src/main", "app-layer"],
+    ["an example importing another example", { "examples/m/src/main.tsx": 'import { z } from "../../n/src/z";\nexport const m = z;\n', "examples/n/src/z.ts": "export const z = 1;\n" }, "examples/m/src/main.tsx", "examples/n/src/z", "app-layer"],
     ["the site importing an app", { "site/src/main.tsx": 'import { m } from "../../apps/a/src/main";\nexport const x = m;\n' }, "site/src/main.tsx", "apps/a/src/main", "site-layer"],
     ["the site importing the template", { "site/src/main.tsx": 'import { x } from "../../template/src/limits";\nexport const m = x;\n' }, "site/src/main.tsx", "template/src/limits", "site-layer"],
     ["a test importing the Desk by path", { "tests/unit/b.test.ts": 'import { D } from "../../../plotwarden-review-desk/src/Desk";\nexport const t = D;\n' }, "tests/unit/b.test.ts", "plotwarden-review-desk/src/Desk", "no-desk"],
@@ -328,6 +330,18 @@ describe("T01 import direction check", () => {
     expect(run.out).toContain(file);
     expect(run.out).toContain(target);
     expect(run.out).toContain(rule);
+  });
+
+  it("lets an example import the template and its own files", () => {
+    const run = check(
+      tree({
+        ...CLEAN,
+        "examples/m/src/main.tsx": 'import { x } from "../../../template/src/limits";\nimport { y } from "./other";\nexport const m = [x, y];\n',
+        "examples/m/src/other.ts": "export const y = 1;\n",
+      }),
+    );
+    expect(run.out).not.toMatch(/->/);
+    expect(run.status).toBe(0);
   });
 
   it("does not fail on words in comments or on longer words", () => {

@@ -70,9 +70,9 @@ export function SeasonReport() {
               </li>
             ))}
           </ul>
-          {table.sections.map((section, index) => (
-            <section key={section.heading} className="stack" aria-labelledby={`part-${index}`}>
-              <h2 id={`part-${index}`}>{section.heading}</h2>
+          {table.sections.map((section) => (
+            <section key={section.heading} className="stack">
+              <h2>{section.heading}</h2>
               {section.rows.length === 0 ? (
                 <p>{section.emptyText}</p>
               ) : (

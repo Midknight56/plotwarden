@@ -1,0 +1,11 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "plot-checks",
+  "version": "1.0.0",
+  "description": "Check plot rules and visitor fields.",
+  "author": {
+    "name": "Adrian Ferguson"
+  },
+  "keywords": ["plot register", "visitor fields", "market stall"],
+  "license": "MIT"
+}

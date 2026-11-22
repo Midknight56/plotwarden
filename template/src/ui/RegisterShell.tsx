@@ -12,6 +12,7 @@ import { keySourceOfDraft, uniqueKeysFor } from "../data/importBatch";
 import { commit, onRevision, readEvents, readSite } from "../data/transaction";
 import type { SiteRow } from "../data/transaction";
 import type { DraftEvent, StoredEvent } from "../events";
+import { loadSettings, saveSettings, themeAttributes } from "../preferences";
 import type { Site } from "../types";
 import { BackupRestore } from "./BackupRestore";
 import { Exchange } from "./Exchange";
@@ -31,24 +32,30 @@ import { TraceEditor } from "./TraceEditor";
 import { ButtonLink } from "./controls";
 import { COPY, fill } from "./copy";
 import { commitMessage } from "./messages";
-import { DEFAULT_SETTINGS, RegisterContext, ShellContext, parseHash, searchOfState, useShell } from "./shellContext";
+import { RegisterContext, ShellContext, parseHash, searchOfState, useShell } from "./shellContext";
 import type { AnyApp, AnyCommand, OpenRegister, RegisterApp, Route, RunOptions, RunOutcome, Settings, ShellValue } from "./shellContext";
 
-const SETTINGS_KEY = "plotwarden.settings";
+/** Whether the system asks for less motion, kept in step while the page is open. */
+function useSystemReducesMotion(): boolean {
+  const query = "(prefers-reduced-motion: reduce)";
+  const [reduces, setReduces] = useState<boolean>(() => (typeof window.matchMedia === "function" ? window.matchMedia(query).matches : false));
+  useEffect(() => {
+    if (typeof window.matchMedia !== "function") return undefined;
+    const media = window.matchMedia(query);
+    const onChange = () => setReduces(media.matches);
+    onChange();
+    media.addEventListener("change", onChange);
+    return () => media.removeEventListener("change", onChange);
+  }, []);
+  return reduces;
+}
 
-/** The settings are three choices and no private value, so they may live in local storage. */
-function loadSettings(): Settings {
+/** The device store, or nothing when the browser blocks it. */
+function browserStorage(): Storage | undefined {
   try {
-    const raw = window.localStorage.getItem(SETTINGS_KEY);
-    if (raw === null) return DEFAULT_SETTINGS;
-    const v = JSON.parse(raw) as Partial<Settings>;
-    return {
-      motion: v.motion === "reduce" ? "reduce" : "follow",
-      contrast: v.contrast === "high" ? "high" : "standard",
-      paper: v.paper === "Letter" ? "Letter" : "A4",
-    };
+    return window.localStorage;
   } catch {
-    return DEFAULT_SETTINGS;
+    return undefined;
   }
 }
 
@@ -72,20 +79,42 @@ function useRoute(): { route: Route; navigate: ShellValue["navigate"] } {
   }, []);
 
   const key = `${route.path.join("/")}?${route.query.toString()}`;
-  const lastPath = useRef(route.path.join("/"));
+  const pathKey = route.path.join("/");
+  const lastPath = useRef(pathKey);
   useEffect(() => {
     window.scrollTo(0, pendingScroll.current ?? 0);
     pendingScroll.current = null;
-    const path = route.path.join("/");
-    if (path !== lastPath.current) {
-      lastPath.current = path;
+  }, [key]);
+
+  // A new page: focus goes to its heading. A register draws its heading only after it has loaded, so when the heading
+  // is not there yet, wait for it. A change of the query alone, such as "?new=1" going away, does not end the wait.
+  // Never take focus from a control the keeper has already reached.
+  useEffect(() => {
+    if (pathKey === lastPath.current) return undefined;
+    lastPath.current = pathKey;
+    const focusHeading = (force: boolean): boolean => {
       const heading = document.querySelector<HTMLElement>("main h1");
-      if (heading !== null) {
+      if (heading === null) return false;
+      const active = document.activeElement;
+      if (force || active === null || active === document.body || active === heading || !document.querySelector("main")?.contains(active)) {
         heading.tabIndex = -1;
         heading.focus({ preventScroll: true });
       }
-    }
-  }, [key, route.path]);
+      return true;
+    };
+    if (focusHeading(true)) return undefined;
+    const main = document.getElementById("main");
+    if (main === null) return undefined;
+    const observer = new MutationObserver(() => {
+      if (focusHeading(false)) observer.disconnect();
+    });
+    observer.observe(main, { childList: true, subtree: true });
+    const stop = window.setTimeout(() => observer.disconnect(), 5000);
+    return () => {
+      observer.disconnect();
+      window.clearTimeout(stop);
+    };
+  }, [pathKey]);
 
   const navigate = useCallback<ShellValue["navigate"]>((to, options) => {
     window.history.replaceState({ ...(window.history.state as object | null), scrollY: window.scrollY }, "");
@@ -186,7 +215,7 @@ function RegisterFrame({ siteId, children }: { siteId: string; children: ReactNo
     [siteId],
   );
 
-  const run = useCallback(
+  const runCommands = useCallback(
     async (commands: AnyCommand[], options?: RunOptions): Promise<RunOutcome> => {
       const current = latest.current;
       if (current === null) return { ok: false, code: "site_missing" };
@@ -218,6 +247,26 @@ function RegisterFrame({ siteId, children }: { siteId: string; children: ReactNo
       return { ok: true, revision: result.revision, replayed: result.replayed };
     },
     [app, db, load, register, shell, siteId, todayFor],
+  );
+
+  /**
+   * Run the commands, then give focus back. A button that is disabled while a save runs loses focus, so after a
+   * refusal or a failed save the keeper would be left on the page. If nothing else has taken focus by then, it goes
+   * back to the control that had it, when that control is still there.
+   */
+  const run = useCallback(
+    async (commands: AnyCommand[], options?: RunOptions): Promise<RunOutcome> => {
+      const trigger = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      const outcome = await runCommands(commands, options);
+      const restore = () => {
+        const lost = document.activeElement === null || document.activeElement === document.body;
+        if (trigger !== null && trigger.isConnected && lost) trigger.focus({ preventScroll: true });
+      };
+      window.setTimeout(restore, 0);
+      window.setTimeout(restore, 150);
+      return outcome;
+    },
+    [runCommands],
   );
 
   const value = useMemo<OpenRegister | null>(() => {
@@ -334,7 +383,8 @@ export function RegisterShell<S extends BaseState, C extends { type: string }, E
   const anyApp = app as unknown as AnyApp;
   const defined = useMemo(() => defineRegister(anyApp.adapter), [anyApp]);
   const { route, navigate } = useRoute();
-  const [settings, setSettingsState] = useState<Settings>(loadSettings);
+  const [settings, setSettingsState] = useState<Settings>(() => loadSettings(browserStorage()));
+  const systemReduces = useSystemReducesMotion();
   const [db, setDb] = useState<IDBDatabase | "opening" | { failed: string }>("opening");
   const [sitesVersion, setSitesVersion] = useState(0);
   const [newerTab, setNewerTab] = useState(false);
@@ -373,8 +423,10 @@ export function RegisterShell<S extends BaseState, C extends { type: string }, E
   // The theme: the app's ink and paper, motion and contrast. High contrast uses its own colours.
   useEffect(() => {
     const root = document.documentElement;
-    root.dataset["motion"] = settings.motion;
-    root.dataset["contrast"] = settings.contrast;
+    const attributes = themeAttributes(settings, systemReduces);
+    root.dataset["motion"] = attributes.motion;
+    root.dataset["motionSetting"] = attributes.motionSetting;
+    root.dataset["contrast"] = attributes.contrast;
     if (settings.contrast === "standard") {
       root.style.setProperty("--ink", anyApp.adapter.theme.ink);
       root.style.setProperty("--paper", anyApp.adapter.theme.paper);
@@ -389,15 +441,12 @@ export function RegisterShell<S extends BaseState, C extends { type: string }, E
       document.head.appendChild(page);
     }
     page.textContent = `@page { size: ${settings.paper}; margin: 12mm; }`;
-  }, [settings, anyApp]);
+  }, [settings, systemReduces, anyApp]);
 
   const setSettings = useCallback((next: Settings) => {
     setSettingsState(next);
-    try {
-      window.localStorage.setItem(SETTINGS_KEY, JSON.stringify(next));
-    } catch {
-      // The setting still holds for this page.
-    }
+    // A refusing store is not an error: the setting still holds for this page.
+    saveSettings(browserStorage(), next);
   }, []);
 
   const now = anyApp.now ?? (() => new Date());

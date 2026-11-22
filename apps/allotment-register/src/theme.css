@@ -276,7 +276,7 @@ html[data-contrast="high"] .hero-card h2 {
 }
 
 .main-action .button {
-  min-width: 14rem;
+  min-width: min(14rem, 100%);
   font-size: 18px;
 }
 

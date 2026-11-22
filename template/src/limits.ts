@@ -132,6 +132,14 @@ export function checkCoordinate(value: number): Result<true> {
   return ok(true);
 }
 
+/**
+ * A site holds at most 20,000 domain records, archived and voided ones included. `existing` is how many it holds
+ * and `adding` is how many the command makes. One over is refused before commit and names the item.
+ */
+export function checkRecordRoom(existing: number, adding = 1): Result<true> {
+  return checkLimit("domainRecordsPerSite", existing + adding);
+}
+
 /** Rows and columns from 1 to 100 whose product fits the remaining plot capacity. */
 export function checkGridSize(rows: number, columns: number, existingPlots: number): Result<true> {
   if (!Number.isInteger(rows) || rows < 1) return err("bad_value", { item: "gridRows", value: rows });

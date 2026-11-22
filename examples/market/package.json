@@ -1,0 +1,8 @@
+{
+  "name": "@plotwarden/market-register",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Offer a stall or start your register. A market stall register that stays on the keeper's device.",
+  "license": "MIT",
+  "type": "module"
+}

@@ -1,0 +1,15 @@
+{
+  "note": "Invented stalls and traders for the market stall example. No real person or place.",
+  "site": { "title": "Stall Row", "zone": "Europe/London" },
+  "asOf": "2026-04-20",
+  "stalls": [
+    { "code": "S1", "frontageCm": 200 },
+    { "code": "S2", "frontageCm": 250 },
+    { "code": "S3", "frontageCm": 300 },
+    { "code": "S4" }
+  ],
+  "traders": [
+    { "name": "Rosa Pennywhistle", "neededCm": 240, "stall": "S2", "start": "2026-04-01" },
+    { "name": "Pim Cartwhistle", "neededCm": 240, "stall": "S1", "start": "2026-04-01", "expect": "stall_too_narrow" }
+  ]
+}

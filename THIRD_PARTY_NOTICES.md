@@ -24,6 +24,10 @@ None of these ship in a built app.
 | @eslint/js | 10.0.1 | MIT | Lint rules |
 | typescript-eslint | 8.73.0 | MIT | Lint for TypeScript |
 | @types/node | 26.6.6 | MIT | Node types for tests and scripts |
+| @axe-core/playwright | 4.14.0 | MPL-2.0 | Accessibility checks in the browser specs |
+| axe-core | 4.14.1 (installed by @axe-core/playwright) | MPL-2.0 | The accessibility rules that those checks run |
+
+axe-core and its Playwright wrapper are used only by the browser specs, from `node_modules`. No file of theirs is copied into this repository or into a built app. Their licence is the Mozilla Public License 2.0.
 
 Python is used only through its standard library, in `scripts/oracle.py`.
 

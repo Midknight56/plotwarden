@@ -23,13 +23,18 @@
     "test:browser": "playwright test --pass-with-no-tests",
     "check:imports": "node scripts/check-imports.mjs",
     "export:exchange": "node scripts/export-exchange.mjs",
+    "create:app": "node scripts/create-app.mjs",
+    "build:inspector": "vite build --config tools/inspector/vite.config.ts && vite build --config tools/inspector/vite.config.ts --mode cli",
     "check:changed": "npm run typecheck && node scripts/check-imports.mjs && node scripts/changed-tests.mjs --git",
     "church:build": "vite build --config apps/churchyard-register/vite.config.ts",
     "church:preview": "vite preview --config apps/churchyard-register/vite.config.ts",
     "church:dev": "vite --config apps/churchyard-register/vite.config.ts",
     "allot:build": "vite build --config apps/allotment-register/vite.config.ts",
     "allot:preview": "vite preview --config apps/allotment-register/vite.config.ts",
-    "allot:dev": "vite --config apps/allotment-register/vite.config.ts"
+    "allot:dev": "vite --config apps/allotment-register/vite.config.ts",
+    "market:build": "vite build --config examples/market/vite.config.ts",
+    "market:preview": "vite preview --config examples/market/vite.config.ts",
+    "market:dev": "vite --config examples/market/vite.config.ts"
   },
   "dependencies": {
     "fflate": "0.8.3",
@@ -38,6 +43,7 @@
     "zod": "4.6.7"
   },
   "devDependencies": {
+    "@axe-core/playwright": "4.14.0",
     "@eslint/js": "10.0.1",
     "@playwright/test": "1.65.1",
     "@types/node": "26.6.6",

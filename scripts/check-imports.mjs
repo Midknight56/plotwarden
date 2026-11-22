@@ -8,7 +8,7 @@
 //   pure-layer           template/src/*.ts and template/src/map/** import only each other and zod
 //   data-layer           template/src/data/** imports no React, ui, output or exchange
 //   public-layer         template/src/output/** and exchange/** import only calendar, limits, map and zod
-//   app-layer            apps/<app>/src/** imports only template/ and its own folder
+//   app-layer            apps/<app>/src/** and examples/<name>/src/** import only template/ and their own folder
 //   site-layer           site/** imports only its own folder
 //   no-kind-word         template/src code names no app kind and compares kind with no string
 //   no-desk              nothing imports the review desk
@@ -114,11 +114,11 @@ function checkFile(rel, text) {
     }
   }
 
-  const app = /^apps\/([^/]+)\//.exec(rel);
+  const app = /^(apps|examples)\/([^/]+)\//.exec(rel);
   if (app) {
     for (const item of resolved) {
       if (item.kind !== "relative") continue;
-      if (!item.target.startsWith(`apps/${app[1]}/`) && !item.target.startsWith("template/")) {
+      if (!item.target.startsWith(`${app[1]}/${app[2]}/`) && !item.target.startsWith("template/")) {
         add(item.target, "app-layer");
       }
     }

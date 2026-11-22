@@ -5,7 +5,7 @@ import { backdropMatrix, boundsOf, toScreen } from "./coordinates";
 import type { Bounds, Point, View } from "./coordinates";
 import type { MapState } from "./edit";
 import { centroid } from "./geometry";
-import { bestSpot, boxOf, spotsAlongLine, spotsAlongTop, spotsAround } from "./labels";
+import { SHEET_MARGIN, bestSpot, boxOf, spotsAlongLine, spotsAlongTop, spotsAround } from "./labels";
 import type { Scene, Spot } from "./labels";
 
 export interface PlotMark {
@@ -66,6 +66,8 @@ export type KeyState = "free" | "reserved" | "taken" | "unusable" | "checking";
 export interface SheetModel {
   width: number;
   height: number;
+  /** How many names were written under the drawing, because a sheet under 300 wide had no clear place for them. */
+  captioned: number;
   /** Pixels per site unit. */
   scale: number;
   /** The transform that drew this model. A point on the screen turns back into a site point with it. */
@@ -94,6 +96,9 @@ const LABEL_SIZE = 12;
 const TAB_SIZE = 14;
 /** The least a plot may measure for its code to be drawn inside it. */
 const LABEL_MIN_BOX = 40;
+/** Under this width, a name with no clear place on the drawing is written under it. A phone at 200 percent zoom is 180 wide. */
+const NARROW_SHEET = 300;
+const CAPTION_LINE = 18;
 const CHAR_WIDTH = 7.2;
 /** How far a label keeps from the line of a path: half the gravel strip and a margin. */
 const GATE_CLEAR = 8;
@@ -197,8 +202,15 @@ export function buildSheet(input: SheetInput, options: SheetOptions): SheetModel
         return { points: points.length > 0 ? [...points, points[0] as Point] : points, clear: OUTLINE_CLEAR, weight: OUTLINE_WEIGHT };
       });
   const keepOff = (clear: number, except?: string): Scene["lines"] => [...pathLines.map((points) => ({ points, clear })), ...outlineLines(except)];
+  /** Names that found no clear place on a narrow sheet. They are written under the drawing, one to a line. */
+  const captions: Label[] = [];
   const place = (text: string, spots: Spot[], lines: Scene["lines"]): Label => {
     const best = bestSpot(text, LABEL_SIZE, spots, scene(lines));
+    if (width < NARROW_SHEET && best.cost > 0) {
+      const caption: Label = { x: SHEET_MARGIN, y: 0, text, size: LABEL_SIZE, anchor: "start" };
+      captions.push(caption);
+      return caption;
+    }
     hard.push({ box: best.box, gap: 2 });
     return { x: best.spot.x, y: best.spot.y, text, size: LABEL_SIZE, anchor: best.spot.anchor };
   };
@@ -222,9 +234,15 @@ export function buildSheet(input: SheetInput, options: SheetOptions): SheetModel
     return { pathId: p.pathId, name: p.name, points, label: place(p.name, spotsAlongLine(points), lines) };
   });
 
+  // The lines under the drawing make the sheet taller, by their own height and a margin above and below.
+  captions.forEach((caption, i) => {
+    caption.y = height + SHEET_MARGIN + LABEL_SIZE + i * CAPTION_LINE;
+  });
+  const sheetHeight = captions.length === 0 ? height : height + SHEET_MARGIN + captions.length * CAPTION_LINE + SHEET_MARGIN;
   const model: SheetModel = {
     width,
-    height,
+    height: sheetHeight,
+    captioned: captions.length,
     scale,
     view,
     empty,

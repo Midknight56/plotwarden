@@ -194,7 +194,10 @@ export async function focusRingContrast(page: Page, selector: string): Promise<n
       return 0.2126 * f(c[0] ?? 0) + 0.7152 * f(c[1] ?? 0) + 0.0722 * f(c[2] ?? 0);
     };
     let bg = [255, 255, 255];
-    for (let p: Element | null = el; p !== null; p = p.parentElement) {
+    // The ring is drawn outside the element, past a gap of `outline-offset`. So it sits on what is behind the element,
+    // not on the element's own fill. With no gap it touches the element, and its own fill counts.
+    const gap = parseFloat(style.outlineOffset) > 0;
+    for (let p: Element | null = gap ? el.parentElement : el; p !== null; p = p.parentElement) {
       const c = parse(getComputedStyle(p).backgroundColor);
       if (c.length < 4 || (c[3] ?? 1) > 0.99) {
         if (c.length >= 3 && getComputedStyle(p).backgroundColor !== "rgba(0, 0, 0, 0)") {
