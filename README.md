@@ -104,7 +104,7 @@ The folder must not exist yet. The example it copies is `examples/market/`, whic
 
 ## Local inspector
 
-`npm run build:inspector` writes `dist/inspector/server.mjs`, a small local server that speaks the Model Context Protocol on standard streams, and `dist/inspector/cli.mjs`, the same three tools on the command line. The tools (`explain_plot`, `audit_projection`, `check_adapter`) work on three invented in memory fixtures only. They read no file, open no address and run no command from an argument. `powers/plot-checks/` holds a skills only power that uses them to review an adapter. The inspector is registered, switched off, in `.kiro/settings/mcp.json`. Switching it on is a step for a person.
+`npm run build:inspector` writes `dist/inspector/server.mjs`, a small local server that speaks the Model Context Protocol on standard streams, and `dist/inspector/cli.mjs`, the same three tools on the command line. The tools (`explain_plot`, `audit_projection`, `check_adapter`) work on three invented in memory fixtures only. They read no file, open no address and run no command from an argument. `powers/plot-checks/` holds a skills only power that uses them to review an adapter. The inspector is registered in `.kiro/settings/mcp.json`. Switching it on is a step for a person.
 
 ## How to test
 
@@ -124,6 +124,7 @@ npm run check:public && npm run check:licenses && npm run check:links && npm run
 - `node scripts/check-imports.mjs` fails the build when a layer imports something it must not. For example, the template never imports an app.
 - The browser specs of the site (`release`, `share-print`, `judge-guide`) need the assembled site, so run `npm run build:apps` and `npm run assemble:site` first. They cover direct entry and refresh on every page, the content policy, the offline cache, the two sample visitor files, and the print documents on A4 and Letter.
 - `npm run check:public`, `check:licenses`, `check:links` and `check:release` check public text, notices, links, and the built site with its proof pictures.
+- `check:public` always checks dashes and local paths. It also checks a list of banned words that is kept outside this repository, in a JSON file of lists of words. Set `PLOTWARDEN_BANNED_WORDS` to the path of that file. When the variable is not set, `check:public` prints one line to say the word lists were skipped and runs every other check.
 - No test makes a network request.
 
 ## Privacy

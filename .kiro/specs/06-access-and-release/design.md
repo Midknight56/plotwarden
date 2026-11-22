@@ -334,6 +334,14 @@ One version has one cache, named `plotwarden-shell-<version>`. The version is th
 | Focus ring compared with the fill of the control, not with what is behind it | `tests/helpers/measureLayout.ts` `focusRingContrast` | `accessibility.spec.ts` ring test |
 
 The last row changes a measurement, not the app. The ring sits 2 px outside the control, past an `outline-offset`, so the page behind it is its background. A ring that must also reach 3 to 1 against a mid green fill cannot be made, and WCAG 1.4.11 asks for the colours next to the indicator. The ring colour was not changed.
+## Z-D13 Banned words outside the repository (Z19)
+
+`scripts/lib/publicText.mjs` keeps the generic rules: dash, local path. It exports `compileBanned(lists)`, which checks that the lists are an object of lists of words and returns one whole word, case blind matcher for each list that holds a word, and `loadBannedWords(file)`, which reads a JSON file and calls it. `scanText(path, text, banned)` takes the compiled lists as an optional third argument, and reports each finding under the name of its list. With none, it runs the generic rules only.
+
+`scripts/check-public.mjs` reads the file named by `PLOTWARDEN_BANNED_WORDS`. With the variable unset it prints one line, `check-public: the banned word lists were skipped, PLOTWARDEN_BANNED_WORDS is not set`, and runs every other check. With the variable set and a bad file it exits 2 and scans nothing, so a typo in the path cannot pass as a clean run.
+
+The two scripts, which were skipped because they held the words, are scanned like any other file. The four tests that hold dashes and local paths as data stay let off those two rules, and are read for words. The tests write their own placeholder lists to a temporary file under `.local/`. The test process clears the variable before it starts a child, so the result does not depend on the shell that runs it.
+
 ## Z-D11 Evidence
 
 Each task row in `docs/kiro-log.md` names its red run and its green run. The log holds no local absolute path. Browser results say headless Chromium on one Windows machine. Results from a unit test, a browser assertion and a person's review of a picture are labelled apart. No claim about users, speed on other machines or other browsers is made.

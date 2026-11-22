@@ -201,6 +201,18 @@ Tests: `layout.spec.ts`, `accessibility.spec.ts`, `recovery.spec.ts`, `tests/uni
 7. When a site holds 20,000 domain records, archived and voided ones included, the churchyard and the garden shall refuse a command that makes one more, name the item, and change nothing. The market example does not enforce this limit yet.
 8. When a practice register is built twice from one ID source, its event IDs shall be equal too. The write time stays one fixed time.
 9. When the ring of a focused control is measured, its contrast shall be taken against what is behind the ring. A ring drawn after a gap of `outline-offset` is behind the element, not on its fill.
+## Z19 Banned words live outside the repository
+
+Tests: T36 (`tests/unit/release.test.ts`). Implements R22 and Z10.8. Built in task 07-evidence.
+
+1. When `check:public` runs, the repository shall hold no list of banned words, and no file of it shall hold one of those words, in a script, a test, a comment or a document. The lists live in a JSON file outside the repository: an object of lists, each a list of non empty strings. The file the author keeps has two lists, one for model and maker names and one for words about a competition. The code does not name them: the name of a list is the name of its rule.
+2. When the environment variable `PLOTWARDEN_BANNED_WORDS` names a readable file of that shape, `check:public` shall flag each word of each list as a whole word, in any letter case, on any line of any public file. A finding shall read `file:line: list: word`.
+3. When the variable is not set, or is empty, `check:public` shall print one line that says the banned word lists were skipped, and shall still run the dash, local path and every other check, with the same exit code as before.
+4. When the variable is set and the file is missing, cannot be read, is not JSON, holds no list, or has a list that is not a list of non empty strings, `check:public` shall exit 2, name the problem, and scan nothing.
+5. When the tests cover this, they shall use invented placeholder words written to a temporary JSON file, and no real name.
+6. The dash and local path checks stay in the repository. The heading and the file name that were allowed for the old fixed list are no longer special, because no list in the repository names them.
+7. The scripts and the tests that held the old lists are scanned like every other file. Four tests are let off the dash and local path rules only, because they hold those as data.
+
 ---
 
 ## Not claimed

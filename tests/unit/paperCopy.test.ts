@@ -321,7 +321,7 @@ describe("the words of the shared screens", () => {
 
   it("says nothing about how the words or the code were made", () => {
     // Generic words only. A public file names no product or provider, so none is listed here.
-    const bad = Object.entries(COPY).filter(([, text]) => /\b(ai|llm|chatbot|assistant|machine learning|language model|generated)\b/i.test(text)).map(([key]) => key);
+    const bad = Object.entries(COPY).filter(([, text]) => /\b(ai|chatbot|assistant|machine learning|generated)\b/i.test(text)).map(([key]) => key);
     expect(bad).toEqual([]);
   });
 });

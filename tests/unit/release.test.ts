@@ -14,7 +14,7 @@ import { dirname, join, relative } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { scanText } from "../../scripts/lib/publicText.mjs";
+import { compileBanned, loadBannedWords, scanText } from "../../scripts/lib/publicText.mjs";
 import { buildVisitorFiles } from "../../tools/site/visitorFiles";
 
 const repo = fileURLToPath(new URL("../..", import.meta.url));
@@ -36,8 +36,11 @@ interface Ran {
   err: string;
 }
 
-function run(script: string, args: string[], timeout = 60_000): Ran {
-  const result = spawnSync(process.execPath, [join(repo, "scripts", script), ...args], { encoding: "utf8", cwd: repo, timeout });
+/** Run a script as a process. The banned words variable is cleared first, so the result does not depend on the shell that runs the test. */
+function run(script: string, args: string[], timeout = 60_000, env: Record<string, string> = {}): Ran {
+  const base = { ...process.env };
+  delete base.PLOTWARDEN_BANNED_WORDS;
+  const result = spawnSync(process.execPath, [join(repo, "scripts", script), ...args], { encoding: "utf8", cwd: repo, timeout, env: { ...base, ...env } });
   return { code: result.status, out: result.stdout, err: result.stderr };
 }
 
@@ -115,28 +118,101 @@ describe("T36 public text: dashes between words", () => {
   });
 });
 
-describe("T36 public text: names, contest words and local paths", () => {
-  const rules = (text: string, path = "docs/a.md"): string[] => scanText(path, text).map((f) => f.rule);
+// Invented words. The real lists live in a file outside the repository (spec 06, Z19), so no test here names a real one.
+const PLACEHOLDER_LISTS = { vendor: ["Zorblax", "Flumph Labs"], other: ["Quibblewick", "Grand Wobble Cup"] };
 
-  it.each(["Claude", "Anthropic", "OpenAI", "ChatGPT", "GPT-4", "Gemini", "Copilot", "Opus", "Sonnet", "a language model", "an LLM"])("flags the name %s", (word) => {
+/** Write a banned words file in a folder of its own, outside any tree that a check reads, and return its path. */
+function wordsFile(lists: unknown): string {
+  const file = join(fresh("words"), "words.json");
+  writeFileSync(file, JSON.stringify(lists));
+  return file;
+}
+
+describe("T36 public text: banned words from a file", () => {
+  const banned = (): ReturnType<typeof loadBannedWords> => loadBannedWords(wordsFile(PLACEHOLDER_LISTS));
+  const rules = (text: string, path = "docs/a.md"): string[] => scanText(path, text, banned()).map((f) => f.rule);
+
+  it.each(["Zorblax", "Flumph Labs", "ZORBLAX", "zorblax", "Zorblax-9"])("flags the vendor word %s in any letter case", (word) => {
     expect(rules(`Made with ${word} today.`)).toEqual(["vendor"]);
     expect(rules(`Made with ${word.toLowerCase()} today.`, "site/src/copy.ts")).toEqual(["vendor"]);
   });
 
-  it("lets Kiro stand", () => {
+  it.each(["Quibblewick", "quibblewick", "Grand Wobble Cup"])("flags the word %s of the second list", (word) => {
+    expect(rules(`See the ${word} page.`)).toEqual(["other"]);
+    expect(rules(`// ${word} note`, "apps/x/src/rules.ts")).toEqual(["other"]);
+  });
+
+  it("matches a whole word only", () => {
+    expect(rules("The Zorblaxian ferry and a Quibblewicker.")).toEqual([]);
+    expect(rules("(Zorblax), Quibblewick.")).toEqual(["vendor", "other"]);
+  });
+
+  it("reports the line and the word", () => {
+    expect(scanText("docs/a.md", "fine\nfine\nMade with Zorblax", banned())).toEqual([{ line: 3, rule: "vendor", match: "Zorblax" }]);
+  });
+
+  it("reports one finding of each list for a line", () => {
+    expect(rules("Zorblax and Flumph Labs and Quibblewick and Grand Wobble Cup")).toEqual(["vendor", "other"]);
+  });
+
+  it("lets Kiro stand, and the words that the old fixed lists would have caught are not special any more", () => {
     expect(rules("Kiro wrote the specs. Kiro CLI ran the tests. Kiro Crew hosts the Desk.")).toEqual([]);
+    expect(rules("Judging criteria at a glance, and the judges say.")).toEqual([]);
   });
 
-  it.each(["hackathon", "Devpost", "Kiroween", "prize", "prizes", "contest", "Skeleton Crew", "the judges", "judging"])("flags the word %s", (word) => {
-    expect(rules(`See the ${word} page.`)).toEqual(["contest"]);
+  it("escapes a word that holds a pattern character", () => {
+    const dotted = compileBanned({ vendor: ["a.b", "c+d"], other: [] });
+    expect(scanText("docs/a.md", "an axb and a ccd", dotted)).toEqual([]);
+    expect(scanText("docs/a.md", "an a.b and a c+d", dotted).map((f) => f.rule)).toEqual(["vendor"]);
   });
 
-  it("lets through the one heading and the one file name that the plan fixes", () => {
-    expect(rules("Judging criteria at a glance")).toEqual([]);
-    expect(rules("See [the path](docs/judge-guide.md).")).toEqual([]);
-    expect(rules("Judging criteria at a glance, and the judges say.")).toEqual(["contest"]);
+  it("takes empty lists", () => {
+    expect(scanText("docs/a.md", "Zorblax Quibblewick", compileBanned({ vendor: [], other: [] }))).toEqual([]);
   });
 
+  it("runs only the generic rules when no list is given", () => {
+    expect(scanText("docs/a.md", "Made with Zorblax for Quibblewick.")).toEqual([]);
+    expect(scanText("docs/a.md", "Zorblax \u2014 Quibblewick").map((f) => f.rule)).toEqual(["dash"]);
+    expect(scanText("docs/a.md", "See C:/Users/someone/x").map((f) => f.rule)).toEqual(["local-path"]);
+  });
+
+  it("still runs the generic rules when a list is given", () => {
+    expect(scanText("docs/a.md", "Zorblax \u2014 here", banned()).map((f) => f.rule)).toEqual(["dash", "vendor"]);
+    expect(scanText("docs/a.md", "Zorblax is in C:/Users/someone/x", banned()).map((f) => f.rule)).toEqual(["vendor", "local-path"]);
+  });
+});
+
+describe("T36 public text: the banned words file", () => {
+  it("reads the file at a path", () => {
+    const loaded = loadBannedWords(wordsFile(PLACEHOLDER_LISTS));
+    expect(scanText("docs/a.md", "Zorblax", loaded)).toHaveLength(1);
+    expect(scanText("docs/a.md", "Quibblewick", loaded)).toHaveLength(1);
+  });
+
+  it.each([
+    ["not an object", [], /object/],
+    ["null", null, /object/],
+    ["an object with no list", {}, /no list/],
+    ["a list that is a string", { vendor: "Zorblax", other: [] }, /"vendor"/],
+    ["a list that is an object", { vendor: [], other: {} }, /"other"/],
+    ["a number in a list", { vendor: [3], other: [] }, /"vendor"/],
+    ["an empty word", { vendor: [], other: [""] }, /"other"/],
+    ["a word of blanks", { vendor: ["  "], other: [] }, /"vendor"/],
+  ])("refuses %s and names the list", (_name, lists, message) => {
+    expect(() => compileBanned(lists)).toThrow(message);
+  });
+
+  it("refuses a missing file and a file that is not JSON", () => {
+    const folder = fresh("words");
+    expect(() => loadBannedWords(join(folder, "none.json"))).toThrow(/banned words/i);
+    const broken = join(folder, "broken.json");
+    writeFileSync(broken, "{ not json");
+    expect(() => loadBannedWords(broken)).toThrow(/banned words/i);
+  });
+});
+
+describe("T36 public text: local paths", () => {
+  const rules = (text: string, path = "docs/a.md"): string[] => scanText(path, text).map((f) => f.rule);
   it.each(["D:\\Projects\\plotwarden\\README.md", "C:\\Users\\someone\\x", "/Users/someone/x", "/home/someone/x", "file:///C:/Users/someone/x", "C:/Users/someone"])("flags the local path %s", (path) => {
     expect(rules(`Look in ${path} for it.`)).toEqual(["local-path"]);
   });
@@ -1008,46 +1084,120 @@ describe("T36 check:links", () => {
 // ---- public text over a tree ------------------------------------------------------------------------------------
 
 describe("T36 check:public", () => {
-  const check = (root: string): Ran => run("check-public.mjs", ["--root", root]);
+  const check = (root: string, env: Record<string, string> = {}): Ran => run("check-public.mjs", ["--root", root], 60_000, env);
+  const withWords = (): Record<string, string> => ({ PLOTWARDEN_BANNED_WORDS: wordsFile(PLACEHOLDER_LISTS) });
+  const skipLines = (out: string): string[] => out.split("\n").filter((line) => /skipped/.test(line));
 
   it("passes clean text and names nothing", () => {
     const root = fresh("public");
-    put(root, "README.md", "# Plotwarden\n\nKiro wrote the specs. Judging criteria at a glance\n");
+    put(root, "README.md", "# Plotwarden\n\nKiro wrote the specs.\n");
     put(root, "docs/guide.md", "Open the register, then close it.\n");
     put(root, "site/index.html", "<!doctype html><title>Plotwarden</title><p>Plot registers.</p>");
-    const result = check(root);
+    const result = check(root, withWords());
     expect(result.err).toBe("");
     expect(result.code).toBe(0);
     expect(result.out).toContain("check-public: ok");
+    expect(skipLines(result.out)).toEqual([]);
   });
 
   it("fails each kind of fault with its file and line, in text and in source", () => {
     const root = fresh("public");
     put(root, "README.md", "fine\nOpen it \u2014 close it\n");
-    put(root, "docs/a.md", "fine\nfine\nMade with Claude\n");
-    put(root, "docs/b.md", "A hackathon entry\n");
+    put(root, "docs/a.md", "fine\nfine\nMade with Zorblax\n");
+    put(root, "docs/b.md", "A Quibblewick entry\n");
     put(root, "docs/c.md", "See D:\\Projects\\plotwarden\\x\n");
-    put(root, "apps/x/src/rules.ts", "// Sonnet wrote this\n");
-    const result = check(root);
+    put(root, "apps/x/src/rules.ts", "// Flumph Labs wrote this\n");
+    const result = check(root, withWords());
     expect(result.code).toBe(1);
     expect(result.err).toContain("README.md:2: dash");
-    expect(result.err).toContain("docs/a.md:3: vendor");
-    expect(result.err).toContain("docs/b.md:1: contest");
+    expect(result.err).toContain("docs/a.md:3: vendor: Zorblax");
+    expect(result.err).toContain("docs/b.md:1: other: Quibblewick");
     expect(result.err).toContain("docs/c.md:1: local-path");
-    expect(result.err).toContain("apps/x/src/rules.ts:1: vendor");
+    expect(result.err).toContain("apps/x/src/rules.ts:1: vendor: Flumph Labs");
+    expect(skipLines(result.out)).toEqual([]);
+  });
+
+  it("with no variable, says once that the two lists were skipped, and still runs every other check", () => {
+    const clean = fresh("public");
+    put(clean, "docs/a.md", "Made with Zorblax for the Quibblewick.\n");
+    const skipped = check(clean);
+    expect(skipped.err).toBe("");
+    expect(skipped.code).toBe(0);
+    expect(skipLines(skipped.out)).toHaveLength(1);
+    expect(skipLines(skipped.out)[0]).toContain("banned word lists");
+    expect(skipped.out).toContain("check-public: ok");
+
+    const faulty = fresh("public");
+    put(faulty, "README.md", "fine\nOpen it \u2014 close it\n");
+    put(faulty, "docs/c.md", "See D:\\Projects\\plotwarden\\x\n");
+    put(faulty, "docs/a.md", "Made with Zorblax\n");
+    const result = check(faulty);
+    expect(result.code).toBe(1);
+    expect(result.err).toContain("README.md:2: dash");
+    expect(result.err).toContain("docs/c.md:1: local-path");
+    expect(result.err).not.toContain("vendor");
+    expect(skipLines(result.out)).toHaveLength(1);
+  });
+
+  it("treats an empty variable as not set", () => {
+    const root = fresh("public");
+    put(root, "docs/a.md", "Made with Zorblax\n");
+    const result = check(root, { PLOTWARDEN_BANNED_WORDS: "" });
+    expect(result.code).toBe(0);
+    expect(skipLines(result.out)).toHaveLength(1);
+  });
+
+  it("exits 2 and scans nothing when the file is missing, not JSON, or the wrong shape", () => {
+    const root = fresh("public");
+    put(root, "docs/a.md", "fine\n");
+    const folder = fresh("words");
+    const broken = join(folder, "broken.json");
+    writeFileSync(broken, "{ not json");
+    const wrong = wordsFile({ vendor: "Zorblax", other: [] });
+    for (const file of [join(folder, "none.json"), broken, wrong]) {
+      const result = check(root, { PLOTWARDEN_BANNED_WORDS: file });
+      expect(result.code).toBe(2);
+      expect(result.err).toMatch(/banned words/i);
+      expect(result.out).not.toContain("check-public: ok");
+      expect(skipLines(result.out)).toEqual([]);
+    }
   });
 
   it("reads the built site pages too, and leaves node_modules, dist apps and the lock file alone", () => {
     const root = fresh("public");
-    put(root, "dist/site/index.html", "<p>one \u2014 two</p>");
+    put(root, "dist/site/index.html", "<p>one \u2014 two</p><p>Zorblax</p>");
     put(root, "dist/apps/hub/index.html", "<p>one \u2014 two</p>");
-    put(root, "node_modules/x/README.md", "Claude \u2014 x");
-    put(root, "package-lock.json", '{"x":"Claude"}');
-    const result = check(root);
+    put(root, "node_modules/x/README.md", "Zorblax \u2014 x");
+    put(root, "package-lock.json", '{"x":"Zorblax"}');
+    const result = check(root, withWords());
     expect(result.code).toBe(1);
     expect(result.err).toContain("dist/site/index.html:1: dash");
+    expect(result.err).toContain("dist/site/index.html:1: vendor");
     expect(result.err).not.toContain("dist/apps");
     expect(result.err).not.toContain("node_modules");
     expect(result.err).not.toContain("package-lock");
+  });
+
+  it("scans its own script and its library, which are no longer skipped", () => {
+    const root = fresh("public");
+    for (const rel of ["scripts/check-public.mjs", "scripts/lib/publicText.mjs"]) put(root, rel, readFileSync(join(repo, rel), "utf8"));
+    const result = check(root, withWords());
+    expect(result.err).toBe("");
+    expect(result.code).toBe(0);
+    expect(result.out).toContain("check-public: ok, 2 files");
+  });
+
+  it("reads the words in the files that are let off the generic rules, and lets them off those rules only", () => {
+    const root = fresh("public");
+    put(root, "scripts/lib/publicText.mjs", "// Zorblax\n");
+    put(root, "scripts/check-public.mjs", "// Quibblewick\n");
+    put(root, "tests/unit/release.test.ts", 'const a = "Zorblax"; const b = "See C:/Users/someone/x";\n');
+    put(root, "tests/unit/copy.test.ts", 'const b = "See C:/Users/someone/x";\n');
+    const result = check(root, withWords());
+    expect(result.code).toBe(1);
+    expect(result.err).toContain("scripts/lib/publicText.mjs:1: vendor: Zorblax");
+    expect(result.err).toContain("scripts/check-public.mjs:1: other: Quibblewick");
+    expect(result.err).toContain("tests/unit/release.test.ts:1: vendor: Zorblax");
+    expect(result.err).not.toContain("local-path");
   });
 });

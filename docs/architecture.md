@@ -85,7 +85,7 @@ A register can write a review file (`plot.review.v1`) with the checks that need 
 | `scripts/lock-desk.mjs` | Writes the Desk lock on a person's command, and never replaces one without `--replace` |
 | `scripts/assemble-site.mjs` | Verifies the Desk preview against the lock, then composes `dist/site/`. Never writes the lock |
 | `scripts/build-sw.mjs` | Stamps the worker with its version and file list |
-| `scripts/check-public.mjs` | Public text has no dash between words, no model or maker name, no word about entering or winning, no local path |
+| `scripts/check-public.mjs` | Public text has no dash between words and no local path. It also has none of the words in a list kept outside the repository, named by `PLOTWARDEN_BANNED_WORDS`. Without that variable it says the lists were skipped |
 | `scripts/check-licenses.mjs` | Every shipped package has a row in `THIRD_PARTY_NOTICES.md` |
 | `scripts/check-links.mjs` | Every link in the README and `docs/` resolves |
 | `scripts/check-release.mjs` | The built site is a set of real pages, with no remote asset, no billing address, no server code, one policy per page, a matching worker version and Desk copy, and every route has its proof pictures |
