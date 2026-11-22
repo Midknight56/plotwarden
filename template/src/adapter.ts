@@ -7,7 +7,7 @@ import { replay } from "./events";
 import { LIMITS } from "./limits";
 import { checkSiteKind } from "./site";
 import { err, ok } from "./types";
-import type { DomainError, FieldError, Result, Site } from "./types";
+import type { Claim, DomainError, FieldError, Result, Site } from "./types";
 
 export type Audience = "private" | "visitor" | "committee";
 
@@ -84,6 +84,11 @@ export interface RegisterAdapter<S, C extends { type: string }, E extends { type
   project(snapshot: S, audience: Audience, asOf: LocalDate): unknown;
   reports: ReportBuilder<S>[];
   reviewFacts(snapshot: S, asOf: LocalDate): ReviewFact[];
+  /**
+   * The earliest day a claim with no start could mean, for a view of the site at a past date. Optional. Absent means a
+   * claim with no start is in force on every date. The answer is never stored.
+   */
+  claimFloor?(snapshot: S, claim: Claim): LocalDate | undefined;
   /** Checks with fingerprints, private strings and record routes, for the Exchange screen. Optional. */
   review?: ReviewSupport<S>;
   labels: CopyCatalog;

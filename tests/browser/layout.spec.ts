@@ -77,6 +77,25 @@ for (const app of APPS) {
       expect(requests.external).toEqual([]);
     });
 
+    test("the map route as at a past date is laid out well, and no name on it lies on a plot", async ({ page }) => {
+      const requests = trackRequests(page, app.origin);
+      const siteId = await openPractice(page, app);
+      const date = app.key === "churchyard" ? "1900-01-01" : "2025-03-31";
+      await page.goto(`/#/r/${siteId}/map`);
+      await settle(page);
+      await page.getByLabel("Show the site as at", { exact: true }).fill(date);
+      await expect(page.getByRole("heading", { level: 2, name: `As at ${date}` })).toBeVisible();
+      await expect(page.getByRole("button", { name: "Back to today" })).toBeVisible();
+      await settle(page);
+      await check(page, `map as at ${date}`);
+      const scenes = await page.evaluate(readSheetScene);
+      expect(scenes.length).toBeGreaterThanOrEqual(1);
+      const onPlot = findLabelCollisions(scenes).filter((v) => v.rule === "label_on_plot");
+      expect(onPlot, JSON.stringify(onPlot, null, 1)).toEqual([]);
+      await proof(page, folder, "route-map-as-at");
+      expect(requests.external).toEqual([]);
+    });
+
     test("a dialog is laid out well, and a state of an unknown address, an empty form and a refused command too", async ({ page }) => {
       const siteId = await openPractice(page, app);
       const { register } = await routesOf(page, app, siteId);

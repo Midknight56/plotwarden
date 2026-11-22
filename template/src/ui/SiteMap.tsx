@@ -4,8 +4,9 @@ import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode, RefObject } from "react";
 import { buildSheet } from "../map/sheet";
 import type { KeyState, SheetModel, SheetPlot } from "../map/sheet";
+import { AsAtField, AsAtHeading } from "./AsAtField";
 import { Button, ButtonLink, Notice, SelectField } from "./controls";
-import { plotCountText, plotRows } from "./plotView";
+import { asAtOf, claimFloorFor, plotCountText, plotRows, queryOf } from "./plotView";
 import { useRegister, useShell } from "./shellContext";
 
 /** The width of an element, kept up to date. The sheet is built for this width. */
@@ -231,16 +232,20 @@ export function MapKey() {
 }
 
 export function SiteMap() {
-  const { t, route, navigate } = useShell();
+  const { t, app, route, navigate } = useShell();
   const open = useRegister();
   const base = `#/r/${open.site.id}`;
   const selected = route.query.get("plot") ?? "";
+  // The view date is in the address as `asAt`, a date and nothing else. Today has no `asAt`.
+  const asAt = asAtOf(route.query, open.today);
+  const viewDate = asAt ?? open.today;
   const [zoom, setZoom] = useState(1);
   const [printStatus, setPrintStatus] = useState<"idle" | "preparing" | "ready">("idle");
   const holder = useRef<HTMLDivElement>(null);
   const width = useElementWidth(holder);
 
-  const rows = useMemo(() => plotRows(open, t), [open, t]);
+  const floor = useMemo(() => claimFloorFor(app, open.state), [app, open.state]);
+  const rows = useMemo(() => plotRows(open, t, viewDate, floor), [open, t, viewDate, floor]);
   const sheet = useMemo(
     () =>
       buildSheet(
@@ -268,11 +273,13 @@ export function SiteMap() {
       <h1>{t("siteMap")}</h1>
       <div className="actions no-print">
         <ButtonLink href={base}>{t("backToRegister")}</ButtonLink>
-        <ButtonLink href={`${base}/list${selected === "" ? "" : `?plot=${selected}`}`} primary>
+        <ButtonLink href={`${base}/list${queryOf({ plot: selected, asAt })}`} primary>
           {t("openPlotList")}
         </ButtonLink>
         <ButtonLink href={`${base}/map/edit`}>{t("editMap")}</ButtonLink>
       </div>
+
+      <AsAtHeading date={viewDate} today={open.today} />
 
       {sheet.empty ? <p>{t("noMapYet")}</p> : null}
       <div ref={holder} className="sheet-scroll" role="region" aria-label={t("siteMap")} tabIndex={0}>
@@ -280,11 +287,18 @@ export function SiteMap() {
       </div>
       <MapKey />
 
+      <AsAtField
+        withHeading={false}
+        date={viewDate}
+        today={open.today}
+        onChange={(date) => navigate(`/r/${open.site.id}/map${queryOf({ plot: selected, asAt: date === open.today ? undefined : date })}`, { search: route.search })}
+      />
+
       <div className="no-print stack">
         <SelectField
           label={t("choosePlot")}
           value={selected}
-          onChange={(value) => navigate(`/r/${open.site.id}/map${value === "" ? "" : `?plot=${value}`}`, { replace: true })}
+          onChange={(value) => navigate(`/r/${open.site.id}/map${queryOf({ plot: value, asAt })}`, { replace: true, search: route.search })}
           options={[{ value: "", label: t("noPlotChosen") }, ...rows.map((r) => ({ value: r.plot.plotId, label: r.line }))]}
         />
         {chosen === undefined ? null : (
@@ -317,7 +331,7 @@ export function SiteMap() {
 
       <section className="print-only stack" aria-hidden="false">
         <h2>{t("plotCodesHeading")}</h2>
-        <p>{t("asAt", { date: open.today })}</p>
+        <p>{t("asAt", { date: viewDate })}</p>
         <p>{plotCountText(rows.length, t)}</p>
         <ul className="plain print-index">
           {rows.map((r) => (

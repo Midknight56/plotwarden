@@ -47,10 +47,42 @@ export function claimInterval(claim: Claim): Interval {
   return span;
 }
 
-function viewOf(space: Space, claims: readonly Claim[], date: LocalDate): SpaceView {
+/**
+ * The earliest day a claim with no start could mean, or nothing. An adapter supplies it for a view at a past date.
+ * It is never stored and never changes a claim.
+ */
+export type ClaimFloor = (claim: Claim) => LocalDate | undefined;
+
+/** The span of a claim for a view at a date. A claim with no start takes the adapter's earliest day, if it names one. */
+function spanFor(claim: Claim, floor: ClaimFloor | undefined): Interval {
+  const span = claimInterval(claim);
+  if (span.start === undefined && floor !== undefined) {
+    const earliest = floor(claim);
+    if (earliest !== undefined) span.start = earliest;
+  }
+  return span;
+}
+
+function inForce(claims: readonly Claim[], date: LocalDate, floor: ClaimFloor | undefined): Claim[] {
+  return claims.filter((c) => c.voided !== true && intervalCovers(spanFor(c, floor), date));
+}
+
+/**
+ * The claims on a space that are in force on a date, with the claims as they stand now (current corrections). A claim
+ * with no start is in force on every date, unless `floor` names the earliest day it could mean.
+ */
+export function claimsInForce(state: CoreState, spaceId: Uuid, date: LocalDate, floor?: ClaimFloor): Claim[] {
+  return inForce(
+    Object.values(state.claims).filter((c) => c.spaceId === spaceId),
+    date,
+    floor,
+  );
+}
+
+function viewOf(space: Space, claims: readonly Claim[], date: LocalDate, floor?: ClaimFloor): SpaceView {
   if (space.retired) return { checked: space.checked, retired: true };
   if (!space.checked) return { checked: false, retired: false };
-  const covering = claims.filter((c) => c.voided !== true && intervalCovers(claimInterval(c), date));
+  const covering = inForce(claims, date, floor);
   let state: PhysicalState = "free";
   if (covering.some((c) => c.mode === "taken")) state = "taken";
   else if (covering.some((c) => c.mode === "held")) state = "reserved";
@@ -68,12 +100,12 @@ function claimsBySpace(state: CoreState): Map<Uuid, Claim[]> {
   return map;
 }
 
-function summarise(plot: Plot, bySpace: Map<Uuid, Claim[]>, date: LocalDate): PlotSummary {
+function summarise(plot: Plot, bySpace: Map<Uuid, Claim[]>, date: LocalDate, floor?: ClaimFloor): PlotSummary {
   const counts = zeroCounts();
   let unchecked = 0;
   let active = 0;
   for (const space of plot.spaces) {
-    const view = viewOf(space, bySpace.get(space.spaceId) ?? [], date);
+    const view = viewOf(space, bySpace.get(space.spaceId) ?? [], date, floor);
     if (view.retired) continue;
     active += 1;
     if (view.state === undefined) unchecked += 1;
@@ -93,20 +125,20 @@ function summarise(plot: Plot, bySpace: Map<Uuid, Claim[]>, date: LocalDate): Pl
 }
 
 /** The state of one space at a date. Undefined when no such space exists. */
-export function spaceStateAt(state: CoreState, spaceId: Uuid, date: LocalDate): SpaceView | undefined {
+export function spaceStateAt(state: CoreState, spaceId: Uuid, date: LocalDate, floor?: ClaimFloor): SpaceView | undefined {
   for (const plot of Object.values(state.plots)) {
     const space = plot.spaces.find((s) => s.spaceId === spaceId);
     if (space === undefined) continue;
     const claims = Object.values(state.claims).filter((c) => c.spaceId === spaceId);
-    return viewOf(space, claims, date);
+    return viewOf(space, claims, date, floor);
   }
   return undefined;
 }
 
-export function plotSummaryAt(state: CoreState, plotId: Uuid, date: LocalDate): PlotSummary | undefined {
+export function plotSummaryAt(state: CoreState, plotId: Uuid, date: LocalDate, floor?: ClaimFloor): PlotSummary | undefined {
   const plot = state.plots[plotId];
   if (plot === undefined) return undefined;
-  return summarise(plot, claimsBySpace(state), date);
+  return summarise(plot, claimsBySpace(state), date, floor);
 }
 
 /** Totals at a date. `include` limits them to some plots, for one section for example. */

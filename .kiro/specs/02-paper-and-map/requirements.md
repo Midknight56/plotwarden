@@ -260,3 +260,22 @@ Tests: T05 (`tests/unit/sheet.test.ts`, `tests/unit/measureLabels.test.ts`), bro
 5. When a plot is selected, the code tab shall sit beside that plot and touch its box, shall cover no other plot, and no name shall lie over it. The tab shall be at 14 px. When the only place that touches is under the lowest plot, the sheet shall grow below the drawing to hold it.
 6. When names are drawn, the text shall stay at 12 px.
 7. When the map routes of both registers are measured in a browser at 360 by 640 and 1920 by 1080, the box of every name drawn as `svg` text (gate, section, path and tab) shall overlap no plot shape. The code of a plot inside its own plot is not a name in this sense.
+
+---
+
+## P20 The site as it was on a date
+
+Tests: `tests/unit/asAt.test.ts`, browser `warden-family.spec.ts`, `secretary-season.spec.ts` and `layout.spec.ts`. Implements spec 01 status at a date, the records rule "never infer a date", R23. Owner: 02-paper-and-map.
+
+Terms. **View date** is the day the Site map or the Plot list is drawn for. It is today unless the keeper typed an earlier day. A **past view** is a view whose date is before today.
+
+1. When the Site map or the Plot list is shown, it shall hold a date field "Show the site as at" that starts at today. The field is a text field with the hint "Year, month, day, for example 2026-04-20". It is the only new control. It has an accessible name, a 44 px target and the usual layout measures.
+2. When the keeper types a valid date before today, the register shall redraw the marks, the counts, the filtered list and every summary line from the claims in force on that date, using the claims as they stand with current corrections. No stored event changes and none is written.
+3. When a past view is shown, the page shall carry a heading "As at {date}" under the page title and a button "Back to today". "Back to today" shall return the view to today, put today in the field and move focus to the field.
+4. When the typed text is today, it shall show the view of today with no heading and no button. The text is valid when it is a real day written YYYY-MM-DD with a year from 1000 to 9999. A date after today, a text that is not a date and an empty field shall change nothing on the page, mark the field invalid and show its message beside it ("Use a valid date." or "Choose today or an earlier date."). Focus is never moved off the field by the message. While the keeper is still typing, a text shorter than ten characters shows no message. A message shows at ten characters, when the keeper leaves the field, and on Enter.
+5. When a past view is shown, every form and every offer shall still use today. The map and the list shall hold no control that saves. A link from a past view to another screen shall not carry the date, so a plot screen, the map editor and every form read today.
+6. When a past view is printed, the print page shall carry "As at {date}" with that date and the index of plot codes with the states of that date. Today's view carries today's date.
+7. When a claim has no start, the register shall count it as in force on every date unless the adapter names an earliest day for it. For a past view the foundation shall ask the adapter, through one optional function `claimFloor(state, claim)`, for the earliest day a claim with no start could mean. The answer is used for that view only. It is never stored, never changes a claim and never applies to the view of today. A claim that has a start ignores the answer.
+8. When the churchyard adapter is asked, it shall read the burial that the claim names. A burial with a year only date gives the first day of that year. A burial with a month gives the first day of that month. A burial with no date, and a claim that names no burial, give no day, so that claim counts on every date. The template holds no churchyard rule.
+9. When the date is carried in the address, it shall be a query value `asAt` made of a date only. The address shall never hold a name, a search text or a `q` value. A date change adds one history entry and keeps in it any search text the current entry holds.
+10. When the view date has changed, Back shall return to the earlier view date with the filter and the highlighted plot kept, and the field shall show that date.

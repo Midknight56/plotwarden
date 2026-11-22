@@ -10,7 +10,7 @@ import { CORE_PAYLOAD_VERSION, applyCore } from "../../../template/src/events";
 import type { CoreEvent, DraftEvent } from "../../../template/src/events";
 import { LIMITS, checkRecordRoom, checkText } from "../../../template/src/limits";
 import { err, ok } from "../../../template/src/types";
-import type { DomainError, FieldError, Result, Uuid } from "../../../template/src/types";
+import type { Claim, DomainError, FieldError, Result, Uuid } from "../../../template/src/types";
 import { CHURCH_COMMAND_TYPES } from "./types";
 import type { ApprovalStatus, Approval, Burial, ChurchCommand, ChurchEvent, ChurchState, Memorial, Person, PublicSettings, Request, Reservation } from "./types";
 
@@ -64,6 +64,17 @@ export function claimStartOf(date: PartialDate): LocalDate | undefined {
 }
 
 const yearOf = (date: PartialDate): number | undefined => (date.p === "unknown" ? undefined : date.y);
+
+/**
+ * The earliest day a claim with no start could mean, for a view of the site at a past date. A burial dated by a year
+ * or a month gives no start (`claimStartOf`), so its claim is read from the first day that date could mean. A burial
+ * with no date, and a claim that names no burial, give no day. Nothing here is stored.
+ */
+export function claimFloorOf(state: ChurchState, claim: Claim): LocalDate | undefined {
+  if (claim.ref === undefined) return undefined;
+  const burial = state.burials[claim.ref];
+  return burial === undefined ? undefined : coveredInterval(burial.date)?.first;
+}
 
 function nameFields(name: string | undefined, unknown: boolean | undefined): FieldError[] {
   const has = !blank(name);

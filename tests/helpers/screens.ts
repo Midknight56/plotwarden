@@ -95,6 +95,24 @@ export function upload(name: string, text: string, mimeType = "text/csv"): { nam
 }
 
 /**
+ * A view date may be in the address. A name never is. No address in the session history holds any word of the given
+ * names, in any encoding, and none carries a `q` parameter.
+ */
+export async function expectNoNameInAddress(page: Page, names: readonly string[]): Promise<void> {
+  const seen = await page.evaluate(() => {
+    const nav = (window as unknown as { navigation?: { entries(): { url: string | null }[] } }).navigation;
+    return { href: location.href, entries: nav === undefined ? [] : nav.entries().map((e) => e.url ?? "") };
+  });
+  const addresses = [seen.href, page.url(), ...seen.entries];
+  const words = names.flatMap((name) => name.split(/\s+/)).filter((w) => w !== "");
+  for (const address of addresses) {
+    const decoded = decodeURIComponent(address).toLowerCase();
+    expect(/[?&]q=/.test(address), `a q parameter in ${address}`).toBe(false);
+    for (const word of words) expect(decoded.includes(word.toLowerCase()), `"${word}" in the address ${address}`).toBe(false);
+  }
+}
+
+/**
  * R22.2 after a search: no address in the session history holds the searched text, in any encoding, and no `q`
  * parameter. The text lives in `history.state`, so Back and a reload still find it there.
  */

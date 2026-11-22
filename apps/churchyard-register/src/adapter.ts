@@ -17,7 +17,7 @@ import { REVIEW_COMMAND_TYPES } from "../../../template/src/review";
 import { CHURCH_COPY } from "./copy";
 import { buildFamilyFile } from "./projection";
 import { churchReviewFacts, churchReviewSupport } from "./review";
-import { CHURCH_CTX, applyChurch, claimStartOf, decideChurch, emptyChurch, validateChurch } from "./rules";
+import { CHURCH_CTX, applyChurch, claimFloorOf, claimStartOf, decideChurch, emptyChurch, validateChurch } from "./rules";
 import { BURIALS, CHURCH_COMMAND_TYPES, CHURCH_KIND } from "./types";
 import type { Burial, ChurchCommand, ChurchEvent, ChurchState } from "./types";
 
@@ -42,6 +42,7 @@ export const churchAdapter: RegisterAdapter<ChurchState, ChurchCommand, ChurchEv
   },
   reports: [],
   reviewFacts: churchReviewFacts,
+  claimFloor: claimFloorOf,
   review: churchReviewSupport,
   labels: CHURCH_COPY,
   theme: { ink: "#22252C", paper: "#FAF5E9", accent: "#232A5C", plotShape: "arch" },

@@ -8,7 +8,8 @@ import { readFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 import { measureLayout, trackRequests } from "../helpers/measureLayout";
 import { CONTACT, INSCRIPTION_WORD, LIVING_HOLDERS, OTHER_OCCUPANT, PAGE_IMAGE_FILENAME, VISITOR_CANARIES } from "../helpers/privacyCanaries";
-import { expectSearchOutOfAddress } from "../helpers/screens";
+import { siteIdOf, storedEvents } from "../helpers/routes";
+import { expectNoNameInAddress, expectSearchOutOfAddress } from "../helpers/screens";
 
 const APP = "http://127.0.0.1:4176/";
 test.use({ baseURL: APP });
@@ -613,4 +614,117 @@ test("every map page of the keeper's own register shows the same plot a name sea
   await page.getByRole("button", { name: "Fit site" }).click();
   await expect(page.getByText("Zoom 100 percent")).toBeVisible();
   await check(page, "map");
+});
+
+test.describe("the site as it was", () => {
+  // Hand totals 1 and 4: Y07 holds a burial of 2 June 1889 and one of 1921. Y01 is of 1871, Y05 has no date, Y04 is
+  // March 1902, Y06 is 1938 and Y09 is 1955. Today the practice register reads 2026-04-20 with six taken plots.
+  const NAMES = ["Quillmoss", "Mirel", "Pellwick", "Torin", "Thornwick", "Edda", "Ashgrove", "Wren"];
+  const Y07_TODAY = "Y07 · Yew Walk · Taken · 2 of 2 spaces used";
+  const Y07_1900 = "Y07 · Yew Walk · Taken · 1 of 2 spaces used";
+
+  test("redraws the map as at a past date, keeps today's forms, saves nothing and keeps names out of the address", async ({ page }) => {
+    const requests = trackRequests(page, APP);
+    await openFold(page);
+    const siteId = siteIdOf(page);
+    const eventsBefore = (await storedEvents(page, siteId)).length;
+    await page.getByRole("link", { name: "Map", exact: true }).click();
+    await expect(page.getByRole("heading", { level: 1, name: "Site map" })).toBeVisible();
+
+    // The field starts at today. No heading and no button show for today.
+    const field = page.getByLabel("Show the site as at", { exact: true });
+    await expect(field).toHaveValue("2026-04-20");
+    await expect(page.getByRole("heading", { level: 2, name: /^As at / })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Back to today" })).toHaveCount(0);
+    await page.getByLabel("Choose a plot", { exact: true }).selectOption({ label: Y07_TODAY });
+    const selected = page.getByRole("region", { name: "Selected plot" });
+    await expect(selected).toContainText(Y07_TODAY);
+    const solid = page.locator("svg.sheet circle.mark.solid");
+    const cross = page.locator("svg.sheet g.mark");
+    await expect(solid).toHaveCount(6);
+    await expect(cross).toHaveCount(1);
+
+    // 1900-01-01: the burial of 1889 stands, the burial of 1921 does not, and Y12 was not yet unusable.
+    await field.fill("1900-01-01");
+    await expect(page.getByRole("heading", { level: 2, name: "As at 1900-01-01" })).toBeVisible();
+    await expect(selected).toContainText(Y07_1900);
+    await expect(solid).toHaveCount(3);
+    await expect(cross).toHaveCount(0);
+    await expect(field).toHaveValue("1900-01-01");
+    await expect(page.getByRole("button", { name: "Back to today" })).toBeVisible();
+    expect(page.url()).toContain("asAt=1900-01-01");
+    await expectNoNameInAddress(page, NAMES);
+    await check(page, "map-as-at");
+
+    // Every link to a form or a record reads today. Nothing was saved.
+    for (const name of ["Open plot", "Edit map"]) await expect(page.getByRole("link", { name, exact: true }).first()).not.toHaveAttribute("href", /asAt/);
+    expect((await storedEvents(page, siteId)).length).toBe(eventsBefore);
+
+    // A burial of a year counts from the first day of that year.
+    await field.fill("1870-12-31");
+    await expect(page.getByRole("heading", { level: 2, name: "As at 1870-12-31" })).toBeVisible();
+    await expect(selected).toContainText("Y07 · Yew Walk · Free · 0 of 2 spaces used");
+    await expect(solid).toHaveCount(1);
+    await field.fill("1871-01-01");
+    await expect(solid).toHaveCount(2);
+
+    // A later day and a text that is not a date change nothing, and focus stays on the field.
+    await field.fill("2026-04-21");
+    await expect(page.getByText("Choose today or an earlier date.")).toBeVisible();
+    await expect(field).toHaveAttribute("aria-invalid", "true");
+    await expect(field).toBeFocused();
+    await expect(page.getByRole("heading", { level: 2, name: "As at 1871-01-01" })).toBeVisible();
+    await expect(solid).toHaveCount(2);
+    await field.fill("last week");
+    await field.press("Enter");
+    await expect(page.getByText("Use a valid date.")).toBeVisible();
+    await expect(field).toBeFocused();
+    await expect(page.getByRole("heading", { level: 2, name: "As at 1871-01-01" })).toBeVisible();
+
+    // Back returns to the earlier view date.
+    await field.fill("1900-01-01");
+    await expect(solid).toHaveCount(3);
+    await page.goBack();
+    await expect(page.getByRole("heading", { level: 2, name: "As at 1871-01-01" })).toBeVisible();
+    await expect(field).toHaveValue("1871-01-01");
+    await page.goForward();
+    await expect(field).toHaveValue("1900-01-01");
+
+    // The plot list holds the same date, filters and links keep it, and a row reads as it did then.
+    await page.getByRole("link", { name: "Open plot list" }).click();
+    await expect(page.getByRole("heading", { level: 1, name: "Plot list" })).toBeVisible();
+    await expect(field).toHaveValue("1900-01-01");
+    await expect(page.getByRole("heading", { level: 2, name: "As at 1900-01-01" })).toBeVisible();
+    const rows = page.locator("ul.cards > li");
+    await expect(rows.filter({ hasText: "Y07 · Yew Walk" })).toContainText(Y07_1900);
+    await expect(rows.filter({ hasText: "Y04 · Yew Walk" })).toContainText("Y04 · Yew Walk · Free");
+    await expect(rows.filter({ hasText: "Y06 · Yew Walk" })).toContainText("Y06 · Yew Walk · Free");
+    await page.getByRole("link", { name: "Taken", exact: true }).click();
+    await expect(page.getByText("3 plots")).toBeVisible();
+    await expect(field).toHaveValue("1900-01-01");
+    await check(page, "list-as-at");
+    await expectNoNameInAddress(page, NAMES);
+
+    // Show on map keeps the date and the plot. Open plot reads today.
+    const y07 = rows.filter({ hasText: "Y07 · Yew Walk" });
+    await expect(y07.getByRole("link", { name: /^Plot Y07/ })).not.toHaveAttribute("href", /asAt/);
+    await y07.getByRole("link", { name: "Show on map" }).click();
+    await expect(page.getByRole("heading", { level: 1, name: "Site map" })).toBeVisible();
+    await expect(field).toHaveValue("1900-01-01");
+    await expect(selected).toContainText(Y07_1900);
+
+    // Back to today puts today in the field, takes the heading away and moves focus to the field.
+    await page.getByRole("button", { name: "Back to today" }).click();
+    await expect(field).toHaveValue("2026-04-20");
+    await expect(field).toBeFocused();
+    await expect(page.getByRole("heading", { level: 2, name: /^As at / })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Back to today" })).toHaveCount(0);
+    await expect(selected).toContainText(Y07_TODAY);
+    await expect(solid).toHaveCount(6);
+    await expect(cross).toHaveCount(1);
+    expect(page.url()).not.toContain("asAt");
+    await expectNoNameInAddress(page, NAMES);
+    expect((await storedEvents(page, siteId)).length).toBe(eventsBefore);
+    expect(requests.external).toEqual([]);
+  });
 });

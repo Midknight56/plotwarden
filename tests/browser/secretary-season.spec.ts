@@ -9,7 +9,8 @@ import { readFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 import { AVAILABILITY_CANARIES, CONTACTS, NEW_HOLDER, RECEIPT_REF, TENANTS } from "../helpers/gardenCanaries";
 import { measureLayout, trackRequests } from "../helpers/measureLayout";
-import { expectSearchOutOfAddress } from "../helpers/screens";
+import { siteIdOf, storedEvents } from "../helpers/routes";
+import { expectNoNameInAddress, expectSearchOutOfAddress } from "../helpers/screens";
 
 const APP = "http://127.0.0.1:4178/";
 test.use({ baseURL: APP });
@@ -573,5 +574,89 @@ test.describe("the availability map and the seeker file", () => {
     await expect(noScript.getByText("Thimble Gate").first()).toBeVisible();
     await expect(noScript.getByRole("button", { name: "Show location" })).toBeHidden();
     await plain.close();
+  });
+});
+
+test.describe("the site as it was", () => {
+  // Hand totals 5.1: B01 began 2024-04-01, B02 on 2025-04-01 and B04 on 2023-04-01. B06 became unusable on
+  // 2026-01-05. Today the practice register reads 2026-04-20 with three taken plots and one unusable.
+  const NAMES = ["Stonecrop", "Ada", "Marlo", "Fennick", "Burrowby", "Ilse", "Tavi", "Bramblequill", "Olin", "Reedwhorl"];
+
+  test("shows B02 free before its tenancy began, keeps today's forms, saves nothing and keeps names out of the address", async ({ page }) => {
+    const requests = trackRequests(page, APP);
+    await openBeds(page);
+    const siteId = siteIdOf(page);
+    const eventsBefore = (await storedEvents(page, siteId)).length;
+    await page.getByRole("link", { name: "Map", exact: true }).click();
+    await expect(page.getByRole("heading", { level: 1, name: "Site map" })).toBeVisible();
+
+    const field = page.getByLabel("Show the site as at", { exact: true });
+    await expect(field).toHaveValue("2026-04-20");
+    await expect(page.getByRole("heading", { level: 2, name: /^As at / })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Back to today" })).toHaveCount(0);
+    await page.getByLabel("Choose a plot", { exact: true }).selectOption({ label: "B02 · Sunny Row · Taken" });
+    const selected = page.getByRole("region", { name: "Selected plot" });
+    await expect(selected).toContainText("B02 · Sunny Row · Taken");
+    const solid = page.locator("svg.sheet circle.mark.solid");
+    const cross = page.locator("svg.sheet g.mark");
+    await expect(solid).toHaveCount(3);
+    await expect(cross).toHaveCount(1);
+
+    // The day before the tenancy of B02 began: B02 is Free, B01 and B04 are Taken, and B06 was not yet unusable.
+    await field.fill("2025-03-31");
+    await expect(page.getByRole("heading", { level: 2, name: "As at 2025-03-31" })).toBeVisible();
+    await expect(selected).toContainText("B02 · Sunny Row · Free");
+    await expect(solid).toHaveCount(2);
+    await expect(cross).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Back to today" })).toBeVisible();
+    expect(page.url()).toContain("asAt=2025-03-31");
+    await expectNoNameInAddress(page, NAMES);
+    await check(page, "map-as-at");
+
+    // On the first day it is Taken. The day before B04 began, B04 is Free.
+    await field.fill("2025-04-01");
+    await expect(selected).toContainText("B02 · Sunny Row · Taken");
+    await expect(solid).toHaveCount(3);
+    await field.fill("2023-03-31");
+    await expect(solid).toHaveCount(0);
+    await field.fill("2023-04-01");
+    await expect(solid).toHaveCount(1);
+
+    // Every link to a form or a record reads today. Nothing was saved.
+    for (const name of ["Open plot", "Edit map"]) await expect(page.getByRole("link", { name, exact: true }).first()).not.toHaveAttribute("href", /asAt/);
+    expect((await storedEvents(page, siteId)).length).toBe(eventsBefore);
+
+    // A later day changes nothing, and focus stays on the field.
+    await field.fill("2026-04-21");
+    await expect(page.getByText("Choose today or an earlier date.")).toBeVisible();
+    await expect(field).toHaveAttribute("aria-invalid", "true");
+    await expect(field).toBeFocused();
+    await expect(page.getByRole("heading", { level: 2, name: "As at 2023-04-01" })).toBeVisible();
+
+    // The plot list holds the same date and reads each plot as it was.
+    await field.fill("2025-03-31");
+    await page.getByRole("link", { name: "Open plot list" }).click();
+    await expect(page.getByRole("heading", { level: 1, name: "Plot list" })).toBeVisible();
+    await expect(field).toHaveValue("2025-03-31");
+    await expect(page.getByRole("heading", { level: 2, name: "As at 2025-03-31" })).toBeVisible();
+    const rows = page.locator("ul.cards > li");
+    await expect(rows.filter({ hasText: "B02 · Sunny Row" })).toContainText("B02 · Sunny Row · Free");
+    await expect(rows.filter({ hasText: "B01 · Sunny Row" })).toContainText("B01 · Sunny Row · Taken");
+    await page.getByRole("link", { name: "Taken", exact: true }).click();
+    await expect(page.getByText("2 plots")).toBeVisible();
+    await expect(field).toHaveValue("2025-03-31");
+    await check(page, "list-as-at");
+    await expectNoNameInAddress(page, NAMES);
+
+    // Back to today.
+    await page.getByRole("button", { name: "Back to today" }).click();
+    await expect(field).toHaveValue("2026-04-20");
+    await expect(field).toBeFocused();
+    await expect(page.getByRole("heading", { level: 2, name: /^As at / })).toHaveCount(0);
+    await expect(page.getByText("3 plots")).toBeVisible();
+    expect(page.url()).not.toContain("asAt");
+    await expectNoNameInAddress(page, NAMES);
+    expect((await storedEvents(page, siteId)).length).toBe(eventsBefore);
+    expect(requests.external).toEqual([]);
   });
 });

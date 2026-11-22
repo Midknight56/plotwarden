@@ -31,6 +31,7 @@ Every production file below has a test listed in `tasks.md`.
 | `template/src/ui/PlotList.tsx` | Filters and the list | ui |
 | `template/src/ui/PlotDetails.tsx` | One plot: spaces, history, notes, photos, rename, status actions | ui |
 | `template/src/ui/SiteMap.tsx` | The sheet screen, key, plot chooser, zoom, print index | ui |
+| `template/src/ui/AsAtField.tsx` | The date field "Show the site as at", the "As at {date}" heading and "Back to today" (H20) | ui |
 | `template/src/ui/MapEditor.tsx` | Grid form, preview, apply, layout file | ui |
 | `template/src/ui/TraceEditor.tsx` | Drawing surface, keyboard form, backdrop controls, revise tools | ui |
 | `template/src/ui/RecordForm.tsx` | One record | ui |
@@ -356,3 +357,29 @@ Problem seen: a name had a place cost of zero only when it touched nothing, but 
 - `SheetSvg` writes `data-kind` on each `text`: `gate`, `section`, `path`, `plot` or `tab`. The tests use it to tell a name from the code of a plot inside its own plot. It holds no private value.
 
 Tests: `sheet.test.ts` builds Lantern Fold and Thimble Beds at 312, 328, 360, 480 and 1120 px, and sweeps 300 to 1200 px, and measures every box with its own estimate of a letter (7.4 px at 12 px). `measureLabels.test.ts` holds the cost order and the browser rule `label_on_plot` on plain data. `layout.spec.ts` reads the real box of every `svg` text on the map and home routes and finds no overlap with a plot shape. Three older checks changed with P19, and each is named in `docs/kiro-log.md`: the exact place of a section name above an outline that shares its top edge with plots, the rule that every name stays in place from 320 px up, and the path name that was written twice.
+
+## H20 The site as it was on a date
+
+Problem. `plotSummaryAt` takes a date, but every screen passed today, and a burial dated by a year or a month stores a claim with no start (`claimStartOf` in `apps/churchyard-register/src/rules.ts`). `viewOf` in `template/src/status.ts` reads such a claim as in force on every date, so Y07 as at 1900 would show two spaces used although the second burial is of 1921.
+
+Foundation (pure).
+
+- `type ClaimFloor = (claim: Claim) => LocalDate | undefined` in `status.ts`.
+- `claimsInForce(state, spaceId, date, floor?)` returns the claims on a space that are not voided and cover the date. A claim with a start uses its start. A claim with no start uses `floor(claim)` when `floor` is given and answers a day, and covers every date when it does not. The end is always the claim's own end. `viewOf` is built on it, so a state is read one way.
+- `plotSummaryAt(state, plotId, date, floor?)` and `spaceStateAt(state, spaceId, date, floor?)` take the same optional last argument. `siteTotalsAt` is not changed.
+- `RegisterAdapter.claimFloor?(state: S, claim: Claim): LocalDate | undefined` in `adapter.ts`. Absent means no claim has a floor. The template never reads `kind`.
+
+Churchyard. `claimFloorOf(state, claim)` in `rules.ts` reads `state.burials[claim.ref]`. It returns `coveredInterval(burial.date)?.first`, which is the first day of the year or the month and nothing for an unknown date. The adapter lists it as `claimFloor`. A date correction voids the old claim and adds a new one (`correctBurial`), and the burial holds the current date, so the floor follows current corrections. The allotment adapter has no function: a tenancy always has a start.
+
+Screens.
+
+| File | Change |
+|---|---|
+| `template/src/ui/plotView.ts` | `plotRows(open, t, date?, floor?)`. `date` defaults to `open.today`. The floor is used only when `date` is before `open.today`. `readAsAt(text, today)` returns the date or a message key (`invalidDate` or `asAtLater`). `asAtOf(query, today)` reads `asAt` from the route and returns a date before today or nothing. `claimFloorOf(app, state)` wraps the adapter function for one state. |
+| `template/src/ui/AsAtField.tsx` | New. `AsAtField` (the field, its message and "Back to today") and `AsAtHeading` (the "As at {date}" heading). On the map the heading sits above the sheet and the field sits below the key, so the sheet stays within 360 px of the top on a phone for the view of today (R23.6). On the plot list both sit under the links. It takes the view date, today and a `change(date | undefined)` callback, and keeps the typed text apart from the view date so a half typed date shows no message and moves nothing. The field sits in a form, so Enter shows the message at once. |
+| `template/src/ui/SiteMap.tsx`, `PlotList.tsx` | Read `asAt` from the route, pass the date and the floor to `plotRows`, show `AsAtField`, and carry `asAt` on links to the other of the two screens and on their own filters and chooser. Links to a plot, the map editor and every form carry nothing. The print block writes the view date. |
+| `template/src/ui/copyScreens.ts` | `showSiteAsAt`, `asAtHint`, `asAtLater`, `backToToday`. The heading uses the existing `asAt`. `invalidDate` is the foundation's. |
+
+The view date lives in the hash query as `asAt` so that reload and Back keep it. A date change calls `navigate` with no `replace` and with the route's own search text, so each valid date is one history entry that keeps the search in `history.state`, Back returns to the earlier date, and the address never holds the search. `AsAtField` follows the address, so Back, Forward and "Back to today" change the text in the field. A typed date that is today removes `asAt`. A date change is one address change and writes nothing.
+
+Tests (`tests/unit/asAt.test.ts`): Lantern Fold as at 1900-01-01 reads `Y07` as "Taken · 1 of 2 spaces used", as at 2026-04-20 as "Taken · 2 of 2 spaces used"; the year and the month rule with their first days and the day before; a burial with no date counts at every date; a garden where B02 was handed over on 2026-05-01 names the earlier tenancy on 2026-04-30 and the new one on 2026-05-01; `readAsAt` accepts today and an earlier day and refuses a later day, a text that is not a date and an empty text; a call with no floor reads a claim with no start as before. The browser specs type a date, read the summary line and the marks, press "Back to today", and read the address and the history entry for any name. `layout.spec.ts` measures a past view of the map route and keeps its picture.
