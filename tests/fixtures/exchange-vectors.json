@@ -1,0 +1,268 @@
+{
+  "format": "plot.exchange.vectors.v1",
+  "note": "Written by hand from design D10 and D11 of spec 00 and hand totals section 6. Codes: unrecognized_keys, invalid, duplicate_issue_key, duplicate_subject_rule, wrong_action, duplicate_action_id. A path is the dotted place of the first problem.",
+  "packets": [
+    {
+      "name": "two issues, valid",
+      "value": {"format":"plot.review.v1","siteKind":"churchyard","siteKey":"5a5a5a5a-0000-4000-8000-000000000001","lineageId":"11e11e11-0000-4000-8000-000000000001","siteAlias":"Site 1","revision":5,"asOf":"2026-04-20","issues":[{"issueKey":"15500000-0000-4000-8000-00000000000a","subjectKey":"50b00000-0000-4000-8000-00000000000a","label":"Record 1","rule":"placement_missing","factVersion":1,"action":"check_location"},{"issueKey":"15500000-0000-4000-8000-00000000000b","subjectKey":"50b00000-0000-4000-8000-00000000000b","label":"Record 2","rule":"reading_unclear","factVersion":1,"action":"read_stone_again"}]},
+      "expect": {"ok": true}
+    },
+    {
+      "name": "no issues, valid",
+      "value": {"format":"plot.review.v1","siteKind":"allotment","siteKey":"5a5a5a5a-0000-4000-8000-000000000002","lineageId":"11e11e11-0000-4000-8000-000000000001","siteAlias":"Site 2","revision":1,"asOf":"2026-04-20","issues":[]},
+      "expect": {"ok": true}
+    },
+    {
+      "name": "one subject with two rules, valid",
+      "value": {"format":"plot.review.v1","siteKind":"allotment","siteKey":"5a5a5a5a-0000-4000-8000-000000000002","lineageId":"11e11e11-0000-4000-8000-000000000001","siteAlias":"Site 2","revision":2,"asOf":"2026-04-20","issues":[{"issueKey":"15500000-0000-4000-8000-00000000000a","subjectKey":"50b00000-0000-4000-8000-00000000000a","label":"Record 1","rule":"offer_late","factVersion":1,"action":"check_reply"},{"issueKey":"15500000-0000-4000-8000-00000000000b","subjectKey":"50b00000-0000-4000-8000-00000000000a","label":"Record 1","rule":"fee_late","factVersion":2,"action":"check_payment"}]},
+      "expect": {"ok": true}
+    },
+    {
+      "name": "a label of 40 characters, valid",
+      "value": {"format":"plot.review.v1","siteKind":"allotment","siteKey":"5a5a5a5a-0000-4000-8000-000000000002","lineageId":"11e11e11-0000-4000-8000-000000000001","siteAlias":"abcdefghijabcdefghijabcdefghijabcdefghij","revision":2,"asOf":"2026-04-20","issues":[{"issueKey":"15500000-0000-4000-8000-00000000000a","subjectKey":"50b00000-0000-4000-8000-00000000000a","label":"abcdefghijabcdefghijabcdefghijabcdefghij","rule":"fee_late","factVersion":1,"action":"check_payment"}]},
+      "expect": {"ok": true}
+    },
+    {
+      "name": "an extra key at the top is refused",
+      "value": {"format":"plot.review.v1","siteKind":"churchyard","siteKey":"5a5a5a5a-0000-4000-8000-000000000001","lineageId":"11e11e11-0000-4000-8000-000000000001","siteAlias":"Site 1","revision":5,"asOf":"2026-04-20","note":"hello","issues":[]},
+      "expect": {"ok": false, "code": "unrecognized_keys", "path": ""}
+    },
+    {
+      "name": "an extra key inside an issue is refused",
+      "value": {"format":"plot.review.v1","siteKind":"churchyard","siteKey":"5a5a5a5a-0000-4000-8000-000000000001","lineageId":"11e11e11-0000-4000-8000-000000000001","siteAlias":"Site 1","revision":5,"asOf":"2026-04-20","issues":[{"issueKey":"15500000-0000-4000-8000-00000000000a","subjectKey":"50b00000-0000-4000-8000-00000000000a","label":"Record 1","rule":"placement_missing","factVersion":1,"action":"check_location","personName":"x"}]},
+      "expect": {"ok": false, "code": "unrecognized_keys", "path": "issues.0"}
+    },
+    {
+      "name": "a newer format is refused",
+      "value": {"format":"plot.review.v2","siteKind":"churchyard","siteKey":"5a5a5a5a-0000-4000-8000-000000000001","lineageId":"11e11e11-0000-4000-8000-000000000001","siteAlias":"Site 1","revision":5,"asOf":"2026-04-20","issues":[]},
+      "expect": {"ok": false, "code": "invalid", "path": "format"}
+    },
+    {
+      "name": "a rule outside the four is refused",
+      "value": {"format":"plot.review.v1","siteKind":"churchyard","siteKey":"5a5a5a5a-0000-4000-8000-000000000001","lineageId":"11e11e11-0000-4000-8000-000000000001","siteAlias":"Site 1","revision":5,"asOf":"2026-04-20","issues":[{"issueKey":"15500000-0000-4000-8000-00000000000a","subjectKey":"50b00000-0000-4000-8000-00000000000a","label":"Record 1","rule":"burial_unknown","factVersion":1,"action":"check_location"}]},
+      "expect": {"ok": false, "code": "invalid", "path": "issues.0.rule"}
+    },
+    {
+      "name": "an action that does not belong to the rule is refused",
+      "value": {"format":"plot.review.v1","siteKind":"allotment","siteKey":"5a5a5a5a-0000-4000-8000-000000000002","lineageId":"11e11e11-0000-4000-8000-000000000001","siteAlias":"Site 2","revision":2,"asOf":"2026-04-20","issues":[{"issueKey":"15500000-0000-4000-8000-00000000000a","subjectKey":"50b00000-0000-4000-8000-00000000000a","label":"Record 1","rule":"fee_late","factVersion":1,"action":"check_location"}]},
+      "expect": {"ok": false, "code": "wrong_action", "path": "issues.0.action"}
+    },
+    {
+      "name": "a fact version of 0 is refused",
+      "value": {"format":"plot.review.v1","siteKind":"allotment","siteKey":"5a5a5a5a-0000-4000-8000-000000000002","lineageId":"11e11e11-0000-4000-8000-000000000001","siteAlias":"Site 2","revision":2,"asOf":"2026-04-20","issues":[{"issueKey":"15500000-0000-4000-8000-00000000000a","subjectKey":"50b00000-0000-4000-8000-00000000000a","label":"Record 1","rule":"fee_late","factVersion":0,"action":"check_payment"}]},
+      "expect": {"ok": false, "code": "invalid", "path": "issues.0.factVersion"}
+    },
+    {
+      "name": "a fact version of 1.5 is refused",
+      "value": {"format":"plot.review.v1","siteKind":"allotment","siteKey":"5a5a5a5a-0000-4000-8000-000000000002","lineageId":"11e11e11-0000-4000-8000-000000000001","siteAlias":"Site 2","revision":2,"asOf":"2026-04-20","issues":[{"issueKey":"15500000-0000-4000-8000-00000000000a","subjectKey":"50b00000-0000-4000-8000-00000000000a","label":"Record 1","rule":"fee_late","factVersion":1.5,"action":"check_payment"}]},
+      "expect": {"ok": false, "code": "invalid", "path": "issues.0.factVersion"}
+    },
+    {
+      "name": "a revision of 0 is refused",
+      "value": {"format":"plot.review.v1","siteKind":"churchyard","siteKey":"5a5a5a5a-0000-4000-8000-000000000001","lineageId":"11e11e11-0000-4000-8000-000000000001","siteAlias":"Site 1","revision":0,"asOf":"2026-04-20","issues":[]},
+      "expect": {"ok": false, "code": "invalid", "path": "revision"}
+    },
+    {
+      "name": "30 February is refused",
+      "value": {"format":"plot.review.v1","siteKind":"churchyard","siteKey":"5a5a5a5a-0000-4000-8000-000000000001","lineageId":"11e11e11-0000-4000-8000-000000000001","siteAlias":"Site 1","revision":5,"asOf":"2026-02-30","issues":[]},
+      "expect": {"ok": false, "code": "invalid", "path": "asOf"}
+    },
+    {
+      "name": "an issue key that is not a UUID is refused",
+      "value": {"format":"plot.review.v1","siteKind":"churchyard","siteKey":"5a5a5a5a-0000-4000-8000-000000000001","lineageId":"11e11e11-0000-4000-8000-000000000001","siteAlias":"Site 1","revision":5,"asOf":"2026-04-20","issues":[{"issueKey":"burial-7","subjectKey":"50b00000-0000-4000-8000-00000000000a","label":"Record 1","rule":"placement_missing","factVersion":1,"action":"check_location"}]},
+      "expect": {"ok": false, "code": "invalid", "path": "issues.0.issueKey"}
+    },
+    {
+      "name": "a site key that is not a UUID is refused",
+      "value": {"format":"plot.review.v1","siteKind":"churchyard","siteKey":"lantern-fold","lineageId":"11e11e11-0000-4000-8000-000000000001","siteAlias":"Site 1","revision":5,"asOf":"2026-04-20","issues":[]},
+      "expect": {"ok": false, "code": "invalid", "path": "siteKey"}
+    },
+    {
+      "name": "two issues with one issue key are refused",
+      "value": {"format":"plot.review.v1","siteKind":"churchyard","siteKey":"5a5a5a5a-0000-4000-8000-000000000001","lineageId":"11e11e11-0000-4000-8000-000000000001","siteAlias":"Site 1","revision":5,"asOf":"2026-04-20","issues":[{"issueKey":"15500000-0000-4000-8000-00000000000a","subjectKey":"50b00000-0000-4000-8000-00000000000a","label":"Record 1","rule":"placement_missing","factVersion":1,"action":"check_location"},{"issueKey":"15500000-0000-4000-8000-00000000000a","subjectKey":"50b00000-0000-4000-8000-00000000000b","label":"Record 2","rule":"reading_unclear","factVersion":1,"action":"read_stone_again"}]},
+      "expect": {"ok": false, "code": "duplicate_issue_key", "path": "issues.1.issueKey"}
+    },
+    {
+      "name": "two issues for one subject and rule are refused",
+      "value": {"format":"plot.review.v1","siteKind":"churchyard","siteKey":"5a5a5a5a-0000-4000-8000-000000000001","lineageId":"11e11e11-0000-4000-8000-000000000001","siteAlias":"Site 1","revision":5,"asOf":"2026-04-20","issues":[{"issueKey":"15500000-0000-4000-8000-00000000000a","subjectKey":"50b00000-0000-4000-8000-00000000000a","label":"Record 1","rule":"placement_missing","factVersion":1,"action":"check_location"},{"issueKey":"15500000-0000-4000-8000-00000000000b","subjectKey":"50b00000-0000-4000-8000-00000000000a","label":"Record 1","rule":"placement_missing","factVersion":1,"action":"check_location"}]},
+      "expect": {"ok": false, "code": "duplicate_subject_rule", "path": "issues.1.rule"}
+    },
+    {
+      "name": "an empty label is refused",
+      "value": {"format":"plot.review.v1","siteKind":"churchyard","siteKey":"5a5a5a5a-0000-4000-8000-000000000001","lineageId":"11e11e11-0000-4000-8000-000000000001","siteAlias":"Site 1","revision":5,"asOf":"2026-04-20","issues":[{"issueKey":"15500000-0000-4000-8000-00000000000a","subjectKey":"50b00000-0000-4000-8000-00000000000a","label":"","rule":"placement_missing","factVersion":1,"action":"check_location"}]},
+      "expect": {"ok": false, "code": "invalid", "path": "issues.0.label"}
+    },
+    {
+      "name": "a label of 41 characters is refused",
+      "value": {"format":"plot.review.v1","siteKind":"churchyard","siteKey":"5a5a5a5a-0000-4000-8000-000000000001","lineageId":"11e11e11-0000-4000-8000-000000000001","siteAlias":"Site 1","revision":5,"asOf":"2026-04-20","issues":[{"issueKey":"15500000-0000-4000-8000-00000000000a","subjectKey":"50b00000-0000-4000-8000-00000000000a","label":"abcdefghijabcdefghijabcdefghijabcdefghijk","rule":"placement_missing","factVersion":1,"action":"check_location"}]},
+      "expect": {"ok": false, "code": "invalid", "path": "issues.0.label"}
+    },
+    {
+      "name": "a site name of 41 characters is refused",
+      "value": {"format":"plot.review.v1","siteKind":"churchyard","siteKey":"5a5a5a5a-0000-4000-8000-000000000001","lineageId":"11e11e11-0000-4000-8000-000000000001","siteAlias":"abcdefghijabcdefghijabcdefghijabcdefghijk","revision":5,"asOf":"2026-04-20","issues":[]},
+      "expect": {"ok": false, "code": "invalid", "path": "siteAlias"}
+    },
+    {
+      "name": "a site kind with a capital is refused",
+      "value": {"format":"plot.review.v1","siteKind":"Churchyard","siteKey":"5a5a5a5a-0000-4000-8000-000000000001","lineageId":"11e11e11-0000-4000-8000-000000000001","siteAlias":"Site 1","revision":5,"asOf":"2026-04-20","issues":[]},
+      "expect": {"ok": false, "code": "invalid", "path": "siteKind"}
+    },
+    {
+      "name": "a missing lineage is refused",
+      "value": {"format":"plot.review.v1","siteKind":"churchyard","siteKey":"5a5a5a5a-0000-4000-8000-000000000001","siteAlias":"Site 1","revision":5,"asOf":"2026-04-20","issues":[]},
+      "expect": {"ok": false, "code": "invalid", "path": "lineageId"}
+    },
+    {
+      "name": "a text instead of an object is refused",
+      "value": "plot.review.v1",
+      "expect": {"ok": false, "code": "invalid", "path": ""}
+    }
+  ],
+  "slips": [
+    {
+      "name": "two decisions, valid",
+      "value": {"format":"plot.slip.v1","siteKey":"5a5a5a5a-0000-4000-8000-000000000001","lineageId":"11e11e11-0000-4000-8000-000000000001","packetRevision":5,"packetAsOf":"2026-04-20","decisions":[{"actionId":"ac700000-0000-4000-8000-000000000001","issueKey":"15500000-0000-4000-8000-00000000000a","factVersion":1,"disposition":"checked","reviewedOn":"2026-04-21"},{"actionId":"ac700000-0000-4000-8000-000000000002","issueKey":"15500000-0000-4000-8000-00000000000b","factVersion":1,"disposition":"needs_keeper","reviewedOn":"2026-04-21"}]},
+      "expect": {"ok": true}
+    },
+    {
+      "name": "no decisions, valid",
+      "value": {"format":"plot.slip.v1","siteKey":"5a5a5a5a-0000-4000-8000-000000000001","lineageId":"11e11e11-0000-4000-8000-000000000001","packetRevision":1,"packetAsOf":"2026-04-20","decisions":[]},
+      "expect": {"ok": true}
+    },
+    {
+      "name": "an extra key at the top is refused",
+      "value": {"format":"plot.slip.v1","siteKey":"5a5a5a5a-0000-4000-8000-000000000001","lineageId":"11e11e11-0000-4000-8000-000000000001","packetRevision":5,"packetAsOf":"2026-04-20","comment":"fine","decisions":[]},
+      "expect": {"ok": false, "code": "unrecognized_keys", "path": ""}
+    },
+    {
+      "name": "an extra key inside a decision is refused",
+      "value": {"format":"plot.slip.v1","siteKey":"5a5a5a5a-0000-4000-8000-000000000001","lineageId":"11e11e11-0000-4000-8000-000000000001","packetRevision":5,"packetAsOf":"2026-04-20","decisions":[{"actionId":"ac700000-0000-4000-8000-000000000001","issueKey":"15500000-0000-4000-8000-00000000000a","factVersion":1,"disposition":"checked","reviewedOn":"2026-04-21","note":"looked fine"}]},
+      "expect": {"ok": false, "code": "unrecognized_keys", "path": "decisions.0"}
+    },
+    {
+      "name": "a disposition outside the two is refused",
+      "value": {"format":"plot.slip.v1","siteKey":"5a5a5a5a-0000-4000-8000-000000000001","lineageId":"11e11e11-0000-4000-8000-000000000001","packetRevision":5,"packetAsOf":"2026-04-20","decisions":[{"actionId":"ac700000-0000-4000-8000-000000000001","issueKey":"15500000-0000-4000-8000-00000000000a","factVersion":1,"disposition":"ignored","reviewedOn":"2026-04-21"}]},
+      "expect": {"ok": false, "code": "invalid", "path": "decisions.0.disposition"}
+    },
+    {
+      "name": "a review date that is not a date is refused",
+      "value": {"format":"plot.slip.v1","siteKey":"5a5a5a5a-0000-4000-8000-000000000001","lineageId":"11e11e11-0000-4000-8000-000000000001","packetRevision":5,"packetAsOf":"2026-04-20","decisions":[{"actionId":"ac700000-0000-4000-8000-000000000001","issueKey":"15500000-0000-4000-8000-00000000000a","factVersion":1,"disposition":"checked","reviewedOn":"21/04/2026"}]},
+      "expect": {"ok": false, "code": "invalid", "path": "decisions.0.reviewedOn"}
+    },
+    {
+      "name": "two decisions with one action ID are refused",
+      "value": {"format":"plot.slip.v1","siteKey":"5a5a5a5a-0000-4000-8000-000000000001","lineageId":"11e11e11-0000-4000-8000-000000000001","packetRevision":5,"packetAsOf":"2026-04-20","decisions":[{"actionId":"ac700000-0000-4000-8000-000000000001","issueKey":"15500000-0000-4000-8000-00000000000a","factVersion":1,"disposition":"checked","reviewedOn":"2026-04-21"},{"actionId":"ac700000-0000-4000-8000-000000000001","issueKey":"15500000-0000-4000-8000-00000000000b","factVersion":1,"disposition":"checked","reviewedOn":"2026-04-21"}]},
+      "expect": {"ok": false, "code": "duplicate_action_id", "path": "decisions.1.actionId"}
+    },
+    {
+      "name": "a packet is not a slip",
+      "value": {"format":"plot.review.v1","siteKey":"5a5a5a5a-0000-4000-8000-000000000001","lineageId":"11e11e11-0000-4000-8000-000000000001","packetRevision":5,"packetAsOf":"2026-04-20","decisions":[]},
+      "expect": {"ok": false, "code": "invalid", "path": "format"}
+    },
+    {
+      "name": "a packet revision of 0 is refused",
+      "value": {"format":"plot.slip.v1","siteKey":"5a5a5a5a-0000-4000-8000-000000000001","lineageId":"11e11e11-0000-4000-8000-000000000001","packetRevision":0,"packetAsOf":"2026-04-20","decisions":[]},
+      "expect": {"ok": false, "code": "invalid", "path": "packetRevision"}
+    }
+  ],
+  "compare": [
+    {
+      "name": "the same content in another key order and issue order",
+      "current": {"format":"plot.review.v1","siteKind":"churchyard","siteKey":"5a5a5a5a-0000-4000-8000-000000000001","lineageId":"11e11e11-0000-4000-8000-000000000001","siteAlias":"Site 1","revision":5,"asOf":"2026-04-20","issues":[{"issueKey":"15500000-0000-4000-8000-00000000000a","subjectKey":"50b00000-0000-4000-8000-00000000000a","label":"Record 1","rule":"placement_missing","factVersion":1,"action":"check_location"},{"issueKey":"15500000-0000-4000-8000-00000000000b","subjectKey":"50b00000-0000-4000-8000-00000000000b","label":"Record 2","rule":"reading_unclear","factVersion":1,"action":"read_stone_again"}]},
+      "incoming": {"asOf":"2026-04-20","revision":5,"issues":[{"action":"read_stone_again","factVersion":1,"rule":"reading_unclear","label":"Record 2","subjectKey":"50b00000-0000-4000-8000-00000000000b","issueKey":"15500000-0000-4000-8000-00000000000b"},{"action":"check_location","factVersion":1,"rule":"placement_missing","label":"Record 1","subjectKey":"50b00000-0000-4000-8000-00000000000a","issueKey":"15500000-0000-4000-8000-00000000000a"}],"siteAlias":"Site 1","lineageId":"11e11e11-0000-4000-8000-000000000001","siteKey":"5a5a5a5a-0000-4000-8000-000000000001","siteKind":"churchyard","format":"plot.review.v1"},
+      "expect": {"relation": "same"}
+    },
+    {
+      "name": "a lower revision is stale",
+      "current": {"format":"plot.review.v1","siteKind":"churchyard","siteKey":"5a5a5a5a-0000-4000-8000-000000000001","lineageId":"11e11e11-0000-4000-8000-000000000001","siteAlias":"Site 1","revision":5,"asOf":"2026-04-20","issues":[{"issueKey":"15500000-0000-4000-8000-00000000000a","subjectKey":"50b00000-0000-4000-8000-00000000000a","label":"Record 1","rule":"placement_missing","factVersion":1,"action":"check_location"},{"issueKey":"15500000-0000-4000-8000-00000000000b","subjectKey":"50b00000-0000-4000-8000-00000000000b","label":"Record 2","rule":"reading_unclear","factVersion":1,"action":"read_stone_again"}]},
+      "incoming": {"format":"plot.review.v1","siteKind":"churchyard","siteKey":"5a5a5a5a-0000-4000-8000-000000000001","lineageId":"11e11e11-0000-4000-8000-000000000001","siteAlias":"Site 1","revision":4,"asOf":"2026-04-20","issues":[{"issueKey":"15500000-0000-4000-8000-00000000000a","subjectKey":"50b00000-0000-4000-8000-00000000000a","label":"Record 1","rule":"placement_missing","factVersion":1,"action":"check_location"}]},
+      "expect": {"relation": "stale"}
+    },
+    {
+      "name": "an earlier date with a higher revision is stale",
+      "current": {"format":"plot.review.v1","siteKind":"churchyard","siteKey":"5a5a5a5a-0000-4000-8000-000000000001","lineageId":"11e11e11-0000-4000-8000-000000000001","siteAlias":"Site 1","revision":5,"asOf":"2026-04-20","issues":[{"issueKey":"15500000-0000-4000-8000-00000000000a","subjectKey":"50b00000-0000-4000-8000-00000000000a","label":"Record 1","rule":"placement_missing","factVersion":1,"action":"check_location"},{"issueKey":"15500000-0000-4000-8000-00000000000b","subjectKey":"50b00000-0000-4000-8000-00000000000b","label":"Record 2","rule":"reading_unclear","factVersion":1,"action":"read_stone_again"}]},
+      "incoming": {"format":"plot.review.v1","siteKind":"churchyard","siteKey":"5a5a5a5a-0000-4000-8000-000000000001","lineageId":"11e11e11-0000-4000-8000-000000000001","siteAlias":"Site 1","revision":6,"asOf":"2026-04-19","issues":[]},
+      "expect": {"relation": "stale"}
+    },
+    {
+      "name": "the same revision and date with other content is a conflict",
+      "current": {"format":"plot.review.v1","siteKind":"churchyard","siteKey":"5a5a5a5a-0000-4000-8000-000000000001","lineageId":"11e11e11-0000-4000-8000-000000000001","siteAlias":"Site 1","revision":5,"asOf":"2026-04-20","issues":[{"issueKey":"15500000-0000-4000-8000-00000000000a","subjectKey":"50b00000-0000-4000-8000-00000000000a","label":"Record 1","rule":"placement_missing","factVersion":1,"action":"check_location"},{"issueKey":"15500000-0000-4000-8000-00000000000b","subjectKey":"50b00000-0000-4000-8000-00000000000b","label":"Record 2","rule":"reading_unclear","factVersion":1,"action":"read_stone_again"}]},
+      "incoming": {"format":"plot.review.v1","siteKind":"churchyard","siteKey":"5a5a5a5a-0000-4000-8000-000000000001","lineageId":"11e11e11-0000-4000-8000-000000000001","siteAlias":"Site 1","revision":5,"asOf":"2026-04-20","issues":[{"issueKey":"15500000-0000-4000-8000-00000000000a","subjectKey":"50b00000-0000-4000-8000-00000000000a","label":"Record 1","rule":"placement_missing","factVersion":1,"action":"check_location"}]},
+      "expect": {"relation": "conflict"}
+    },
+    {
+      "name": "a later date with a changed and a new and a vanished issue replaces",
+      "current": {"format":"plot.review.v1","siteKind":"churchyard","siteKey":"5a5a5a5a-0000-4000-8000-000000000001","lineageId":"11e11e11-0000-4000-8000-000000000001","siteAlias":"Site 1","revision":5,"asOf":"2026-04-20","issues":[{"issueKey":"15500000-0000-4000-8000-00000000000a","subjectKey":"50b00000-0000-4000-8000-00000000000a","label":"Record 1","rule":"placement_missing","factVersion":1,"action":"check_location"},{"issueKey":"15500000-0000-4000-8000-00000000000b","subjectKey":"50b00000-0000-4000-8000-00000000000b","label":"Record 2","rule":"reading_unclear","factVersion":1,"action":"read_stone_again"}]},
+      "incoming": {"format":"plot.review.v1","siteKind":"churchyard","siteKey":"5a5a5a5a-0000-4000-8000-000000000001","lineageId":"11e11e11-0000-4000-8000-000000000001","siteAlias":"Site 1","revision":6,"asOf":"2026-04-21","issues":[{"issueKey":"15500000-0000-4000-8000-00000000000a","subjectKey":"50b00000-0000-4000-8000-00000000000a","label":"Record 1","rule":"placement_missing","factVersion":2,"action":"check_location"},{"issueKey":"15500000-0000-4000-8000-00000000000c","subjectKey":"50b00000-0000-4000-8000-00000000000c","label":"Record 3","rule":"reading_unclear","factVersion":1,"action":"read_stone_again"}]},
+      "expect": {"relation": "replace", "changes": {"new": ["15500000-0000-4000-8000-00000000000c"], "stillOpen": [], "changed": ["15500000-0000-4000-8000-00000000000a"], "noLongerFlagged": ["15500000-0000-4000-8000-00000000000b"]}}
+    },
+    {
+      "name": "the same date with one more issue replaces and keeps two open",
+      "current": {"format":"plot.review.v1","siteKind":"churchyard","siteKey":"5a5a5a5a-0000-4000-8000-000000000001","lineageId":"11e11e11-0000-4000-8000-000000000001","siteAlias":"Site 1","revision":5,"asOf":"2026-04-20","issues":[{"issueKey":"15500000-0000-4000-8000-00000000000a","subjectKey":"50b00000-0000-4000-8000-00000000000a","label":"Record 1","rule":"placement_missing","factVersion":1,"action":"check_location"},{"issueKey":"15500000-0000-4000-8000-00000000000b","subjectKey":"50b00000-0000-4000-8000-00000000000b","label":"Record 2","rule":"reading_unclear","factVersion":1,"action":"read_stone_again"}]},
+      "incoming": {"format":"plot.review.v1","siteKind":"churchyard","siteKey":"5a5a5a5a-0000-4000-8000-000000000001","lineageId":"11e11e11-0000-4000-8000-000000000001","siteAlias":"Site 1","revision":6,"asOf":"2026-04-20","issues":[{"issueKey":"15500000-0000-4000-8000-00000000000a","subjectKey":"50b00000-0000-4000-8000-00000000000a","label":"Record 1","rule":"placement_missing","factVersion":1,"action":"check_location"},{"issueKey":"15500000-0000-4000-8000-00000000000b","subjectKey":"50b00000-0000-4000-8000-00000000000b","label":"Record 2","rule":"reading_unclear","factVersion":1,"action":"read_stone_again"},{"issueKey":"15500000-0000-4000-8000-00000000000c","subjectKey":"50b00000-0000-4000-8000-00000000000c","label":"Record 3","rule":"reading_unclear","factVersion":1,"action":"read_stone_again"}]},
+      "expect": {"relation": "replace", "changes": {"new": ["15500000-0000-4000-8000-00000000000c"], "stillOpen": ["15500000-0000-4000-8000-00000000000a", "15500000-0000-4000-8000-00000000000b"], "changed": [], "noLongerFlagged": []}}
+    },
+    {
+      "name": "another site key with the same issue keys is another source",
+      "current": {"format":"plot.review.v1","siteKind":"churchyard","siteKey":"5a5a5a5a-0000-4000-8000-000000000001","lineageId":"11e11e11-0000-4000-8000-000000000001","siteAlias":"Site 1","revision":5,"asOf":"2026-04-20","issues":[{"issueKey":"15500000-0000-4000-8000-00000000000a","subjectKey":"50b00000-0000-4000-8000-00000000000a","label":"Record 1","rule":"placement_missing","factVersion":1,"action":"check_location"},{"issueKey":"15500000-0000-4000-8000-00000000000b","subjectKey":"50b00000-0000-4000-8000-00000000000b","label":"Record 2","rule":"reading_unclear","factVersion":1,"action":"read_stone_again"}]},
+      "incoming": {"format":"plot.review.v1","siteKind":"churchyard","siteKey":"5a5a5a5a-0000-4000-8000-000000000002","lineageId":"11e11e11-0000-4000-8000-000000000001","siteAlias":"Site 1","revision":9,"asOf":"2026-05-01","issues":[{"issueKey":"15500000-0000-4000-8000-00000000000a","subjectKey":"50b00000-0000-4000-8000-00000000000a","label":"Record 1","rule":"placement_missing","factVersion":1,"action":"check_location"}]},
+      "expect": {"relation": "different_source"}
+    },
+    {
+      "name": "another lineage is another source",
+      "current": {"format":"plot.review.v1","siteKind":"churchyard","siteKey":"5a5a5a5a-0000-4000-8000-000000000001","lineageId":"11e11e11-0000-4000-8000-000000000001","siteAlias":"Site 1","revision":5,"asOf":"2026-04-20","issues":[]},
+      "incoming": {"format":"plot.review.v1","siteKind":"churchyard","siteKey":"5a5a5a5a-0000-4000-8000-000000000001","lineageId":"11e11e11-0000-4000-8000-000000000002","siteAlias":"Site 1","revision":5,"asOf":"2026-04-20","issues":[]},
+      "expect": {"relation": "different_source"}
+    }
+  ],
+  "reading": [
+    {
+      "name": "a current decision is ready",
+      "slip": {"format":"plot.slip.v1","siteKey":"5a5a5a5a-0000-4000-8000-000000000001","lineageId":"11e11e11-0000-4000-8000-000000000001","packetRevision":5,"packetAsOf":"2026-04-20","decisions":[{"actionId":"ac700000-0000-4000-8000-000000000001","issueKey":"15500000-0000-4000-8000-00000000000a","factVersion":1,"disposition":"checked","reviewedOn":"2026-04-21"}]},
+      "context": {"siteKey":"5a5a5a5a-0000-4000-8000-000000000001","lineageId":"11e11e11-0000-4000-8000-000000000001","open":[{"issueKey":"15500000-0000-4000-8000-00000000000a","factVersion":1}],"received":[]},
+      "expect": {"ok": true, "statuses": ["ready"]}
+    },
+    {
+      "name": "an older fact version is changed",
+      "slip": {"format":"plot.slip.v1","siteKey":"5a5a5a5a-0000-4000-8000-000000000001","lineageId":"11e11e11-0000-4000-8000-000000000001","packetRevision":5,"packetAsOf":"2026-04-20","decisions":[{"actionId":"ac700000-0000-4000-8000-000000000001","issueKey":"15500000-0000-4000-8000-00000000000a","factVersion":1,"disposition":"checked","reviewedOn":"2026-04-21"}]},
+      "context": {"siteKey":"5a5a5a5a-0000-4000-8000-000000000001","lineageId":"11e11e11-0000-4000-8000-000000000001","open":[{"issueKey":"15500000-0000-4000-8000-00000000000a","factVersion":2}],"received":[]},
+      "expect": {"ok": true, "statuses": ["changed"]}
+    },
+    {
+      "name": "an issue that is not open is closed",
+      "slip": {"format":"plot.slip.v1","siteKey":"5a5a5a5a-0000-4000-8000-000000000001","lineageId":"11e11e11-0000-4000-8000-000000000001","packetRevision":5,"packetAsOf":"2026-04-20","decisions":[{"actionId":"ac700000-0000-4000-8000-000000000001","issueKey":"15500000-0000-4000-8000-00000000000a","factVersion":1,"disposition":"checked","reviewedOn":"2026-04-21"}]},
+      "context": {"siteKey":"5a5a5a5a-0000-4000-8000-000000000001","lineageId":"11e11e11-0000-4000-8000-000000000001","open":[{"issueKey":"15500000-0000-4000-8000-00000000000b","factVersion":1}],"received":[]},
+      "expect": {"ok": true, "statuses": ["closed"]}
+    },
+    {
+      "name": "an action ID already received wins over a closed issue",
+      "slip": {"format":"plot.slip.v1","siteKey":"5a5a5a5a-0000-4000-8000-000000000001","lineageId":"11e11e11-0000-4000-8000-000000000001","packetRevision":5,"packetAsOf":"2026-04-20","decisions":[{"actionId":"ac700000-0000-4000-8000-000000000001","issueKey":"15500000-0000-4000-8000-00000000000a","factVersion":1,"disposition":"checked","reviewedOn":"2026-04-21"}]},
+      "context": {"siteKey":"5a5a5a5a-0000-4000-8000-000000000001","lineageId":"11e11e11-0000-4000-8000-000000000001","open":[],"received":["ac700000-0000-4000-8000-000000000001"]},
+      "expect": {"ok": true, "statuses": ["received"]}
+    },
+    {
+      "name": "four decisions give the four words in order",
+      "slip": {"format":"plot.slip.v1","siteKey":"5a5a5a5a-0000-4000-8000-000000000001","lineageId":"11e11e11-0000-4000-8000-000000000001","packetRevision":5,"packetAsOf":"2026-04-20","decisions":[{"actionId":"ac700000-0000-4000-8000-000000000001","issueKey":"15500000-0000-4000-8000-00000000000a","factVersion":1,"disposition":"checked","reviewedOn":"2026-04-21"},{"actionId":"ac700000-0000-4000-8000-000000000002","issueKey":"15500000-0000-4000-8000-00000000000b","factVersion":1,"disposition":"needs_keeper","reviewedOn":"2026-04-21"},{"actionId":"ac700000-0000-4000-8000-000000000003","issueKey":"15500000-0000-4000-8000-00000000000c","factVersion":1,"disposition":"checked","reviewedOn":"2026-04-21"},{"actionId":"ac700000-0000-4000-8000-000000000004","issueKey":"15500000-0000-4000-8000-00000000000a","factVersion":1,"disposition":"checked","reviewedOn":"2026-04-22"}]},
+      "context": {"siteKey":"5a5a5a5a-0000-4000-8000-000000000001","lineageId":"11e11e11-0000-4000-8000-000000000001","open":[{"issueKey":"15500000-0000-4000-8000-00000000000a","factVersion":1},{"issueKey":"15500000-0000-4000-8000-00000000000b","factVersion":2}],"received":["ac700000-0000-4000-8000-000000000004"]},
+      "expect": {"ok": true, "statuses": ["ready", "changed", "closed", "received"]}
+    },
+    {
+      "name": "a slip with a higher version than the open one reads as ready",
+      "slip": {"format":"plot.slip.v1","siteKey":"5a5a5a5a-0000-4000-8000-000000000001","lineageId":"11e11e11-0000-4000-8000-000000000001","packetRevision":5,"packetAsOf":"2026-04-20","decisions":[{"actionId":"ac700000-0000-4000-8000-000000000001","issueKey":"15500000-0000-4000-8000-00000000000a","factVersion":3,"disposition":"checked","reviewedOn":"2026-04-21"}]},
+      "context": {"siteKey":"5a5a5a5a-0000-4000-8000-000000000001","lineageId":"11e11e11-0000-4000-8000-000000000001","open":[{"issueKey":"15500000-0000-4000-8000-00000000000a","factVersion":2}],"received":[]},
+      "expect": {"ok": true, "statuses": ["ready"]}
+    },
+    {
+      "name": "another site key refuses the whole slip",
+      "slip": {"format":"plot.slip.v1","siteKey":"5a5a5a5a-0000-4000-8000-000000000002","lineageId":"11e11e11-0000-4000-8000-000000000001","packetRevision":5,"packetAsOf":"2026-04-20","decisions":[{"actionId":"ac700000-0000-4000-8000-000000000001","issueKey":"15500000-0000-4000-8000-00000000000a","factVersion":1,"disposition":"checked","reviewedOn":"2026-04-21"}]},
+      "context": {"siteKey":"5a5a5a5a-0000-4000-8000-000000000001","lineageId":"11e11e11-0000-4000-8000-000000000001","open":[{"issueKey":"15500000-0000-4000-8000-00000000000a","factVersion":1}],"received":[]},
+      "expect": {"ok": false, "code": "other_register"}
+    },
+    {
+      "name": "another lineage refuses the whole slip",
+      "slip": {"format":"plot.slip.v1","siteKey":"5a5a5a5a-0000-4000-8000-000000000001","lineageId":"11e11e11-0000-4000-8000-000000000002","packetRevision":5,"packetAsOf":"2026-04-20","decisions":[]},
+      "context": {"siteKey":"5a5a5a5a-0000-4000-8000-000000000001","lineageId":"11e11e11-0000-4000-8000-000000000001","open":[],"received":[]},
+      "expect": {"ok": false, "code": "other_register"}
+    }
+  ]
+}

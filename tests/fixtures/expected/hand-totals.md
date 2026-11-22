@@ -392,3 +392,97 @@ Privacy canaries that must be absent from every availability file byte and every
 | 2026-04-18 | same offer | `offer_late` 0, because the reply date itself is not late |
 | 2026-06-30 | the B02 charge, due 2025-06-30, fully paid | 0 |
 | any | an offer with no reply date | 0 |
+
+## 6 Committee exchange (added for spec 05, worked before the exchange code)
+
+Sections 1, 2, 4 and 5 fix the checks. This section fixes the packet, the keys, the versions and the slip readings. Everything here is **Assumed** and invented. The fixed review date is 2026-04-20. "Record n" is the neutral label a subject gets when it first appears, where n counts the subjects in the ledger from 1.
+
+### 6.1 Sizes of the two files
+
+| File | Top level fields | Fields in each issue or decision |
+|---|---|---|
+| Review packet `plot.review.v1` | format, siteKind, siteKey, lineageId, siteAlias, revision, asOf, issues = 8 | issueKey, subjectKey, label, rule, factVersion, action = 6 |
+| Return slip `plot.slip.v1` | format, siteKey, lineageId, packetRevision, packetAsOf, decisions = 6 | actionId, issueKey, factVersion, disposition, reviewedOn = 5 |
+
+A packet with 2 issues holds 8 + 2 times 6 = 20 values. A slip with 2 decisions holds 6 + 2 times 5 = 16 values.
+
+Limits: 2,000 issues are accepted and 2,001 refused. A label or a site name of 40 characters is accepted and 41 refused. A packet of 2 MiB (2,097,152 bytes) is accepted and one byte more is refused.
+
+Rule to action: `placement_missing` gives `check_location`, `reading_unclear` gives `read_stone_again`, `offer_late` gives `check_reply`, `fee_late` gives `check_payment`.
+
+### 6.2 Lantern Fold at 2026-04-20
+
+Section 1 gives 2 review issues. The church lists an unplaced burial first, then an unclear reading, so the first export gives:
+
+| Label | Rule | Action | Fact version |
+|---|---|---|---|
+| Record 1 | `placement_missing` (LF-H1, the unplaced burial) | `check_location` | 1 |
+| Record 2 | `reading_unclear` (the Y07 reading) | `read_stone_again` | 1 |
+
+Check: 1 + 1 = 2 issues. The site name is "Site 1" because none was approved. Let R be the revision of the walkthrough before the export. The first export stores 2 new subjects, so it commits once and the packet revision is R + 1. A second export on the same date commits nothing, the revision stays R + 1 and the file has the same bytes.
+
+Canaries absent from the packet bytes: Mirel Quillmoss, Torin Pellwick, Perrin Gladwyn, both living reservation holders, the invented contact, the private inscription word, "LF-H1", "LF-07A", "Lantern Fold", "Y07", "Y03". Total 0 found.
+
+### 6.3 Thimble Beds
+
+At 2026-04-20 in the start state (hand totals 5.6): 1 issue, `fee_late` on the B02 charge, label Record 1, action `check_payment`.
+
+In the late offer branch (offer on B03 made 2026-04-04, reply by 2026-04-18, hand totals 2.6), a first export at 2026-04-20 gives 2 issues. The garden lists a late offer first, then a late fee:
+
+| Label | Rule | Action | Fact version |
+|---|---|---|---|
+| Record 1 | `offer_late` (B03) | `check_reply` | 1 |
+| Record 2 | `fee_late` (B02 charge) | `check_payment` | 1 |
+
+Check: 1 + 1 = 2 issues, as hand totals 2.6. Canaries absent from the packet bytes: Tavi Bramblequill, Olin Reedwhorl, Marlo Fennick, Ada Stonecrop, Ilse Burrowby, Hale Pennywort, their contacts, 36.00, 30.00, 12.00, 24.00, 3600, 3000, 1200, 2400, "TB-RCPT-1", "B02", "B03", "Thimble Beds". Total 0 found.
+
+### 6.4 Keys and versions over several exports (Thimble Beds, late offer branch)
+
+| Step | As at | Issues in the file | Commits | Notes |
+|---|---|---|---|---|
+| A | 2026-04-18 | fee_late = 1 | 1 | New subject, label Record 1, version 1. Key F |
+| B | 2026-04-18 again | fee_late = 1 | 0 | Same key F, same bytes, revision unchanged |
+| C | 2026-04-20 | offer_late + fee_late = 2 | 1 | Offer is a new subject, label Record 2, key O, version 1. Fee keeps key F and version 1 |
+| D | 2026-04-18 | fee_late = 1 | 0 | The offer is not late yet. Its key stays stored |
+| E | 2026-04-20 | offer_late + fee_late = 2 | 0 | The offer reopens with key O and version 1 |
+| F | 2026-04-22, after a receipt of 1000 pence on 2026-04-21 | offer_late + fee_late = 2 | 1 | The balance of the charge goes from 3000 to 2000, so fee_late has version 1 + 1 = 2. Key F is the same. The offer is still version 1 |
+| G | 2026-04-24, after a receipt of 2000 pence on 2026-04-23 | offer_late = 1 | 0 | The charge is paid, so fee_late is no longer raised. Keys O and F stay stored |
+
+Subjects stored after step C: 2. After G: still 2. Commits over A to G: 3 (A, C, F). Check: 1 + 0 + 1 + 0 + 0 + 1 + 0 = 3.
+
+Lantern Fold: after the first export, the keeper corrects the Y07 reading's words (still unclear). Its fact version at the next export is 1 + 1 = 2, its key is unchanged, and placement_missing stays version 1. After LF-H1 is placed in Y03 (hand totals 4.6), the next export has 1 issue (reading_unclear) and the placement key stays stored.
+
+### 6.5 Reading a slip in Lantern Fold
+
+After the first export the two issues are I1 (placement) and I2 (reading). The slips below are made for the test, one decision each unless noted.
+
+| Slip | Decisions | State of the register when it is read | Rows |
+|---|---|---|---|
+| S1 | D1 (I1, version 1, checked), D2 (I2, version 1, needs_keeper) | unchanged | Ready to check 2 |
+| S1, after Record receipt | the same | 2 receipts stored | Already received 2, Ready 0. Record receipt is not offered |
+| S2 | D3 (I1, version 1), D4 (I2, version 1), new action IDs | the Y07 reading's words changed, still unclear | D3 Ready to check, D4 Source has changed (open version 2). Ready 1, changed 1 |
+| S2, after LF-H1 is placed in Y03 | the same | placement_missing closed | D3 Issue already closed, D4 Source has changed. Ready 0, closed 1, changed 1 |
+| S3 | D5 with an issue key the register never made | any | Issue already closed |
+| S4 | any decision, but its siteKey is another UUID | any | refused as a whole, 0 rows, "This slip belongs to another register." |
+
+Record receipt on S1 writes 2 `review_received` events in one commit. The revision rises by 1. The record counts do not change: unplaced burials 1, plots Taken 6, reservations 2, readings unclear 1 (hand totals section 1 and 4). A second Record receipt on S1 writes 0 events.
+
+### 6.6 Desk comparison vectors
+
+Current packet C: source P, revision 5, asOf 2026-04-20, issues a (version 1) and b (version 1).
+
+| Incoming | Result | New | Still open | Changed | No longer flagged |
+|---|---|---|---|---|---|
+| Same bytes | same | | | | |
+| Revision 4, asOf 2026-04-20 | stale | | | | |
+| Revision 6, asOf 2026-04-19 | stale | | | | |
+| Revision 5, asOf 2026-04-20, only a (version 1) | conflict | | | | |
+| Revision 6, asOf 2026-04-21, a (version 2) and c (version 1) | replace | c | none | a | b |
+| Revision 6, asOf 2026-04-20, a, b and c all version 1 | replace | c | a, b | none | none |
+| Source Q (another siteKey), same issue keys, revision 9 | different source | | | | |
+
+Check: row 5 has 1 + 0 + 1 + 1 = 3 keys (a, b, c). Row 6 has 1 + 2 = 3 keys.
+
+### 6.7 The pinned copy
+
+Files copied: exchange schema, packet, compare, slip (4), calendar, limits, types (3) = 7 source files. Written with them: vectors.json and provenance.json = 9 files in all. `provenance.json` lists 7 source files and vectors.json = 8 entries and not itself. One required package: zod 4.6.7.

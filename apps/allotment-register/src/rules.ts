@@ -2,7 +2,7 @@
 // An application keeps its join sequence for ever. Offers, tenancies and fees follow in later tasks.
 import { intervalCovers, intervalsOverlap, isValidLocalDate } from "../../../template/src/calendar";
 import type { LocalDate } from "../../../template/src/calendar";
-import { BASE_COMMAND_TYPES, applyBase, decideBase, emptyBase, validateBase } from "../../../template/src/base";
+import { applyBase, decideBase, emptyBase, isBaseCommand, validateBase } from "../../../template/src/base";
 import type { BaseCommand } from "../../../template/src/base";
 import { decideCore } from "../../../template/src/commands";
 import type { CoreCommand } from "../../../template/src/commands";
@@ -23,9 +23,8 @@ type Own = Exclude<AllotCommand, BaseCommand>;
 type Cmd<T extends Own["type"]> = Extract<Own, { type: T }>;
 type Drafts = DraftEvent<AllotEvent>[];
 
-const BASE_NAMES: ReadonlySet<string> = new Set(BASE_COMMAND_TYPES);
 const OWN_NAMES: ReadonlySet<string> = new Set(ALLOT_COMMAND_TYPES);
-const isBase = (type: string): boolean => BASE_NAMES.has(type);
+const isBase = (type: string): boolean => isBaseCommand({ type });
 
 export function emptyAllot(siteId: Uuid, currency?: Currency): AllotState {
   return {

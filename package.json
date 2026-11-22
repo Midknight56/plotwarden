@@ -22,6 +22,7 @@
     "test:oracle": "vitest run tests/oracle",
     "test:browser": "playwright test --pass-with-no-tests",
     "check:imports": "node scripts/check-imports.mjs",
+    "export:exchange": "node scripts/export-exchange.mjs",
     "check:changed": "npm run typecheck && node scripts/check-imports.mjs && node scripts/changed-tests.mjs --git",
     "church:build": "vite build --config apps/churchyard-register/vite.config.ts",
     "church:preview": "vite preview --config apps/churchyard-register/vite.config.ts",

@@ -1,0 +1,35 @@
+# 05 Exchange: tasks
+
+Each task writes its test first, sees it fail on the missing behaviour (a stub that compiles and throws "not implemented", never a missing module), then writes the smallest complete code. A task is ticked only when its test passes. Expected values come from `tests/fixtures/expected/hand-totals.md` section 6 and from the vectors file. T IDs repeat the owner table in spec 00. The Desk is built in its own repository in the next task. Section X11 of the requirements is what it must meet (T25, T26, T27).
+
+- [x] 5.1 Spec 05 and hand totals section 6 (worked before code). Files: `.kiro/specs/05-exchange/*`, `tests/fixtures/expected/hand-totals.md`. T IDs: none.
+- [x] 5.2 Closed schemas and file reading: packet, slip, rules, actions, limits, `readExchangeFile`. Files: `template/src/exchange/schema.ts`, `tests/unit/exchange.test.ts`, `tests/fixtures/exchange-vectors.json`, `tests/helpers/exchangeVectors.ts`. T IDs: T24. X3, X5.1.
+- [x] 5.3 Packet building, label check, preview, file names. Files: `template/src/exchange/packet.ts`, `tests/unit/exchange.test.ts`. T IDs: T24. X3.
+- [x] 5.4 Comparison: same, stale, conflict, replace, different source, cross site keys. Files: `template/src/exchange/compare.ts`, `tests/unit/exchange.test.ts`. T IDs: T24. X7.
+- [x] 5.5 Slip building and reading, in the order of D11. Files: `template/src/exchange/slip.ts`, `tests/unit/exchange.test.ts`. T IDs: T24. X5.
+- [x] 5.6 The ledger in the base state: `prepare_review`, `receive_review`, keys, versions, labels, name, replay, read only receipts. Files: `template/src/review.ts`, `template/src/base.ts`, `template/src/adapter.ts` (`ReviewSource`, `ReviewSupport`), `tests/unit/reviewLedger.test.ts`. T IDs: T24. X1, X6.1, X6.2.
+- [x] 5.7 App support: sources with fingerprints, private strings, record routes. Lantern Fold gives one unclear reading and one unplaced burial. Thimble Beds gives the late offer and the late fee in the late offer branch of hand totals 2.6. Files: `apps/churchyard-register/src/{review,adapter,rules}.ts`, `apps/allotment-register/src/{review,adapter,rules}.ts`, `tests/unit/exchangeApps.test.ts`. T IDs: T24. X2.
+- [x] 5.8 Exchange flow: plan, preview, commit order, slip reading. Files: `template/src/ui/exchangeFlow.ts`, `tests/unit/exchangeFlow.test.ts`. T IDs: T24. X4, X5.
+- [x] 5.9 Copy catalog. Files: `template/src/ui/copyExchange.ts`, `template/src/ui/copy.ts`, `tests/unit/exchangeCopy.test.ts`. T IDs: T35 support. X8.
+- [x] 5.10 The Exchange screen, its route and the link in both app homes. Files: `template/src/ui/Exchange.tsx`, `template/src/ui/RegisterShell.tsx`, `template/src/ui/register.css`, `apps/*/src/{ChurchyardHome,AllotmentHome}.tsx`. T IDs: none (browser). X4, X5, X6. The shared `screenWords` test covers the new file.
+- [x] 5.11 The pinned copy, `provenance.json` and `vectors.json`. Files: `scripts/export-exchange.mjs`, `package.json` (`export:exchange`), `tests/unit/exportExchange.test.ts`. T IDs: T27 support. X9.
+- [x] 5.12 Browser: desk return, register side. Files: `tests/browser/desk-return.spec.ts`, `docs/acceptance/layout/exchange/*.png`. T IDs: browser `desk-return.spec.ts`. X4, X5, X6, X10.
+- [x] 5.13 Log and exit gate. Files: `docs/kiro-log.md`, this file. T IDs: none.
+- [x] 5.14 Property tests of the exchange: closed shapes, order free bytes, comparison, slip rows, label check, 1,000 cases each from recorded seeds. Files: `tests/properties/exchange.test.ts`, `tests/properties/seeds.ts`. T IDs: T24. X3, X5, X7.
+
+## Not settled in spec 05
+
+- The Review Desk does not exist yet. Every slip in `desk-return.spec.ts` was made by `buildSlip` from the bytes of the file the app downloaded. No slip was made by the Desk, so the Desk to register path is untried. Section X11 is what the Desk task must prove.
+- No real warden, secretary or committee member used the screen. The words and the order of steps are untried by a person. Only headless Chromium on one Windows machine was used, no other browser and no phone.
+- Thimble Beds at its start state raises the late fee alone (hand totals 5.6, and `gardenWalkthrough.test.ts` still says so). The late offer comes from the late offer branch of hand totals 2.6: through commands in `exchangeApps.test.ts`, and through the screens in the browser spec with a reply date of 2026-04-20 and a review date of 2026-04-21. The walkthrough itself was not changed.
+- A slip whose fact version is higher than the open one reads "Ready to check", as D11 says. This cannot come from this register. It is not special cased and no test says it is right, only the vector "a slip with a higher version than the open one reads as ready".
+- `BASE_COMMAND_TYPES` keeps its 16 names, because `base.test.ts` counts them. The two review commands are in `REVIEW_COMMAND_TYPES` and `isBaseCommand` accepts both. `tests/helpers/paperKind.ts` and the market adapter do not list the review commands and have no ledger screen.
+- The first export of a register commits one revision (the new keys), so a keeper's revision rises by one with no change to any record. A second export on the same date commits nothing. This follows from "random stable keys" and was not put to a keeper.
+- A site name and a label are stored on the first download that sends them, and the screen fills them in again next time. Typed values are not stored by a preview.
+- `Record receipt` records only rows that are ready. A changed or closed row gets no receipt, so it stays changed or closed on every later opening. No control records that the keeper saw such a row.
+- The Exchange screen has no dialog, so Escape and focus return were not exercised on it. Focus after an invalid preview, after a preview and after a slip opens is tested.
+- Browser Back was not tested on the Exchange route. The route is a hash route like every other and the typed values are local to the screen, so Back returns to the page before with the values gone.
+- Property tests of the exchange (`tests/properties/exchange.test.ts`, task 5.14) cover shape, order, comparison, slip reading and the label check. They do not cover the checks the apps raise from a register, which stay example tests in `exchangeApps.test.ts`. The label property varies case and surrounding text only, not accents or spacing.
+- The fingerprint is a 53 bit digest. A collision would leave a version unraised. It is stored privately and never exported.
+- The full browser run re-took 32 older proof pictures in `docs/acceptance/layout/allotment` and `churchyard` (git shows them as modified). The two desk pictures of each app now show the new "Committee review" button, which is a real change. Why the other 28 differ was not checked, and they were not restored, because restoring needs a git command that the rules for this run do not allow.
+- Not run: Firefox, WebKit, a real phone, 200 percent zoom, a print preview, a screen reader. Contrast was measured by `measureLayout`. The exchange screen has no animation.

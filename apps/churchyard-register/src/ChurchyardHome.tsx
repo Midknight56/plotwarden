@@ -198,6 +198,9 @@ export function ChurchyardHome() {
               <li>
                 <ButtonLink href={`${base}/report`}>{t("reportsLink")}</ButtonLink>
               </li>
+              <li>
+                <ButtonLink href={`${base}/exchange`}>{t("committeeReview")}</ButtonLink>
+              </li>
             </ul>
           </nav>
           <nav aria-label={t("mainNavigation")}>

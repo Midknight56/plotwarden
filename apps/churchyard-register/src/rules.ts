@@ -2,7 +2,7 @@
 // A burial is permanent. A name, date or space changes only by a correction that names the original.
 import { isValidLocalDate } from "../../../template/src/calendar";
 import type { LocalDate, PartialDate } from "../../../template/src/calendar";
-import { BASE_COMMAND_TYPES, applyBase, decideBase, emptyBase, validateBase } from "../../../template/src/base";
+import { applyBase, decideBase, emptyBase, isBaseCommand, validateBase } from "../../../template/src/base";
 import type { BaseCommand } from "../../../template/src/base";
 import { decideCore } from "../../../template/src/commands";
 import type { CoreCommand } from "../../../template/src/commands";
@@ -20,9 +20,8 @@ type Own = Exclude<ChurchCommand, BaseCommand>;
 type Cmd<T extends Own["type"]> = Extract<Own, { type: T }>;
 type Drafts = DraftEvent<ChurchEvent>[];
 
-const BASE_NAMES: ReadonlySet<string> = new Set(BASE_COMMAND_TYPES);
 const CHURCH_NAMES: ReadonlySet<string> = new Set(CHURCH_COMMAND_TYPES);
-const isBase = (type: string): boolean => BASE_NAMES.has(type);
+const isBase = (type: string): boolean => isBaseCommand({ type });
 
 export function emptyChurch(siteId: Uuid): ChurchState {
   return {

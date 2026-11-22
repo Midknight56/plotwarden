@@ -5,6 +5,7 @@ import { MONTH_NAMES } from "../calendar";
 import type { PartialDate } from "../calendar";
 import type { PlotSummary } from "../status";
 import { SCREEN_COPY } from "./copyScreens";
+import { EXCHANGE_COPY } from "./copyExchange";
 import type { PhysicalState } from "../types";
 
 export const FOUNDATION_COPY: Readonly<Record<string, string>> = {
@@ -37,8 +38,8 @@ export const FOUNDATION_COPY: Readonly<Record<string, string>> = {
   actionContinueInTab: "Continue in this tab",
 };
 
-/** The whole catalog: the foundation words and the words of the shared screens. */
-export const COPY: Readonly<Record<string, string>> = { ...FOUNDATION_COPY, ...SCREEN_COPY };
+/** The whole catalog: the foundation words, the words of the shared screens and the words of the Exchange screen. */
+export const COPY: Readonly<Record<string, string>> = { ...FOUNDATION_COPY, ...SCREEN_COPY, ...EXCHANGE_COPY };
 
 /** Error code to catalog key. Codes without an entry here get their words with their own feature. */
 const ERROR_KEYS: Readonly<Record<string, string>> = {

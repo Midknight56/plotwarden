@@ -13,9 +13,10 @@ import type { SearchName } from "../../../template/src/search";
 import type { Plot, Uuid } from "../../../template/src/types";
 import { formatPartialDate } from "../../../template/src/ui/copy";
 import { BURIAL_FIELDS, BURIALS_SHEET } from "./fields";
-import { churchReviewFacts } from "./review";
+import { REVIEW_COMMAND_TYPES } from "../../../template/src/review";
 import { CHURCH_COPY } from "./copy";
 import { buildFamilyFile } from "./projection";
+import { churchReviewFacts, churchReviewSupport } from "./review";
 import { CHURCH_CTX, applyChurch, claimStartOf, decideChurch, emptyChurch, validateChurch } from "./rules";
 import { BURIALS, CHURCH_COMMAND_TYPES, CHURCH_KIND } from "./types";
 import type { Burial, ChurchCommand, ChurchEvent, ChurchState } from "./types";
@@ -26,7 +27,7 @@ export const churchAdapter: RegisterAdapter<ChurchState, ChurchCommand, ChurchEv
   spacesPerPlot: CHURCH_CTX.spacesPerPlot,
   fields: BURIAL_FIELDS,
   sheets: [BURIALS_SHEET],
-  commands: [...BASE_COMMAND_TYPES, ...CHURCH_COMMAND_TYPES],
+  commands: [...BASE_COMMAND_TYPES, ...REVIEW_COMMAND_TYPES, ...CHURCH_COMMAND_TYPES],
   initialState: (site) => emptyChurch(site.id),
   validate: validateChurch,
   decide: decideChurch,
@@ -41,6 +42,7 @@ export const churchAdapter: RegisterAdapter<ChurchState, ChurchCommand, ChurchEv
   },
   reports: [],
   reviewFacts: churchReviewFacts,
+  review: churchReviewSupport,
   labels: CHURCH_COPY,
   theme: { ink: "#22252C", paper: "#FAF5E9", accent: "#232A5C", plotShape: "arch" },
 };

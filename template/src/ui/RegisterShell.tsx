@@ -14,6 +14,7 @@ import type { SiteRow } from "../data/transaction";
 import type { DraftEvent, StoredEvent } from "../events";
 import type { Site } from "../types";
 import { BackupRestore } from "./BackupRestore";
+import { Exchange } from "./Exchange";
 import { FastEntry } from "./FastEntry";
 import { Help } from "./Help";
 import { ImportWizard } from "./ImportWizard";
@@ -266,6 +267,8 @@ function RegisterRoutes({ route }: { route: Route }) {
       if (arg === "fast") return <FastEntry />;
       if (arg === "import") return <ImportWizard />;
       return <NotFound />;
+    case "exchange":
+      return <Exchange />;
     case "backup":
       return <BackupRestore mode="backup" />;
     case "restore":

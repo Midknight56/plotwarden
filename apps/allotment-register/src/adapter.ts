@@ -2,6 +2,7 @@
 import { defineRegister } from "../../../template/src/adapter";
 import type { Register, RegisterAdapter } from "../../../template/src/adapter";
 import { BASE_COMMAND_TYPES } from "../../../template/src/base";
+import { REVIEW_COMMAND_TYPES } from "../../../template/src/review";
 import { parseDateEntry } from "../../../template/src/calendar";
 import type { DateOrder, LocalDate } from "../../../template/src/calendar";
 import type { OpenImporter, SheetImporter } from "../../../template/src/data/importBatch";
@@ -13,7 +14,7 @@ import { formatPartialDate } from "../../../template/src/ui/copy";
 import { ALLOT_COPY } from "./copy";
 import { ALL_FIELDS, TENANCIES_SHEET_DEF, WAITING_SHEET_DEF } from "./fields";
 import { buildAvailabilityFile } from "./projection";
-import { allotReviewFacts } from "./review";
+import { allotReviewFacts, allotReviewSupport } from "./review";
 import { ALLOT_CTX, applyAllot, decideAllot, emptyAllot, validateAllot } from "./rules";
 import { ALLOT_COMMAND_TYPES, ALLOT_KIND, TENANCIES_SHEET, WAITING_SHEET } from "./types";
 import type { AllotCommand, AllotEvent, AllotState } from "./types";
@@ -25,7 +26,7 @@ export const allotAdapter: RegisterAdapter<AllotState, AllotCommand, AllotEvent>
   spacesPerPlot: ALLOT_CTX.spacesPerPlot,
   fields: ALL_FIELDS,
   sheets: [WAITING_SHEET_DEF, TENANCIES_SHEET_DEF],
-  commands: [...BASE_COMMAND_TYPES, ...ALLOT_COMMAND_TYPES],
+  commands: [...BASE_COMMAND_TYPES, ...REVIEW_COMMAND_TYPES, ...ALLOT_COMMAND_TYPES],
   initialState: (site) => emptyAllot(site.id, site.currency),
   validate: validateAllot,
   decide: decideAllot,
@@ -40,6 +41,7 @@ export const allotAdapter: RegisterAdapter<AllotState, AllotCommand, AllotEvent>
   },
   reports: [],
   reviewFacts: allotReviewFacts,
+  review: allotReviewSupport,
   labels: ALLOT_COPY,
   theme: { ink: "#1B312A", paper: "#F7F5E8", accent: "#2F6B4F", plotShape: "bed" },
 };

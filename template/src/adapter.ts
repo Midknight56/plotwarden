@@ -35,6 +35,20 @@ export interface ReviewFact {
   label: string;
 }
 
+/** A check with the private digest of the fields it depends on. A change in the digest raises the fact version. */
+export interface ReviewSource extends ReviewFact {
+  fingerprint: string;
+}
+
+/** What an adapter gives the Exchange screen. All of it is private and pure. None of it enters a packet. */
+export interface ReviewSupport<S> {
+  sources(snapshot: S, asOf: LocalDate): ReviewSource[];
+  /** Words a committee label must not hold: names, contacts, references. */
+  privateStrings(snapshot: S): string[];
+  /** The route of the record behind a check, under the register, for example `burial/{id}`. */
+  link(snapshot: S, source: { rule: string; subjectId: string }): string | undefined;
+}
+
 export interface ReportBuilder<S> {
   id: string;
   title: string;
@@ -68,6 +82,8 @@ export interface RegisterAdapter<S, C extends { type: string }, E extends { type
   project(snapshot: S, audience: Audience, asOf: LocalDate): unknown;
   reports: ReportBuilder<S>[];
   reviewFacts(snapshot: S, asOf: LocalDate): ReviewFact[];
+  /** Checks with fingerprints, private strings and record routes, for the Exchange screen. Optional. */
+  review?: ReviewSupport<S>;
   labels: CopyCatalog;
   theme: ThemeTokens;
 }
