@@ -236,7 +236,7 @@ describe("INV_EXCHANGE_SLIP: each row is read in the order received, closed, cha
         if (!reading.ok) throw new Error("INV_EXCHANGE_SLIP: the right register was refused");
         expect(reading.rows).toHaveLength(slip.decisions.length);
         reading.rows.forEach((row, i) => {
-          const want = received[i] ? "received" : open[i] === undefined ? "closed" : open[i]! > slip.decisions[i]!.factVersion ? "changed" : "ready";
+          const want = received[i] ? "received" : open[i] === undefined ? "closed" : open[i]! === slip.decisions[i]!.factVersion ? "ready" : "changed";
           expect(row.status).toBe(want);
         });
         const total = reading.counts.ready + reading.counts.changed + reading.counts.closed + reading.counts.received;

@@ -18,6 +18,7 @@ interface Card {
 export function Library() {
   const { app, db, t, register, route, sitesVersion, navigate, newId, bumpSites } = useShell();
   const [cards, setCards] = useState<Card[] | null>(null);
+  const [started, setStarted] = useState(false);
   const [practice, setPractice] = useState<"idle" | "busy" | "failed">("idle");
   const guard = useRef(false);
 
@@ -43,7 +44,10 @@ export function Library() {
   useEffect(() => {
     let cancelled = false;
     void (async () => {
-      const sites = siteLibrary(await listSites(db), { kind: app.adapter.kind, workspace: "own" });
+      const all = await listSites(db);
+      const sites = siteLibrary(all, { kind: app.adapter.kind, workspace: "own" });
+      // The practice register is offered for a restart only once it has been opened.
+      const began = app.walkthrough !== undefined && all.some((s) => s.workspace === "walkthrough" && s.kind === app.adapter.kind && s.title === app.walkthrough?.siteTitle);
       const out: Card[] = [];
       for (const site of sites) {
         const events = await readEvents(db, site.id);
@@ -55,7 +59,10 @@ export function Library() {
           changed: last === undefined ? undefined : localDateOf(last.recordedAt, site.zone),
         });
       }
-      if (!cancelled) setCards(out);
+      if (!cancelled) {
+        setCards(out);
+        setStarted(began);
+      }
     })();
     return () => {
       cancelled = true;
@@ -66,15 +73,11 @@ export function Library() {
     <section className="stack">
       <h1>{app.title}</h1>
       <p>{app.adapter.labels["libraryPrompt"] ?? t("libraryPrompt")}</p>
+      <p>{t("libraryWho")}</p>
       {route.query.get("removed") === "1" ? <Notice tone="good">{t("registerRemoved")}</Notice> : null}
       {practice === "failed" ? <Notice tone="error">{t("storageUnavailable")}</Notice> : null}
       <div className="actions">
-        {app.walkthrough === undefined ? null : (
-          <Button primary={cards !== null && cards.length === 0} onClick={() => void openPractice(false)} disabled={practice === "busy"}>
-            {t("openWalkthrough")}
-          </Button>
-        )}
-        <ButtonLink href="#/new" primary={app.walkthrough === undefined || (cards !== null && cards.length > 0)}>
+        <ButtonLink href="#/new" primary={cards !== null && cards.length === 0}>
           {t("startRegister")}
         </ButtonLink>
         <ButtonLink href="#/restore">{t("restoreBackup")}</ButtonLink>
@@ -83,9 +86,14 @@ export function Library() {
         <div className="stack">
           <p>{t("walkthroughNote")}</p>
           <div className="actions">
-            <Button onClick={() => void openPractice(true)} disabled={practice === "busy"}>
-              {t("restartWalkthrough")}
+            <Button className="button quiet" onClick={() => void openPractice(false)} disabled={practice === "busy"}>
+              {t("openWalkthrough")}
             </Button>
+            {started ? (
+              <Button onClick={() => void openPractice(true)} disabled={practice === "busy"}>
+                {t("restartWalkthrough")}
+              </Button>
+            ) : null}
           </div>
         </div>
       )}

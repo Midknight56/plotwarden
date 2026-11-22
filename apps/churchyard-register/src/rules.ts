@@ -1,6 +1,6 @@
 // Churchyard rules: decide and apply. Pure: no I/O, no random choice. Every ID comes from the command.
 // A burial is permanent. A name, date or space changes only by a correction that names the original.
-import { isValidLocalDate } from "../../../template/src/calendar";
+import { coveredInterval, isValidLocalDate } from "../../../template/src/calendar";
 import type { LocalDate, PartialDate } from "../../../template/src/calendar";
 import { applyBase, decideBase, emptyBase, isBaseCommand, validateBase } from "../../../template/src/base";
 import type { BaseCommand } from "../../../template/src/base";
@@ -226,6 +226,11 @@ function takenClaim(burial: { burialId: Uuid; sourceRef: string; date: PartialDa
     sourceRef: burial.sourceRef,
   };
   if (start !== undefined) command.start = start;
+  else {
+    // A year or a month gives no start. Its earliest possible day bounds the overlap check only.
+    const first = coveredInterval(burial.date)?.first;
+    if (first !== undefined) command.overlapFrom = first;
+  }
   return command;
 }
 

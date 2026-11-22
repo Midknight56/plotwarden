@@ -16,6 +16,7 @@ import { useRegister, useShell } from "./shellContext";
 import type { AnyCommand, RunOutcome } from "./shellContext";
 import { Status } from "./Status";
 import type { StatusState } from "./Status";
+import { DraftOffer, useScreenDraft } from "./screenDraft";
 import { stateWord } from "./copy";
 
 const EVENT_KEYS: Readonly<Record<string, string>> = {
@@ -83,7 +84,22 @@ export function PlotDetails({ plotId }: { plotId: string }) {
   const [busy, setBusy] = useState(false);
   const form = useRef<HTMLDivElement>(null);
   const opId = useRef<string | undefined>(undefined);
+  const kept = useScreenDraft(`plot:${plotId}`);
 
+  /** What was typed, as plain text, for a draft. A chosen photo file is not kept: it must be chosen again. */
+  const typedText = (): Record<string, string> => ({ action: action ?? "", spaceId, reason, date, claimChoice, correctionReason, newCode, note, caption });
+  const restoreTyped = (saved: Record<string, string>) => {
+    const picked = (["check", "free", "unusable", "return"] as const).find((a) => a === saved["action"]);
+    setAction(picked);
+    setSpaceId(saved["spaceId"] ?? "");
+    setReason(saved["reason"] ?? "");
+    setDate(saved["date"] ?? open.today);
+    setClaimChoice(saved["claimChoice"] ?? "");
+    setCorrectionReason(saved["correctionReason"] ?? "");
+    setNewCode(saved["newCode"] ?? "");
+    setNote(saved["note"] ?? "");
+    setCaption(saved["caption"] ?? "");
+  };
   if (plot === undefined || row === undefined) {
     return (
       <section className="stack">
@@ -110,14 +126,17 @@ export function PlotDetails({ plotId }: { plotId: string }) {
     setBusy(false);
     if (outcome.ok) {
       opId.current = undefined;
+      void kept.discard();
       setStatus({ phase: "saved", text: done });
       return true;
     }
     const text = outcome.error !== undefined ? errorMessage(t, outcome.error, context) : commitMessage(t, outcome.commit ?? { code: "storage_abort" });
-    // An error that sits on a field is said once, on the field.
-    setStatus(field === undefined ? { phase: "error", code: outcome.commit?.code ?? outcome.code, text } : { phase: "idle" });
+    // A rule's error that sits on a field is said once, on the field. A failure of the save itself (another tab saved
+    // first, or the write failed) is not about a field, so it goes where its buttons are.
+    const onField = field !== undefined && outcome.commit === undefined;
+    setStatus(onField ? { phase: "idle" } : { phase: "error", code: outcome.commit?.code ?? outcome.code, text });
     setNeedsCorrection(outcome.code === "taken_needs_correction");
-    if (field !== undefined) {
+    if (onField) {
       setFieldError({ field, text });
       window.setTimeout(() => focusFirstInvalid(form.current), 0);
     }
@@ -301,7 +320,16 @@ export function PlotDetails({ plotId }: { plotId: string }) {
         <ButtonLink href={`${base}/map?plot=${plotId}`}>{t("showOnMap")}</ButtonLink>
       </div>
       {app.plotExtras === undefined ? null : <app.plotExtras plotId={plotId} />}
-      <Status status={status} actions={{ tryAgain: () => setStatus({ phase: "idle" }), keepEditing: () => setStatus({ phase: "idle" }), openLatest: () => void open.reload() }} />
+      <Status
+        status={status}
+        actions={{
+          tryAgain: () => setStatus({ phase: "idle" }),
+          keepEditing: () => setStatus({ phase: "idle" }),
+          openLatest: () => void open.reload(),
+          ...kept.actions(typedText, setStatus),
+        }}
+      />
+      <DraftOffer draft={kept} onResume={restoreTyped} />
       {needsCorrection ? (
         <div className="actions">
           <Button onClick={() => setCorrecting(true)}>{t("correctAnEntry")}</Button>

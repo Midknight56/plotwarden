@@ -12,6 +12,7 @@ import { downloadText } from "./download";
 import { commitMessage, errorMessage } from "./messages";
 import type { MessageContext } from "./messages";
 import { useRegister, useShell } from "./shellContext";
+import { DraftOffer, useScreenDraft } from "./screenDraft";
 import { Status } from "./Status";
 import type { StatusState } from "./Status";
 
@@ -61,6 +62,35 @@ type FieldKey = keyof Fields;
 
 const whole = (text: string): number | undefined => (/^-?\d{1,9}$/.test(text.trim()) ? Number(text.trim()) : undefined);
 
+/** The fields as plain text, for a draft. */
+const fieldsToText = (f: Fields): Record<string, string> => ({ ...f, reverse: String(f.reverse) });
+
+/** The fields from a draft. A value that is not one of the choices gives the first choice. */
+function fieldsFromText(saved: Record<string, string>): Fields {
+  const text = (key: keyof Fields): string => saved[key] ?? (INITIAL[key] as string);
+  const one = <T extends string>(key: keyof Fields, choices: readonly T[]): T => choices.find((c) => c === saved[key]) ?? choices[0]!;
+  return {
+    section: text("section"),
+    prefix: text("prefix"),
+    first: text("first"),
+    digits: text("digits"),
+    rows: text("rows"),
+    columns: text("columns"),
+    width: text("width"),
+    height: text("height"),
+    east: text("east"),
+    north: text("north"),
+    rowSpacing: text("rowSpacing"),
+    columnSpacing: text("columnSpacing"),
+    rotation: text("rotation"),
+    skip: text("skip"),
+    numbering: one("numbering", ["across", "down"]),
+    startRow: one("startRow", ["north", "south"]),
+    startColumn: one("startColumn", ["west", "east"]),
+    reverse: saved["reverse"] === "true",
+  };
+}
+
 interface Pending {
   source: "grid" | "file";
   command: LayoutCommand;
@@ -77,6 +107,7 @@ export function MapEditor() {
   const { t, newId } = useShell();
   const open = useRegister();
   const base = `#/r/${open.site.id}`;
+  const draft = useScreenDraft("map_edit");
   const [fields, setFields] = useState<Fields>(INITIAL);
   const [errors, setErrors] = useState<Partial<Record<FieldKey, string>>>({});
   const [pending, setPending] = useState<Pending | undefined>();
@@ -278,6 +309,7 @@ export function MapEditor() {
     setBusy(false);
     if (outcome.ok) {
       opId.current = undefined;
+      void draft.discard();
       setStatus({ phase: "saved", text: t("mapSaved") });
       setAdded(pending.count);
       setPending(undefined);
@@ -304,7 +336,16 @@ export function MapEditor() {
         <ButtonLink href={`${base}/map`}>{t("backToMap")}</ButtonLink>
       </div>
 
-      <Status status={status} actions={{ tryAgain: () => setStatus({ phase: "idle" }), openLatest: () => void open.reload(), keepEditing: () => setStatus({ phase: "idle" }) }} />
+      <Status
+        status={status}
+        actions={{
+          tryAgain: () => setStatus({ phase: "idle" }),
+          openLatest: () => void open.reload(),
+          keepEditing: () => setStatus({ phase: "idle" }),
+          ...draft.actions(() => fieldsToText(fields), setStatus),
+        }}
+      />
+      <DraftOffer draft={draft} onResume={(saved) => setFields(fieldsFromText(saved))} />
       {added !== undefined ? <Notice tone="good">{t("plotsAdded", { count: added })}</Notice> : null}
 
       <section className="stack" aria-label={t("tracingHeading")}>

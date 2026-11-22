@@ -320,7 +320,7 @@ const draftSchema = z.strictObject({
 });
 
 /** Read a `plot.draft.v1` file for a draft preview. It applies no command and writes nothing. */
-export function parseDraftFile(text: string, expected: { kind: string; siteId: Uuid }): Result<RecoveredDraft> {
+export function parseDraftFile(text: string, expected: { kind: string; siteId: Uuid; screen?: string }): Result<RecoveredDraft> {
   let raw: unknown;
   try {
     raw = JSON.parse(text);
@@ -338,6 +338,8 @@ export function parseDraftFile(text: string, expected: { kind: string; siteId: U
   const file = parsed.data;
   if (file.kind !== expected.kind) return err("wrong_kind");
   if (file.siteId !== expected.siteId) return err("foreign_site");
+  // A draft belongs to the screen that made it. Fast entry has no screen name.
+  if (file.mapping["screen"] !== expected.screen) return err("wrong_kind");
   return ok({
     kind: file.kind,
     siteId: file.siteId,

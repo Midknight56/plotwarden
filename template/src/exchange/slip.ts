@@ -78,9 +78,9 @@ export function readSlip(slip: ReturnSlip, context: SlipContext): SlipReading {
       ? "received"
       : current === undefined
         ? "closed"
-        : current > decision.factVersion
-          ? "changed"
-          : "ready";
+        : current === decision.factVersion
+          ? "ready"
+          : "changed";
     counts[status] += 1;
     return {
       actionId: decision.actionId,

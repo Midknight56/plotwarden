@@ -30,3 +30,7 @@ Each task writes its test first, sees it fail on the missing behaviour (a stub t
 - A burial date typed on the form is entered at the precision chosen, in year first form. Free text such as "March 1874" is read only by the spreadsheet import.
 - An approval returns to review when the name, the unknown flag, the plot or (if the year was approved) the year changes. A change to a date that leaves the year alone does not.
 - Lantern Fold uses the shared practice register machinery in the same database, in the `walkthrough` workspace, not a second database. It is isolated by workspace and by site, and `restartWalkthrough` removes only that site.
+
+## Repair 07 (findings of an independent review)
+
+- [x] 3.16 A burial dated by a year or a month is checked for overlap from the earliest day that date could mean (R8.9). A family file checks the public name of each burial and any word of a living name (R15.10, R15.11). Files: `template/src/commands.ts` (`overlapFrom`), `apps/churchyard-register/src/{rules,projection}.ts`, `apps/allotment-register/src/projection.ts`, `template/src/output/privacy.ts`, `tests/unit/{burial,visitor}.test.ts`. T IDs: T13, T22.

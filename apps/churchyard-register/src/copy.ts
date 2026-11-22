@@ -9,6 +9,7 @@ import type { T } from "../../../template/src/ui/messages";
 export const CHURCH_COPY: Readonly<Record<string, string>> = {
   // The library and the desk
   libraryPrompt: "Find a burial or start your register.",
+  libraryWho: "For the volunteer who keeps a churchyard's burial records. Records stay on this device.",
   openWalkthrough: "Open Lantern Fold",
   restartWalkthrough: "Restart walkthrough",
   walkthroughNote: "Lantern Fold is a practice register. Nothing you do here touches your own registers.",

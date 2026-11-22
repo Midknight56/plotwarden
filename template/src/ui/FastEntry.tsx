@@ -73,7 +73,7 @@ function Board({ single, importer, sheet }: { single: boolean; importer: Importe
     let current = true;
     void listDrafts(db, open.site.id).then((found) => {
       if (!current) return;
-      const mine = found.filter((d) => d.kind === app.adapter.kind && d.rawRows.length > 0);
+      const mine = found.filter((d) => d.kind === app.adapter.kind && d.rawRows.length > 0 && d.mapping["screen"] === undefined);
       const latest = mine.sort((a, b) => (a.savedAt < b.savedAt ? 1 : -1))[0];
       if (latest !== undefined) {
         setPending(latest);
@@ -294,12 +294,21 @@ function Board({ single, importer, sheet }: { single: boolean; importer: Importe
     setPending(undefined);
     setHasDraft(false);
     setMessage(undefined);
-    for (const d of await listDrafts(db, open.site.id)) if (d.kind === app.adapter.kind) await deleteDraft(db, open.site.id, d.draftId);
+    for (const d of await listDrafts(db, open.site.id)) if (d.kind === app.adapter.kind && d.mapping["screen"] === undefined) await deleteDraft(db, open.site.id, d.draftId);
   };
 
   const downloadRecovery = () => {
     const file = buildRecoveryFile(toDraft(session, meta()));
     downloadText(file.filename, file.text, "application/json");
+  };
+
+  /** The rows are saved as a draft as they change. This saves them once more and says so only when the store has them. */
+  const keepDraft = () => {
+    draftId.current ??= newId();
+    void saveDraft(db, toDraft(session, meta())).then((result) => {
+      setHasDraft(result.ok);
+      setStatus(result.ok ? { phase: "working", text: t("draftKept") } : { phase: "error", code: "storage_abort", text: t("storageAbort") });
+    });
   };
 
   const readRecovery = async (file: File | undefined) => {
@@ -407,7 +416,7 @@ function Board({ single, importer, sheet }: { single: boolean; importer: Importe
       </div>
 
       {saved === undefined ? null : <Notice tone="good">{t("savedCount", { count: saved.count, unplaced: saved.unplaced })}</Notice>}
-      <Status status={status} actions={{ tryAgain: () => setStatus({ phase: "idle" }), openLatest: () => void open.reload(), keepEditing: () => setStatus({ phase: "idle" }), downloadRecovery }} />
+      <Status status={status} actions={{ tryAgain: () => setStatus({ phase: "idle" }), openLatest: () => void open.reload(), keepEditing: () => setStatus({ phase: "idle" }), keepDraft, downloadRecovery }} />
 
       {staged === undefined ? null : (
         <ImportReview staged={staged} onChange={setStaged} onCommit={() => void commit()} onCancel={() => setStaged(undefined)} busy={busy} sheet={sheet} fields={allFields} mode="entry" />

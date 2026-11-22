@@ -1,6 +1,6 @@
 // Small form parts that every screen shares. Words come from the caller, never from here.
 import { useId } from "react";
-import type { ChangeEvent, InputHTMLAttributes, ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes } from "react";
+import type { ChangeEvent, InputHTMLAttributes, MouseEvent, ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes } from "react";
 
 interface FieldShell {
   label: string;
@@ -150,6 +150,16 @@ export function Notice({ tone = "info", children }: { tone?: "info" | "error" | 
       {children}
     </p>
   );
+}
+
+/**
+ * A link whose search text must not enter the address. A plain click goes by `go`, which keeps the text in the history
+ * entry. A click with a modifier key, or a middle click, follows the address and carries no search.
+ */
+export function keepSearch(event: MouseEvent<HTMLAnchorElement>, go: () => void): void {
+  if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+  event.preventDefault();
+  go();
 }
 
 /** A link that looks like a button. */

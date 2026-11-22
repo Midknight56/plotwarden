@@ -220,6 +220,25 @@ svg.sheet .path-line {
   }
 }
 
+@media (max-width: 37.4375rem) {
+  :root {
+    --band: 44px;
+  }
+
+  header.app .mist {
+    background-size: 1200px 44px;
+  }
+
+  header.app .brand {
+    padding-top: 8px;
+    font-size: 20px;
+  }
+
+  header.app nav {
+    padding: 8px 16px 12px;
+  }
+}
+
 @media print {
   header.app::before,
   header.app .mist {

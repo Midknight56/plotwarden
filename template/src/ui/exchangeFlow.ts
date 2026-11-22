@@ -73,17 +73,18 @@ export function planExchange(input: PlanInput): PlanResult {
 
   const sources = sourcesOf(adapter, state, input.asOf);
   const known = [...(adapter.review?.privateStrings(state) ?? []), site.title];
+  const names = [...(adapter.review?.privateNames?.(state) ?? []), site.title];
   const problems: FieldProblem[] = [];
 
   const alias = input.alias.trim();
-  const aliasProblem = checkLabelText(alias, known, LIMITS.siteAliasChars);
+  const aliasProblem = checkLabelText(alias, known, LIMITS.siteAliasChars, names);
   if (aliasProblem !== undefined) problems.push({ field: "alias", code: aliasProblem });
 
   const approved: Record<Uuid, string> = {};
   for (const source of sources) {
     const typed = input.labels[source.subjectId]?.trim() ?? "";
     if (typed === "" || approved[source.subjectId] !== undefined) continue;
-    const problem = checkLabelText(typed, known);
+    const problem = checkLabelText(typed, known, undefined, names);
     if (problem === undefined) approved[source.subjectId] = typed;
     else problems.push({ field: `label:${source.subjectId}`, code: problem });
   }

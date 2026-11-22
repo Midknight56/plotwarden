@@ -32,6 +32,11 @@ export type CoreCommand =
       ref?: string;
       sourceRef?: string;
       reason?: string;
+      /**
+       * The earliest day the claim could begin, when `start` is unknown (a burial dated by year only).
+       * It is the lower bound of the overlap check and nothing else: it is never stored on the claim.
+       */
+      overlapFrom?: LocalDate;
       /** A held claim on this space that this claim takes over. */
       converts?: Uuid;
     }
@@ -86,6 +91,7 @@ export function validateCore(command: CoreCommand, _state: CoreState): FieldErro
       const endOk = command.endExclusive === undefined || isValidLocalDate(command.endExclusive);
       if (!startOk) push("start", "invalid_date");
       if (!endOk) push("endExclusive", "invalid_date");
+      if (command.overlapFrom !== undefined && !isValidLocalDate(command.overlapFrom)) push("overlapFrom", "invalid_date");
       if (
         startOk &&
         endOk &&
@@ -287,7 +293,9 @@ function decideAddClaim(state: CoreState, command: Cmd<"add_claim">, on: LocalDa
   }
 
   const span: { start?: LocalDate; endExclusive?: LocalDate } = {};
-  if (command.start !== undefined) span.start = command.start;
+  // The stored claim keeps its own start. Only the overlap check may use the earliest possible day.
+  const checkFrom = command.start ?? command.overlapFrom;
+  if (checkFrom !== undefined) span.start = checkFrom;
   if (command.endExclusive !== undefined) span.endExclusive = command.endExclusive;
   const overlaps = overlappingClaims(state, command.spaceId, span, command.converts);
   if (overlaps.length > 0) {

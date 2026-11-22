@@ -45,6 +45,8 @@ export interface ReviewSupport<S> {
   sources(snapshot: S, asOf: LocalDate): ReviewSource[];
   /** Words a committee label must not hold: names, contacts, references. */
   privateStrings(snapshot: S): string[];
+  /** People's names. A word of one, three letters or more, is also a private word. Optional. */
+  privateNames?(snapshot: S): string[];
   /** The route of the record behind a check, under the register, for example `burial/{id}`. */
   link(snapshot: S, source: { rule: string; subjectId: string }): string | undefined;
 }

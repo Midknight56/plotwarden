@@ -73,19 +73,33 @@ const fold = (value: string): string =>
     .replace(/\s+/g, " ");
 
 const AMOUNT = /[£$€]|\b(?:GBP|EUR|USD|CAD)\b|\d+[.,]\d{2}\b/i;
+
+/** The words of a text, folded, split on anything that is not a letter or a digit. */
+const wordsOf = (value: string): string[] =>
+  fold(value)
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter((w) => w !== "");
+
+/** The words of a name that are at least three letters. Shorter words and numbers are too common to guard. */
+const nameWords = (name: string): string[] => wordsOf(name).filter((w) => [...w].length >= 3 && /^\p{L}+$/u.test(w));
 const SEPARATOR_BETWEEN_DIGITS = /(?<=\d)[\s\-().]+(?=\d)/g;
 
 /**
  * One code for a typed site name or label, or undefined when it is fine.
  * The order is fixed: empty, too long, a known private string, an amount, a contact.
+ * `names` are people's names and the site title. A word of one, three letters or more, counts as a private string.
  */
-export function checkLabelText(text: string, known: readonly string[], max: number = LIMITS.reviewLabelChars): LabelProblem | undefined {
+export function checkLabelText(text: string, known: readonly string[], max: number = LIMITS.reviewLabelChars, names: readonly string[] = []): LabelProblem | undefined {
   if (text.trim() === "") return "required";
   if ([...text].length > max) return "over_limit";
   const haystack = fold(text);
   for (const entry of known) {
     const needle = fold(entry);
     if (needle !== "" && haystack.includes(needle)) return "private_string";
+  }
+  if (names.length > 0) {
+    const words = new Set(wordsOf(text));
+    for (const name of names) if (nameWords(name).some((w) => words.has(w))) return "private_string";
   }
   if (AMOUNT.test(text)) return "looks_like_amount";
   if (text.includes("@") || /\d{7,}/.test(text.replace(SEPARATOR_BETWEEN_DIGITS, ""))) return "looks_like_contact";

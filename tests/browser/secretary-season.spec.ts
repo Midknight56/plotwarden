@@ -9,6 +9,7 @@ import { readFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 import { AVAILABILITY_CANARIES, CONTACTS, NEW_HOLDER, RECEIPT_REF, TENANTS } from "../helpers/gardenCanaries";
 import { measureLayout, trackRequests } from "../helpers/measureLayout";
+import { expectSearchOutOfAddress } from "../helpers/screens";
 
 const APP = "http://127.0.0.1:4178/";
 test.use({ baseURL: APP });
@@ -59,19 +60,24 @@ async function giveB03ToTavi(page: Page): Promise<void> {
 }
 
 test.describe("the first view", () => {
-  test("names one job, has one main action above the fold, and keeps the garden look apart from the churchyard", async ({ page }) => {
+  test("names who it is for, has Start a register as the one main action, and keeps the garden look apart from the churchyard", async ({ page }) => {
     const requests = trackRequests(page, APP);
     await page.goto("/");
     await expect(page.getByRole("heading", { level: 1, name: "Allotment Register" })).toBeVisible();
     await expect(page.getByText("Offer the next free plot or start your register.")).toBeVisible();
+    await expect(page.getByText("For the secretary of an allotment garden. Records stay on this device.")).toBeVisible();
     await expect(page.getByText("No registers on this device.")).toBeVisible();
 
-    const main = page.getByRole("button", { name: "Open Thimble Beds" });
+    const main = page.getByRole("link", { name: "Start a register" });
     await expect(main).toBeVisible();
     await expect(main).toHaveClass(/primary/);
     expect(await page.locator(".button.primary").count()).toBe(1);
     const box = await main.boundingBox();
     expect((box?.y ?? 9999) + (box?.height ?? 0)).toBeLessThanOrEqual(page.viewportSize()?.height ?? 0);
+    const practice = page.getByRole("button", { name: "Open Thimble Beds" });
+    await expect(practice).toBeVisible();
+    await expect(practice).not.toHaveClass(/primary/);
+    await expect(page.getByRole("button", { name: "Restart walkthrough" })).toHaveCount(0);
 
     // The garden strip sits above the title and never over a word or a control. The colours are the garden's own.
     const strip = await page.evaluate(() => {
@@ -80,20 +86,37 @@ test.describe("the first view", () => {
       const brand = header.querySelector(".brand") as HTMLElement;
       return {
         mistBottom: mist.getBoundingClientRect().bottom,
+        brandShown: getComputedStyle(brand).display !== "none",
         brandTop: brand.getBoundingClientRect().top,
+        headerHeight: header.getBoundingClientRect().height,
         mistEvents: getComputedStyle(mist).pointerEvents,
         sky: getComputedStyle(header, "::before").backgroundColor,
         ink: getComputedStyle(document.documentElement).color,
         paper: getComputedStyle(document.body).backgroundColor,
       };
     });
-    expect(strip.mistBottom).toBeLessThanOrEqual(strip.brandTop);
+    if (sizeOf(page) === "phone") {
+      expect(strip.brandShown).toBe(false);
+      expect(strip.headerHeight).toBeLessThanOrEqual(130);
+      await expect(page.getByText("Allotment Register", { exact: true }).filter({ visible: true })).toHaveCount(1);
+    } else {
+      expect(strip.brandShown).toBe(true);
+      expect(strip.mistBottom).toBeLessThanOrEqual(strip.brandTop);
+    }
     expect(strip.mistEvents).toBe("none");
     expect(strip.sky).toBe("rgb(207, 231, 223)");
     expect(strip.ink).toBe("rgb(27, 49, 42)");
     expect(strip.paper).toBe("rgb(247, 245, 232)");
     await check(page, "library");
     expect(requests.external).toEqual([]);
+  });
+
+  test("offers Restart walkthrough once the walkthrough was started", async ({ page }) => {
+    await openBeds(page);
+    await page.goto("/");
+    await expect(page.getByRole("button", { name: "Restart walkthrough" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Start a register" })).toHaveClass(/primary/);
+    await check(page);
   });
 });
 
@@ -138,10 +161,11 @@ test.describe("the desk", () => {
     await expect(page.getByText("1 unusable")).toBeVisible();
     await check(page, "desk");
 
-    // A search finds a holder and keeps the words in the address, so Back returns to them.
+    // A search finds a holder and keeps the words in the history entry, never in the address, so Back returns to them.
     await page.getByLabel("Name or plot code", { exact: true }).fill("Stonecrop");
     await page.getByRole("button", { name: "Search", exact: true }).click();
     await expect(page.getByText("Holder of B02 · Ada Stonecrop")).toBeVisible();
+    await expectSearchOutOfAddress(page, "Stonecrop");
     await page.getByRole("link", { name: "Open plot" }).first().click();
     await expect(page.getByRole("heading", { level: 2, name: "Current tenancies" })).toBeVisible();
     await page.goBack();
@@ -213,6 +237,19 @@ test.describe("offers", () => {
     await expect(page.getByRole("heading", { level: 1, name: "Make an offer" })).toBeVisible();
     await expect(page.getByRole("combobox", { name: "Choose a free plot" })).toHaveValue(/.+/);
     await expect(page.getByLabel("Offer to", { exact: true })).toContainText(`Position 1 · ${TAVI}`);
+    // The heading and the label differ, and the choice of applicant is never cut off: the chosen words fit the box.
+    await expect(page.getByRole("heading", { level: 2, name: "Plot and applicant" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Choose a free plot" })).toHaveCount(0);
+    await expect(page.getByText(`Position 1 · ${TAVI} · Joined 2026-01-10`)).toBeVisible();
+    const fits = await page.getByLabel("Offer to", { exact: true }).evaluate((el) => {
+      const select = el as HTMLSelectElement;
+      const text = select.selectedOptions[0]?.textContent ?? "";
+      const style = getComputedStyle(select);
+      const context = document.createElement("canvas").getContext("2d") as CanvasRenderingContext2D;
+      context.font = `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
+      return context.measureText(text).width <= select.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight) - 28;
+    });
+    expect(fits).toBe(true);
     await page.getByLabel("Reply by", { exact: true }).fill("2026-04-30");
     await page.getByRole("button", { name: "Review offer" }).click();
     const review = page.getByRole("region", { name: "Review offer" });
@@ -266,7 +303,7 @@ test.describe("offers", () => {
   test("passes over the first applicant only with a reason, and keeps the applicant with an open offer in the list", async ({ page }) => {
     await openBeds(page);
     await page.getByRole("link", { name: "Make an offer" }).click();
-    await page.getByLabel("Offer to", { exact: true }).selectOption({ label: `Position 2 · ${OLIN} · Joined 2026-01-10` });
+    await page.getByLabel("Offer to", { exact: true }).selectOption({ label: `Position 2 · ${OLIN}` });
     const why = page.getByLabel(`Why skip this applicant? ${TAVI}`, { exact: true });
     await expect(why).toBeVisible();
     await page.getByRole("button", { name: "Review offer" }).click();

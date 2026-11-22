@@ -247,10 +247,10 @@
       "expect": {"ok": true, "statuses": ["ready", "changed", "closed", "received"]}
     },
     {
-      "name": "a slip with a higher version than the open one reads as ready",
+      "name": "a slip with a higher version than the open one reads as changed",
       "slip": {"format":"plot.slip.v1","siteKey":"5a5a5a5a-0000-4000-8000-000000000001","lineageId":"11e11e11-0000-4000-8000-000000000001","packetRevision":5,"packetAsOf":"2026-04-20","decisions":[{"actionId":"ac700000-0000-4000-8000-000000000001","issueKey":"15500000-0000-4000-8000-00000000000a","factVersion":3,"disposition":"checked","reviewedOn":"2026-04-21"}]},
       "context": {"siteKey":"5a5a5a5a-0000-4000-8000-000000000001","lineageId":"11e11e11-0000-4000-8000-000000000001","open":[{"issueKey":"15500000-0000-4000-8000-00000000000a","factVersion":2}],"received":[]},
-      "expect": {"ok": true, "statuses": ["ready"]}
+      "expect": {"ok": true, "statuses": ["changed"]}
     },
     {
       "name": "another site key refuses the whole slip",

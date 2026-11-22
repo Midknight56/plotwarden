@@ -381,6 +381,21 @@ export function chooseConflict<S, C extends { type: string }, E extends { type: 
   return withSelection(staged, (s) => s.choices.set(rowNumber, choice));
 }
 
+/**
+ * Stage again, for example against a newer state, with the keeper's choices kept: the rows left out, the conflict
+ * choices and the fixed cells. Each is applied to the row of the same number, and nothing else is carried over.
+ */
+export function restageWith<S, C extends { type: string }, E extends { type: string }>(
+  input: StageInput<S, C, E>,
+  selection: Selection,
+): StagedImport<S, C, E> {
+  return run(input, {
+    leftOut: new Map(selection.leftOut),
+    choices: new Map(selection.choices),
+    fixes: new Map([...selection.fixes].map(([n, cells]) => [n, { ...cells }])),
+  });
+}
+
 export function canCommit<S, C extends { type: string }, E extends { type: string }>(staged: StagedImport<S, C, E>): boolean {
   return staged.counts.errors === 0 && staged.counts.conflicts === 0 && staged.writes > 0;
 }

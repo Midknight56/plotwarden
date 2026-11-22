@@ -40,6 +40,11 @@ export interface Route {
   /** The path segments of the hash, for example ["r", "abc", "map"]. */
   path: string[];
   query: URLSearchParams;
+  /**
+   * The search text of a register home. It lives in `history.state`, never in the address, because a searched name
+   * is private. It is empty on any route that was not reached by a search.
+   */
+  search: string;
 }
 
 export interface Settings {
@@ -56,8 +61,11 @@ export interface ShellValue {
   db: IDBDatabase;
   t(key: string, values?: Readonly<Record<string, string | number>>): string;
   route: Route;
-  /** Go to a hash route, for example "/r/abc/map?plot=p". */
-  navigate(to: string, options?: { replace?: boolean }): void;
+  /**
+   * Go to a hash route, for example "/r/abc/map?plot=p". `search` is the text of a search. It is kept in the history
+   * entry and never in the address.
+   */
+  navigate(to: string, options?: { replace?: boolean; search?: string }): void;
   settings: Settings;
   setSettings(next: Settings): void;
   now(): Date;
@@ -110,14 +118,22 @@ export function useRegister(): OpenRegister {
 /** Make a hash route from path segments and a query. */
 export function hashFor(path: readonly string[], query?: Record<string, string | undefined>): string {
   const q = new URLSearchParams();
-  for (const [key, value] of Object.entries(query ?? {})) if (value !== undefined && value !== "") q.set(key, value);
+  for (const [key, value] of Object.entries(query ?? {})) if (key !== "q" && value !== undefined && value !== "") q.set(key, value);
   const text = q.toString();
   return `#/${path.join("/")}${text === "" ? "" : `?${text}`}`;
 }
 
-/** Read a hash such as "#/r/abc/map?plot=p" into a route. */
-export function parseHash(hash: string): Route {
+/** Read a hash such as "#/r/abc/map?plot=p" into a route. A `q` in the address is never read as a search. */
+export function parseHash(hash: string, search = ""): Route {
   const body = hash.startsWith("#") ? hash.slice(1) : hash;
   const [pathPart = "", queryPart = ""] = body.split("?");
-  return { path: pathPart.split("/").filter((s) => s !== "").map(decodeURIComponent), query: new URLSearchParams(queryPart) };
+  const query = new URLSearchParams(queryPart);
+  query.delete("q");
+  return { path: pathPart.split("/").filter((s) => s !== "").map(decodeURIComponent), query, search };
+}
+
+/** The search text kept in a history entry, or an empty text. */
+export function searchOfState(state: unknown): string {
+  const q = (state as { q?: unknown } | null)?.q;
+  return typeof q === "string" ? q : "";
 }

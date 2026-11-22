@@ -162,6 +162,71 @@ describe("T13 partial dates are kept as they were entered (C1.4)", () => {
   });
 });
 
+describe("T13 a partial date burial on a space with an ended reservation (R3.4, R8.8, review finding 2)", () => {
+  const holdY07 = (from: string, until?: string) => async () => {
+    await confirmEmpty(env, ["Y07"]);
+    await env.must([
+      {
+        type: "record_reservation",
+        reservationId: id("reservation:LF-R7"),
+        holderId: id("holder:LF-R7"),
+        holderName: "Odalys Fennimore",
+        spaceId: spaceId("Y07"),
+        claimId: id("claim:LF-R7"),
+        start: from,
+        sourceRef: "LF-R7",
+      },
+    ]);
+    if (until !== undefined) await env.must([{ type: "release_reservation", reservationId: id("reservation:LF-R7"), reason: "No longer needed" }], until);
+  };
+
+  it("takes a year only burial after the reservation ended, and keeps the claim without a start", async () => {
+    await holdY07("2020-01-01", "2021-06-01")();
+    await env.must([burial("LF-24", "Y07", { date: { p: "year", y: 2024 }, dateText: "2024" })]);
+    const claim = env.state.core.claims[id("claim:LF-24")];
+    expect(claim).toMatchObject({ mode: "taken", spaceId: spaceId("Y07") });
+    expect(claim?.start).toBeUndefined();
+    expect(env.state.burials[id("burial:LF-24")]?.date).toEqual({ p: "year", y: 2024 });
+    expect(await env.reload()).toEqual(env.state);
+  });
+
+  it("takes a month only burial after the reservation ended", async () => {
+    await holdY07("2020-01-01", "2021-06-01")();
+    await env.must([burial("LF-24", "Y07", { date: { p: "month", y: 2024, m: 3 }, dateText: "March 2024" })]);
+    expect(env.state.burials[id("burial:LF-24")]?.spaceId).toBe(spaceId("Y07"));
+  });
+
+  it("still refuses a year only burial while the reservation is open, naming the reservation", async () => {
+    await holdY07("2020-01-01")();
+    const before = await snapshot();
+    const out = await env.dispatch([burial("LF-24", "Y07", { date: { p: "year", y: 2024 }, dateText: "2024" })]);
+    expect(out.ok).toBe(false);
+    if (!out.ok) {
+      expect(out.error.code).toBe("space_reserved");
+      expect(out.error.detail?.["reservationId"]).toBe(id("reservation:LF-R7"));
+    }
+    expect(await snapshot()).toEqual(before);
+  });
+
+  it("still refuses when any day of the year could fall inside the reservation", async () => {
+    await holdY07("2020-01-01", "2024-06-01")();
+    const before = await snapshot();
+    const out = await env.dispatch([burial("LF-24", "Y07", { date: { p: "year", y: 2024 }, dateText: "2024" })]);
+    expect(out.ok).toBe(false);
+    if (!out.ok) expect(out.error.code).toBe("space_reserved");
+    expect(await snapshot()).toEqual(before);
+  });
+
+  it("never guesses a day for an unknown date: it still refuses on a space with any earlier claim", async () => {
+    await holdY07("2020-01-01", "2021-06-01")();
+    const before = await snapshot();
+    const out = await env.dispatch([burial("LF-24", "Y07", { date: { p: "unknown" }, dateText: "" })]);
+    expect(out.ok).toBe(false);
+    if (!out.ok) expect(out.error.code).toBe("space_reserved");
+    expect(await snapshot()).toEqual(before);
+  });
+});
+
 describe("T13 unknown identity (C1.5)", () => {
   it("stores a nameless burial with the flag and no name", async () => {
     await env.must([burial("LF-05", "Y05", { recordedName: undefined, nameUnknown: true, date: { p: "unknown" }, dateText: "" })]);

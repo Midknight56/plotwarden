@@ -8,6 +8,7 @@ import { readFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 import { measureLayout, trackRequests } from "../helpers/measureLayout";
 import { CONTACT, INSCRIPTION_WORD, LIVING_HOLDERS, OTHER_OCCUPANT, PAGE_IMAGE_FILENAME, VISITOR_CANARIES } from "../helpers/privacyCanaries";
+import { expectSearchOutOfAddress } from "../helpers/screens";
 
 const APP = "http://127.0.0.1:4176/";
 test.use({ baseURL: APP });
@@ -36,22 +37,29 @@ async function find(page: Page, text: string): Promise<void> {
 }
 
 test.describe("the first view", () => {
-  test("names one job, has one main action above the fold, and keeps the sky strip clear of words", async ({ page }) => {
+  test("names who it is for, has Start a register as the one main action, and keeps the sky strip clear of words", async ({ page }) => {
     const requests = trackRequests(page, APP);
     await page.goto("/");
     await expect(page.getByRole("heading", { level: 1, name: "Churchyard Register" })).toBeVisible();
     await expect(page.getByText("Find a burial or start your register.")).toBeVisible();
+    await expect(page.getByText("For the volunteer who keeps a churchyard's burial records. Records stay on this device.")).toBeVisible();
     await expect(page.getByText("No registers on this device.")).toBeVisible();
 
-    const main = page.getByRole("button", { name: "Open Lantern Fold" });
+    // With no register of its own, Start a register is the one main action, above the fold. The practice register is plain.
+    const main = page.getByRole("link", { name: "Start a register" });
     await expect(main).toBeVisible();
     await expect(main).toHaveClass(/primary/);
     expect(await page.locator(".button.primary").count()).toBe(1);
     const box = await main.boundingBox();
     const height = page.viewportSize()?.height ?? 0;
     expect((box?.y ?? 9999) + (box?.height ?? 0)).toBeLessThanOrEqual(height);
-    await expect(page.getByRole("link", { name: "Start a register" })).toBeVisible();
+    const practice = page.getByRole("button", { name: "Open Lantern Fold" });
+    await expect(practice).toBeVisible();
+    await expect(practice).not.toHaveClass(/primary/);
+    await expect(practice).toHaveClass(/quiet/);
     await expect(page.getByRole("link", { name: "Restore backup" })).toBeVisible();
+    // Restart walkthrough is offered only after the walkthrough was started.
+    await expect(page.getByRole("button", { name: "Restart walkthrough" })).toHaveCount(0);
 
     // The lantern and the mist sit in their own strip above the title, never over a word or a control.
     const strip = await page.evaluate(() => {
@@ -62,22 +70,42 @@ test.describe("the first view", () => {
       const m = mist.getBoundingClientRect();
       return {
         mistBottom: m.bottom,
+        brandShown: getComputedStyle(brand).display !== "none",
         brandTop: brand.getBoundingClientRect().top,
         navTop: nav.getBoundingClientRect().top,
+        headerHeight: header.getBoundingClientRect().height,
         mistEvents: getComputedStyle(mist).pointerEvents,
         sky: getComputedStyle(header, "::before").backgroundColor,
         ink: getComputedStyle(document.documentElement).color,
         paper: getComputedStyle(document.body).backgroundColor,
       };
     });
-    expect(strip.mistBottom).toBeLessThanOrEqual(strip.brandTop);
-    expect(strip.brandTop).toBeLessThan(strip.navTop);
+    if (sizeOf(page) === "phone") {
+      // A compact header: one row of menu, and the app name once, as the title of the page.
+      expect(strip.brandShown).toBe(false);
+      expect(strip.headerHeight).toBeLessThanOrEqual(130);
+      await expect(page.getByText("Churchyard Register", { exact: true }).filter({ visible: true })).toHaveCount(1);
+    } else {
+      expect(strip.brandShown).toBe(true);
+      expect(strip.mistBottom).toBeLessThanOrEqual(strip.brandTop);
+      expect(strip.brandTop).toBeLessThan(strip.navTop);
+    }
     expect(strip.mistEvents).toBe("none");
     expect(strip.sky).toBe("rgb(35, 42, 92)");
     expect(strip.ink).toBe("rgb(34, 37, 44)");
     expect(strip.paper).toBe("rgb(250, 245, 233)");
     await check(page, "library");
     expect(requests.external).toEqual([]);
+  });
+
+  test("offers Restart walkthrough once the walkthrough was started, and Start a register stays plain beside the register", async ({ page }) => {
+    await openFold(page);
+    await page.goto("/");
+    await expect(page.getByRole("button", { name: "Restart walkthrough" })).toBeVisible();
+    // The practice register is not one of the keeper's own, so Start a register is still the one main action.
+    await expect(page.getByRole("link", { name: "Start a register" })).toHaveClass(/primary/);
+    expect(await page.locator(".button.primary").count()).toBe(1);
+    await check(page);
   });
 });
 
@@ -127,6 +155,38 @@ test.describe("the desk", () => {
     await expect(page.getByLabel("Name or plot code", { exact: true })).toHaveValue("Quillmoss");
     await expect(card).toHaveCount(1);
     expect(requests.external).toEqual([]);
+  });
+
+  test("keeps the searched name out of the address, and Back and a reload still find it (R22.2)", async ({ page }) => {
+    await openFold(page);
+    const home = await page.evaluate(() => location.hash);
+    await find(page, "Quillmoss");
+    const card = page.getByRole("listitem").filter({ hasText: "Mirel Quillmoss · Y07 · Yew Walk" });
+    await expect(card).toHaveCount(1);
+    await expectSearchOutOfAddress(page, "Quillmoss");
+
+    // Show on map puts only the plot in the address. The search is still behind Back to results.
+    await card.getByRole("link", { name: "Show on map" }).click();
+    await expect(page.getByRole("heading", { level: 2, name: "Selected plot" })).toBeFocused();
+    await expect(page.locator(".summary-line")).toContainText("Y07");
+    await expectSearchOutOfAddress(page, "Quillmoss");
+    await page.getByRole("button", { name: "Back to results" }).click();
+    await expect(page.getByLabel("Name or plot code", { exact: true })).toHaveValue("Quillmoss");
+
+    // A reload keeps the search, from the history entry and not from the address.
+    await page.reload();
+    await expect(page.getByLabel("Name or plot code", { exact: true })).toHaveValue("Quillmoss");
+    await expect(card).toHaveCount(1);
+    await expectSearchOutOfAddress(page, "Quillmoss");
+
+    // An address that carries a search is not read as one.
+    await page.getByRole("button", { name: "Clear search" }).click();
+    await expect(page.getByText("Search for a name or code.")).toBeVisible();
+    await page.evaluate((hash) => {
+      window.location.hash = `${hash}?q=Quillmoss`;
+    }, home);
+    await expect(page.getByText("Search for a name or code.")).toBeVisible();
+    await expect(page.getByLabel("Name or plot code", { exact: true })).toHaveValue("");
   });
 
   test("Show on map selects the plot and moves focus to its heading, with Back to results", async ({ page }) => {
@@ -532,5 +592,25 @@ test("every map page of the keeper's own register shows the same plot a name sea
   expect(open).toMatch(/burial\//);
   await page.getByRole("link", { name: "Map", exact: true }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Site map" })).toBeVisible();
+
+  // The map and its key come before the zoom controls, and the map is on view without scrolling far.
+  const sheet = await page.getByRole("img", { name: /Site map/ }).boundingBox();
+  const key = await page.getByRole("list", { name: "Map key" }).boundingBox();
+  const zoomIn = await page.getByRole("button", { name: "Zoom in" }).boundingBox();
+  expect(sheet && key && zoomIn).toBeTruthy();
+  expect((key?.y ?? 0) >= (sheet?.y ?? 0) + (sheet?.height ?? 0)).toBe(true);
+  expect((zoomIn?.y ?? 0) >= (key?.y ?? 0) + (key?.height ?? 0)).toBe(true);
+  if (sizeOf(page) === "phone") expect(sheet?.y ?? 9999).toBeLessThanOrEqual(360);
+  // The plot chooser never shows a blank choice, and a zoom that cannot act is unavailable to the keyboard and the reader.
+  expect(await page.getByLabel("Choose a plot", { exact: true }).evaluate((s) => (s as HTMLSelectElement).selectedOptions[0]?.textContent)).toBe("No plot chosen");
+  await expect(page.getByText("Zoom 100 percent")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Zoom out" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Fit site" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Zoom in" })).toBeEnabled();
+  await page.getByRole("button", { name: "Zoom in" }).click();
+  await expect(page.getByText("Zoom 150 percent")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Zoom out" })).toBeEnabled();
+  await page.getByRole("button", { name: "Fit site" }).click();
+  await expect(page.getByText("Zoom 100 percent")).toBeVisible();
   await check(page, "map");
 });

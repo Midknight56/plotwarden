@@ -227,7 +227,7 @@ export function OfferScreen() {
         </section>
       ) : (
         <form ref={form} className="stack card" onSubmit={goReview} noValidate aria-labelledby="offer-heading">
-          <h2 id="offer-heading">{t("chooseFreePlot")}</h2>
+          <h2 id="offer-heading">{t("offerHeading")}</h2>
           <SelectField
             label={t("chooseFreePlot")}
             value={plotId}
@@ -241,15 +241,18 @@ export function OfferScreen() {
           {eligible.length === 0 ? (
             <p>{t("noEligibleApplicant")}</p>
           ) : (
-            <SelectField
-              label={t("offerTo")}
-              value={applicationId}
-              onChange={(v) => {
-                setApplicantChoice(v);
-                setReview(false);
-              }}
-              options={eligible.map((r) => ({ value: r.applicationId, label: `${t("positionLabel")} ${r.position} · ${r.name} · ${t("joinedLabel")} ${r.joinedOn}` }))}
-            />
+            <>
+              <SelectField
+                label={t("offerTo")}
+                value={applicationId}
+                onChange={(v) => {
+                  setApplicantChoice(v);
+                  setReview(false);
+                }}
+                options={eligible.map((r) => ({ value: r.applicationId, label: `${t("positionLabel")} ${r.position} · ${r.name}` }))}
+              />
+              {chosen === undefined ? null : <p className="hint">{`${t("positionLabel")} ${chosen.position} · ${chosen.name} · ${t("joinedLabel")} ${chosen.joinedOn}`}</p>}
+            </>
           )}
           {plan === undefined || plan.skipped.length === 0 ? null : (
             <div className="stack" role="group" aria-label={t("skippedNotice")}>

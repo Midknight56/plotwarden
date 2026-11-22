@@ -16,6 +16,7 @@ export const SCREEN_COPY: Readonly<Record<string, string>> = {
 
   // Library and new site
   libraryPrompt: "Open a register or start your own.",
+  libraryWho: "For the person who keeps a register of plots. Records stay on this device.",
   startRegister: "Start a register",
   myRegisters: "My registers",
   restoreBackup: "Restore backup",
@@ -69,6 +70,8 @@ export const SCREEN_COPY: Readonly<Record<string, string>> = {
   zoomIn: "Zoom in",
   zoomOut: "Zoom out",
   fitSite: "Fit site",
+  zoomLevel: "Zoom {percent} percent",
+  noPlotChosen: "No plot chosen",
   mapKey: "Map key",
   editMap: "Edit map",
   filterAll: "All",
@@ -289,6 +292,10 @@ export const SCREEN_COPY: Readonly<Record<string, string>> = {
   resumeDraft: "Resume draft",
   draftFound: "A draft of unsaved rows is waiting.",
   draftRestored: "Draft restored. Choose the page photo again.",
+  draftKept: "Your draft is kept on this device.",
+  draftFoundInput: "A draft of unsaved input is waiting.",
+  draftRestoredInput: "Draft restored.",
+  draftRestoredImport: "Draft restored. Check the rows, then import.",
   chooseRecoveryFile: "Choose recovery file",
   recoveryFileHeading: "Recovery file",
   rowsHeading: "Rows",

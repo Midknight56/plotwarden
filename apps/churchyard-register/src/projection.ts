@@ -4,7 +4,7 @@
 // with the closed schema before it is returned. A living person, a contact, a request, a note, a reading,
 // a photo, a source ref and every private ID are left out.
 import type { LocalDate } from "../../../template/src/calendar";
-import { flagPrivateStrings, parseFamily } from "../../../template/src/output/privacy";
+import { flagPrivateStrings, flagWholeNames, looksLikeContact, parseFamily } from "../../../template/src/output/privacy";
 import type { FamilyFile, Point, PublicBurial, PublicPath, PublicPlot, PublicSection } from "../../../template/src/output/privacy";
 import { livePhotos } from "../../../template/src/notes";
 import type { Uuid } from "../../../template/src/types";
@@ -34,6 +34,9 @@ export type FamilyBuild =
   | { ok: false; missing: string[]; flagged: { field: string; matches: string[] }[] };
 
 const blank = (value: string | undefined): boolean => value === undefined || value.trim() === "";
+
+/** Lower case, accents removed, single spaces. For comparing names only. */
+const foldName = (value: string): string => value.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase().trim().replace(/\s+/g, " ");
 
 /** A private string worth guarding in a public label: a full name, an address or a number. */
 function identifying(text: string): boolean {
@@ -74,14 +77,21 @@ export function buildFamilyFile(
   const byCode = (a: Burial, b: Burial) => plotCodeOf(state, a.plotId).localeCompare(plotCodeOf(state, b.plotId), "en", { numeric: true }) || a.sourceRef.localeCompare(b.sourceRef, "en", { numeric: true });
   included.sort(byCode);
 
-  // Private strings that must not appear in a public label. The names of included burials are allowed.
-  const shown = new Set(included.flatMap((b) => [b.recordedName ?? "", state.approvals[b.burialId]?.name ?? ""]));
+  // Private strings that must not appear in a public label. The recorded names of included burials are allowed.
+  const shown = new Set(included.map((b) => b.recordedName ?? ""));
   const known = new Set<string>();
+  // Names whose single words are guarded too: every living person, and every burial that is not shown.
+  const guarded = new Set<string>();
   for (const person of Object.values(state.people)) {
     for (const text of [person.displayName, person.contact ?? ""]) if (identifying(text)) known.add(text);
+    if (person.displayName.trim() !== "") guarded.add(person.displayName);
   }
   for (const request of Object.values(state.requests)) if (request.note !== undefined && identifying(request.note)) known.add(request.note);
-  for (const burial of live) if (burial.recordedName !== undefined && !shown.has(burial.recordedName) && identifying(burial.recordedName)) known.add(burial.recordedName);
+  for (const burial of live) {
+    if (burial.recordedName === undefined || shown.has(burial.recordedName)) continue;
+    if (identifying(burial.recordedName)) known.add(burial.recordedName);
+    guarded.add(burial.recordedName);
+  }
 
   // Public IDs belong to this one file.
   const sectionIds = new Map<string, string>();
@@ -135,7 +145,7 @@ export function buildFamilyFile(
   const flagged: { field: string; matches: string[] }[] = [];
   const check = (field: string, text: string | undefined) => {
     if (text === undefined || text === "") return;
-    const matches = flagPrivateStrings(text, [...known]);
+    const matches = flagPrivateStrings(text, [...known], [...guarded]);
     if (matches.length > 0) flagged.push({ field, matches });
   };
   check("siteName", siteName);
@@ -144,6 +154,20 @@ export function buildFamilyFile(
   for (const [id, text] of Object.entries(pub.sectionNames)) if (sectionIds.has(id)) check("sectionNames", text);
   for (const p of paths) check("pathNames", p.name);
   for (const plot of plots) check("plotCodes", plot.code);
+
+  // The public name of a burial is typed text. Unless it is the recorded name itself, it must hold no other
+  // person's name and no contact. The burial's own recorded name is left out of the check.
+  const nameMatches = new Set<string>();
+  for (const burial of included) {
+    const approval = state.approvals[burial.burialId];
+    if (approval === undefined) continue;
+    const own = foldName(burial.recordedName ?? "");
+    if (foldName(approval.name) === own) continue;
+    for (const m of flagPrivateStrings(approval.name, [...known].filter((k) => foldName(k) !== own))) nameMatches.add(m);
+    for (const m of flagWholeNames(approval.name, [...guarded].filter((n) => foldName(n) !== own))) nameMatches.add(m);
+    if (looksLikeContact(approval.name)) nameMatches.add(approval.name);
+  }
+  if (nameMatches.size > 0) flagged.push({ field: "names", matches: [...nameMatches] });
   if (missing.length > 0 || flagged.length > 0) return { ok: false, missing, flagged };
 
   const file: FamilyFile = {

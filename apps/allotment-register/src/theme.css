@@ -401,6 +401,25 @@ table.report-table {
   font-size: 14px;
 }
 
+@media (max-width: 37.4375rem) {
+  :root {
+    --band: 52px;
+  }
+
+  header.app .mist {
+    background-size: 1200px 52px;
+  }
+
+  header.app .brand {
+    padding-top: 8px;
+    font-size: 22px;
+  }
+
+  header.app nav {
+    padding: 8px 16px 12px;
+  }
+}
+
 @media print {
   header.app::before,
   header.app .mist {

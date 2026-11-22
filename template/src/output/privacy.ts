@@ -190,10 +190,47 @@ export function scanForCanaries(subject: unknown, canaries: readonly string[]): 
 }
 
 /** Known private full names or contact strings that a public label contains. */
-export function flagPrivateStrings(label: string, known: readonly string[]): string[] {
+export function flagPrivateStrings(label: string, known: readonly string[], names: readonly string[] = []): string[] {
   const haystack = fold(label);
-  return known.filter((entry) => {
+  const found = known.filter((entry) => {
     const needle = fold(entry);
     return needle !== "" && haystack.includes(needle);
   });
+  // A word of a private name counts too: "Thorne gate" holds "Ada Thorne". A word has at least three letters.
+  const words = new Set(wordsOf(label));
+  for (const name of names) {
+    if (found.includes(name)) continue;
+    if (nameWords(name).some((w) => words.has(w))) found.push(name);
+  }
+  return found;
+}
+
+/** The words of a text, folded, split on anything that is not a letter or a digit. */
+function wordsOf(value: string): string[] {
+  return fold(value)
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter((w) => w !== "");
+}
+
+/** The words of a name that are at least three letters. Shorter words and numbers are too common to guard. */
+export function nameWords(name: string): string[] {
+  return wordsOf(name).filter((w) => [...w].length >= 3 && /^\p{L}+$/u.test(w));
+}
+
+/** The names that a text holds as a whole, word for word. A single word name matches only as a whole word. */
+export function flagWholeNames(text: string, names: readonly string[]): string[] {
+  const words = wordsOf(text);
+  return names.filter((name) => {
+    const want = wordsOf(name);
+    if (want.length === 0) return false;
+    for (let i = 0; i + want.length <= words.length; i += 1) {
+      if (want.every((w, j) => words[i + j] === w)) return true;
+    }
+    return false;
+  });
+}
+
+/** True when a text looks like an email address or a phone number. */
+export function looksLikeContact(text: string): boolean {
+  return text.includes("@") || /\d{7,}/.test(text.replace(/(?<=\d)[\s\-().]+(?=\d)/g, ""));
 }

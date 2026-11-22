@@ -372,6 +372,31 @@ describe("what a typed site name or label may hold (X3.4)", () => {
     expect(checkLabelText("Record 1", ["", "  "])).toBeUndefined();
   });
 
+  // Review finding 4 (R16.2, R16.3): a word of a private name is private too.
+  it("refuses one word of a private name when the names are given, ignoring case and accents", () => {
+    const names = ["Ada Thorne", "Mirèl Quillmoss"];
+    expect(checkLabelText("Thorne grave", [], 40, names)).toBe("private_string");
+    expect(checkLabelText("ADA bed", [], 40, names)).toBe("private_string");
+    expect(checkLabelText("by quillmoss yew", [], 40, names)).toBe("private_string");
+    expect(checkLabelText("Mirel's plot", [], 40, names)).toBe("private_string");
+    expect(checkLabelText("Mirel plot", [], 40, names)).toBe("private_string");
+  });
+
+  it("refuses a single word name as a whole word, and no longer word that only starts with it", () => {
+    expect(checkLabelText("Thorne gate", [], 40, ["Thorne"])).toBe("private_string");
+    expect(checkLabelText("Thornewood gate", [], 40, ["Thorne"])).toBeUndefined();
+  });
+
+  it("does not guard a word of fewer than three letters or a number inside a name", () => {
+    expect(checkLabelText("Jo bed 12", [], 40, ["Jo Li 12"])).toBeUndefined();
+    expect(checkLabelText("Row 12", [], 40, ["Ada 12 Thorne"])).toBeUndefined();
+  });
+
+  it("keeps the order of the problems: empty, too long, a private string, an amount, a contact", () => {
+    expect(checkLabelText("", [], 40, ["Thorne"])).toBe("required");
+    expect(checkLabelText("Thorne £5", [], 40, ["Thorne"])).toBe("private_string");
+  });
+
   it("refuses what looks like an amount", () => {
     for (const text of ["GBP 36", "owes £5", "$20", "€4", "36.00", "12,50", "usd 9", "Cad 3"]) {
       expect(checkLabelText(text, known), text).toBe("looks_like_amount");
@@ -572,6 +597,13 @@ describe("reading a slip (X5.4, D11, hand totals 6.5)", () => {
       [actionId(2), issueKey(2), "checked", "2026-04-21"],
       [actionId(1), issueKey(1), "checked", "2026-04-21"],
     ]);
+  });
+
+  // Review finding 7, requirement R18.6: ready only when the versions are equal.
+  it("calls a decision whose fact version is above the current one changed, never ready (R18.6)", () => {
+    const reading = readSlip(slip(decisions([1, 99])), context([{ issueKey: issueKey(1), factVersion: 2 }]));
+    expect(reading.ok && reading.rows.map((r) => r.status)).toEqual(["changed"]);
+    expect(reading.ok && reading.counts).toEqual({ ready: 0, changed: 1, closed: 0, received: 0 });
   });
 
   it("refuses the whole slip for another site key or another lineage, with no rows", () => {

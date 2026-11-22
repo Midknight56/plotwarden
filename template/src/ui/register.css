@@ -590,6 +590,39 @@ svg.sheet text {
   display: none;
 }
 
+/* A plain action: no box, an underline. For a choice that is there but is not the main one. */
+.button.quiet {
+  padding-right: 0;
+  padding-left: 0;
+  border-color: transparent;
+  background: transparent;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.button.quiet:disabled {
+  border-color: transparent;
+  text-decoration: none;
+}
+
+/* Phones: a compact header. The menu is one row, and the app name shows once, as the title of the first page. */
+@media (max-width: 37.4375rem) {
+  header.app nav ul {
+    flex-wrap: nowrap;
+    gap: 12px;
+  }
+
+  header.app nav .button {
+    min-width: 44px;
+    padding: 8px 8px;
+    font-size: 14px;
+  }
+
+  header.app[data-library] .brand {
+    display: none;
+  }
+}
+
 .print-index {
   columns: 2;
   column-gap: 24px;

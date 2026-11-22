@@ -248,8 +248,8 @@ Reading a slip in the register, per decision:
 |---|---|
 | `actionId` already received | "Already received" |
 | No issue with this `issueKey` is open | "Issue already closed" |
-| Open issue has a higher `factVersion` | "Source has changed" |
-| Otherwise | "Ready to check" |
+| Open issue has a different `factVersion` (lower or higher) | "Source has changed" |
+| Otherwise (equal `factVersion`) | "Ready to check" |
 
 A slip whose `siteKey` or `lineageId` differs from the open site is refused whole with "This slip belongs to another register." "Record receipt" appends one `review_received` event per new `actionId`. Nothing else changes.
 

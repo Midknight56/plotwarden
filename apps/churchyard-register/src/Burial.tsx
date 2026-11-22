@@ -5,7 +5,7 @@ import type { FormEvent } from "react";
 import { isValidLocalDate } from "../../../template/src/calendar";
 import type { PartialDate } from "../../../template/src/calendar";
 import { historyOf } from "../../../template/src/events";
-import { Button, ButtonLink, CheckField, Notice, RadioGroup, SelectField, TextArea, TextField } from "../../../template/src/ui/controls";
+import { Button, ButtonLink, CheckField, Notice, RadioGroup, SelectField, TextArea, TextField, keepSearch } from "../../../template/src/ui/controls";
 import { formatPartialDate } from "../../../template/src/ui/copy";
 import { useShell } from "../../../template/src/ui/shellContext";
 import { Status } from "../../../template/src/ui/Status";
@@ -393,7 +393,7 @@ function CorrectionSection({ burial }: { burial: Burial }) {
 }
 
 export function BurialDetail({ burialId }: { burialId: string }) {
-  const { t } = useShell();
+  const { t, navigate } = useShell();
   const open = useChurch();
   const base = `#/r/${open.site.id}`;
   const burial = open.state.burials[burialId];
@@ -417,7 +417,9 @@ export function BurialDetail({ burialId }: { burialId: string }) {
           <ButtonLink href={`${base}/unplaced`}>{t("chooseLocation")}</ButtonLink>
         ) : (
           <>
-            <ButtonLink href={`${base}/?q=${encodeURIComponent(plot.code)}&plot=${plot.plotId}`}>{t("showOnMap")}</ButtonLink>
+            <ButtonLink href={`${base}?plot=${plot.plotId}`} onClick={(e) => keepSearch(e, () => navigate(`/r/${open.site.id}?plot=${plot.plotId}`, { search: plot.code }))}>
+              {t("showOnMap")}
+            </ButtonLink>
             <ButtonLink href={`${base}/plot/${plot.plotId}`}>{t("openPlot")}</ButtonLink>
           </>
         )}

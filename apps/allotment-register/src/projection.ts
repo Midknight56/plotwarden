@@ -89,8 +89,11 @@ export function buildAvailabilityFile(
 
   // Private strings that must not appear in a public label.
   const known = new Set<string>();
+  // Every applicant and holder is guarded by single words as well, so "Thorne gate" holds "Ada Thorne".
+  const guarded = new Set<string>();
   for (const person of Object.values(state.people)) {
     for (const text of [person.displayName, person.contact ?? ""]) if (identifying(text)) known.add(text);
+    if (person.displayName.trim() !== "") guarded.add(person.displayName);
   }
 
   // Public IDs belong to this one file.
@@ -135,7 +138,7 @@ export function buildAvailabilityFile(
   const flagged: { field: string; matches: string[] }[] = [];
   const check = (field: string, text: string | undefined) => {
     if (text === undefined || text === "") return;
-    const matches = flagPrivateStrings(text, [...known]);
+    const matches = flagPrivateStrings(text, [...known], [...guarded]);
     if (matches.length > 0) flagged.push({ field, matches });
   };
   check("siteName", siteName);

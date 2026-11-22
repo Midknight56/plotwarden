@@ -319,8 +319,9 @@ describe("the words of the shared screens", () => {
     expect(bad).toEqual([]);
   });
 
-  it("holds no brand of a model or a provider", () => {
-    const bad = Object.entries(COPY).filter(([, text]) => /\b(claude|gpt|openai|anthropic|gemini|copilot|llm)\b/i.test(text)).map(([key]) => key);
+  it("says nothing about how the words or the code were made", () => {
+    // Generic words only. A public file names no product or provider, so none is listed here.
+    const bad = Object.entries(COPY).filter(([, text]) => /\b(ai|llm|chatbot|assistant|machine learning|language model|generated)\b/i.test(text)).map(([key]) => key);
     expect(bad).toEqual([]);
   });
 });

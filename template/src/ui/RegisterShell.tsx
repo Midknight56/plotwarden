@@ -31,7 +31,7 @@ import { TraceEditor } from "./TraceEditor";
 import { ButtonLink } from "./controls";
 import { COPY, fill } from "./copy";
 import { commitMessage } from "./messages";
-import { DEFAULT_SETTINGS, RegisterContext, ShellContext, parseHash, useShell } from "./shellContext";
+import { DEFAULT_SETTINGS, RegisterContext, ShellContext, parseHash, searchOfState, useShell } from "./shellContext";
 import type { AnyApp, AnyCommand, OpenRegister, RegisterApp, Route, RunOptions, RunOutcome, Settings, ShellValue } from "./shellContext";
 
 const SETTINGS_KEY = "plotwarden.settings";
@@ -53,16 +53,16 @@ function loadSettings(): Settings {
 }
 
 function useRoute(): { route: Route; navigate: ShellValue["navigate"] } {
-  const [route, setRoute] = useState<Route>(() => parseHash(window.location.hash));
+  const [route, setRoute] = useState<Route>(() => parseHash(window.location.hash, searchOfState(window.history.state)));
   const pendingScroll = useRef<number | null>(null);
 
   useEffect(() => {
     window.history.scrollRestoration = "manual";
     const onPop = (event: PopStateEvent) => {
       pendingScroll.current = typeof (event.state as { scrollY?: unknown } | null)?.scrollY === "number" ? (event.state as { scrollY: number }).scrollY : 0;
-      setRoute(parseHash(window.location.hash));
+      setRoute(parseHash(window.location.hash, searchOfState(event.state)));
     };
-    const onHash = () => setRoute(parseHash(window.location.hash));
+    const onHash = () => setRoute(parseHash(window.location.hash, searchOfState(window.history.state)));
     window.addEventListener("popstate", onPop);
     window.addEventListener("hashchange", onHash);
     return () => {
@@ -89,10 +89,23 @@ function useRoute(): { route: Route; navigate: ShellValue["navigate"] } {
 
   const navigate = useCallback<ShellValue["navigate"]>((to, options) => {
     window.history.replaceState({ ...(window.history.state as object | null), scrollY: window.scrollY }, "");
+    const search = options?.search ?? "";
+    const target = `#${to}`;
     if (options?.replace === true) {
       pendingScroll.current = window.scrollY;
-      window.history.replaceState({ scrollY: window.scrollY }, "", `#${to}`);
-      setRoute(parseHash(`#${to}`));
+      window.history.replaceState({ scrollY: window.scrollY, ...(search === "" ? {} : { q: search }) }, "", target);
+      setRoute(parseHash(target, search));
+    } else if (search !== "") {
+      // A search is kept in the history entry. The address never holds it. Setting the hash cannot carry state.
+      if (window.location.hash === target && searchOfState(window.history.state) === search) return;
+      window.history.pushState({ q: search }, "", target);
+      setRoute(parseHash(target, search));
+    } else if (window.location.hash === target) {
+      // The same place. Only a search that was showing needs to go.
+      if (searchOfState(window.history.state) !== "") {
+        window.history.replaceState({ scrollY: window.scrollY }, "", target);
+        setRoute(parseHash(target, ""));
+      }
     } else {
       window.location.hash = to;
     }
@@ -396,7 +409,7 @@ export function RegisterShell<S extends BaseState, C extends { type: string }, E
   const settingsHref = insideRegister ? `#/r/${route.path[1] as string}/settings` : "#/settings";
   const frame = (body: ReactNode) => (
     <div className="shell">
-      <header className="app">
+      <header className="app" {...(route.path[0] === undefined ? { "data-library": "" } : {})}>
         <div className="mist" aria-hidden="true" />
         <p className="brand">{anyApp.title}</p>
         <nav aria-label={t("mainNavigation")}>

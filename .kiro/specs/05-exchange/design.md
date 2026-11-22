@@ -80,7 +80,7 @@ A parse failure inside a known format gives `{ ok: false, code: "invalid", issue
 
 ## E5 Slip (`exchange/slip.ts`) and comparison (`exchange/compare.ts`)
 
-`buildSlip(input)` writes and parses a slip as `buildPacket` does for a packet. `readSlip(slip, context)` with `context = { siteKey, lineageId, open: { issueKey, factVersion }[], received: readonly string[] }` returns `{ ok: false, code: "other_register" }` or `{ ok: true, rows, counts }`. A row is `{ actionId, issueKey, factVersion, disposition, reviewedOn, status }` with `status` one of `received`, `closed`, `changed`, `ready`, tested in that order (D11). A slip factVersion equal to or above the open one reads as ready. A higher slip version cannot come from this register and is not special cased.
+`buildSlip(input)` writes and parses a slip as `buildPacket` does for a packet. `readSlip(slip, context)` with `context = { siteKey, lineageId, open: { issueKey, factVersion }[], received: readonly string[] }` returns `{ ok: false, code: "other_register" }` or `{ ok: true, rows, counts }`. A row is `{ actionId, issueKey, factVersion, disposition, reviewedOn, status }` with `status` one of `received`, `closed`, `changed`, `ready`, tested in that order (D11). A slip factVersion that is not equal to the open one reads as changed, whether lower or higher. Only an equal version reads as ready.
 
 `comparePackets(current, incoming)` returns one of:
 

@@ -6,7 +6,7 @@ import { buildSheet } from "../../../template/src/map/sheet";
 import { siteTotalsAt } from "../../../template/src/status";
 import { search } from "../../../template/src/search";
 import type { SearchEntry, SearchName } from "../../../template/src/search";
-import { Button, ButtonLink, TextField } from "../../../template/src/ui/controls";
+import { Button, ButtonLink, TextField, keepSearch } from "../../../template/src/ui/controls";
 import { plotRows } from "../../../template/src/ui/plotView";
 import { useShell } from "../../../template/src/ui/shellContext";
 import { MapKey, SheetSvg, useElementWidth } from "../../../template/src/ui/SiteMap";
@@ -38,7 +38,7 @@ export function AllotmentHome() {
   const { t, route, navigate } = useShell();
   const open = useAllot();
   const base = `#/r/${open.site.id}`;
-  const query = route.query.get("q") ?? "";
+  const query = route.search;
   const plotParam = route.query.get("plot") ?? "";
   const [text, setText] = useState(query);
   const holder = useRef<HTMLDivElement>(null);
@@ -84,7 +84,7 @@ export function AllotmentHome() {
     [open.state.map, rows, selectedId, width],
   );
 
-  const go = (q: string) => navigate(`/r/${open.site.id}${q === "" ? "" : `?q=${encodeURIComponent(q)}`}`);
+  const go = (q: string, plot = "") => navigate(`/r/${open.site.id}${plot === "" ? "" : `?plot=${plot}`}`, q === "" ? undefined : { search: q });
   const submit = (event: FormEvent) => {
     event.preventDefault();
     go(text.trim());
@@ -266,7 +266,11 @@ export function AllotmentHome() {
                         {hit.via === "sourceRef" ? <p>{t("sourceOf", { ref: hit.matchedText })}</p> : null}
                         <div className="actions">
                           {waiting ? <ButtonLink href={`${base}/waiting`}>{t("waitingList")}</ButtonLink> : <ButtonLink href={`${base}/plot/${hit.plotId}`}>{t("openPlot")}</ButtonLink>}
-                          {waiting ? null : <ButtonLink href={`${base}?q=${encodeURIComponent(query)}&plot=${hit.plotId}`}>{t("showOnMap")}</ButtonLink>}
+                          {waiting ? null : (
+                            <ButtonLink href={`${base}?plot=${hit.plotId}`} onClick={(e) => keepSearch(e, () => go(query, hit.plotId))}>
+                              {t("showOnMap")}
+                            </ButtonLink>
+                          )}
                         </div>
                       </li>
                     );

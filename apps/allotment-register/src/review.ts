@@ -57,6 +57,11 @@ function allotPrivateStrings(state: AllotState): string[] {
   return [...words];
 }
 
+/** The names of people a label must not hold even one word of. */
+function allotPrivateNames(state: AllotState): string[] {
+  return [...new Set(Object.values(state.people).map((p) => p.displayName.trim()).filter((n) => n !== ""))];
+}
+
 /** The staff screen of the record behind a check. */
 function allotReviewLink(_state: AllotState, source: { rule: string; subjectId: string }): string | undefined {
   if (source.rule === "offer_late") return "offer";
@@ -68,5 +73,6 @@ function allotReviewLink(_state: AllotState, source: { rule: string; subjectId: 
 export const allotReviewSupport: ReviewSupport<AllotState> = {
   sources: allotReviewSources,
   privateStrings: allotPrivateStrings,
+  privateNames: allotPrivateNames,
   link: allotReviewLink,
 };

@@ -8,7 +8,7 @@ import { readFileSync } from "node:fs";
 import { verifyBackup } from "../../template/src/data/backup";
 import { findMetadata } from "../../template/src/data/images";
 import { measureLayout, trackRequests } from "../helpers/measureLayout";
-import { BOOK_GRID, fixturePath, generateGrid, readDownload, startRegister, upload } from "../helpers/screens";
+import { BOOK_GRID, expectSearchOutOfAddress, fixturePath, generateGrid, readDownload, startRegister, upload } from "../helpers/screens";
 
 const noViolations = async (page: Page) => {
   const violations = await measureLayout(page);
@@ -147,6 +147,7 @@ test.describe("entering records from paper", () => {
     await page.getByLabel("Name or plot code").fill("Ashgrove");
     await page.getByRole("button", { name: "Search" }).click();
     await expect(page.getByText("21 found")).toBeVisible();
+    await expectSearchOutOfAddress(page, "Ashgrove");
     await page.getByRole("link", { name: "Plot list" }).click();
     await page.getByRole("link", { name: "Taken", exact: true }).click();
     await expect(page.getByText("21 plots")).toBeVisible();
@@ -342,6 +343,87 @@ test.describe("entering records from paper", () => {
     // A file that is not a CSV is said so.
     await page.getByLabel("Choose CSV").setInputFiles({ name: "a.csv", mimeType: "text/csv", buffer: Buffer.from([0x61, 0xc3, 0x28, 0x62]) });
     await expect(page.getByText("Choose a spreadsheet saved as CSV.")).toBeVisible();
+  });
+
+  // Review finding 5 (R9.5, R9.6, R26.7): the staged rows and the fixes outlive a refresh and a save from another tab.
+  test("keeps a staged import and its fixes across a reload and a save from another tab", async ({ page, context }) => {
+    const requests = trackRequests(page);
+    await bookWithPlots(page);
+    await openAdd(page, "Import spreadsheet");
+    await page.getByLabel("Choose CSV").setInputFiles(fixturePath("paper-200-bad.csv"));
+    await page.getByRole("button", { name: "Review import" }).click();
+    await expect(counts(page)).toContainText("Errors 1");
+    await page.getByRole("listitem").filter({ hasText: "Row 117" }).getByRole("button", { name: "Fix row" }).click();
+    const dialog = page.getByRole("dialog", { name: "Fix row 117" });
+    await dialog.getByLabel("Source ref").fill("R117");
+    await dialog.getByRole("button", { name: "Save row" }).click();
+    await expect(counts(page)).toContainText("Errors 0");
+    await expect(counts(page)).toContainText("Ready 198");
+    await noViolations(page);
+
+    // A recovery file holds the same rows and the fix. It holds no command and no site name.
+    const [recovery] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "Download recovery file" }).click()]);
+    expect(recovery.suggestedFilename()).toBe("register-recovery.json");
+    const recoveryText = await readDownload(recovery);
+    const file = JSON.parse(recoveryText) as { format: string; rawRows: unknown[]; commands: unknown[]; mapping: Record<string, string> };
+    expect(file.format).toBe("plot.draft.v1");
+    expect(file.rawRows).toHaveLength(200);
+    expect(file.commands).toEqual([]);
+    expect(file.mapping["screen"]).toBe("import");
+    expect(JSON.parse(file.mapping["fix:117"] ?? "{}")).toMatchObject({ sourceRef: "R117" });
+    expect(recoveryText).not.toContain("Paper Book");
+
+    // A refresh loses nothing: the draft is offered, and resuming brings back the rows with the fix.
+    await page.reload();
+    await expect(page.getByText("A draft of unsaved rows is waiting.")).toBeVisible();
+    await noViolations(page);
+    await page.getByRole("button", { name: "Resume draft" }).click();
+    await expect(page.getByText("Draft restored. Check the rows, then import.")).toBeVisible();
+    await expect(counts(page)).toContainText("Errors 0");
+    await expect(counts(page)).toContainText("Ready 198");
+    await expect(page.getByRole("button", { name: "Import 200 records" })).toBeEnabled();
+
+    // Another tab saves one record first.
+    const other = await context.newPage();
+    const size = page.viewportSize();
+    if (size !== null) await other.setViewportSize(size);
+    await other.goto(page.url().replace("/add/import", "/add/one"));
+    await other.getByLabel("Name", { exact: true }).fill("Other Person");
+    await other.getByLabel("Source ref").fill("R900");
+    await other.getByLabel("Plot", { exact: true }).fill("C200");
+    await other.getByLabel("Burial date").fill("1874");
+    await other.getByRole("button", { name: "Review rows" }).click();
+    await other.getByRole("button", { name: "Save 1 record" }).click();
+    await expect(other.getByText("1 saved · 0 still need a plot.")).toBeVisible();
+    await other.close();
+
+    // This tab tries to save. It is refused, and both buttons are offered inside the import screen.
+    const changed = page.getByRole("alert").filter({ hasText: "This register changed in another tab." });
+    await expect(changed).toHaveCount(1);
+    await page.getByRole("button", { name: "Import 200 records" }).click();
+    await expect(changed).toHaveCount(2);
+    const mine = changed.last();
+    await expect(mine.getByRole("button", { name: "Keep my draft" })).toBeVisible();
+    await expect(mine.getByRole("button", { name: "Open latest" })).toBeVisible();
+    await noViolations(page);
+    await mine.getByRole("button", { name: "Keep my draft" }).click();
+    await expect(page.getByText("Your draft is kept on this device.")).toBeVisible();
+    await expect(counts(page)).toContainText("Ready 198");
+
+    // Open latest checks the rows again against the newer register. The fix and the counts are kept, and it saves.
+    await changed.first().getByRole("button", { name: "Open latest" }).click();
+    await expect(counts(page)).toContainText("Errors 0");
+    await expect(counts(page)).toContainText("Ready 198");
+    await expect(counts(page)).toContainText("Location to confirm 2");
+    const importAll = page.getByRole("button", { name: "Import 200 records" });
+    await expect(importAll).toBeEnabled();
+    await importAll.click();
+    await expect(page.getByText("200 saved · 2 still need a plot.")).toBeVisible();
+
+    // The draft is gone once the rows are saved.
+    await page.reload();
+    await expect(page.getByText("A draft of unsaved rows is waiting.")).toHaveCount(0);
+    await expect(requests.external).toEqual([]);
   });
 });
 

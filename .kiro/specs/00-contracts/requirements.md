@@ -95,6 +95,7 @@ Tests: T12, T13, T14, T18, T19. Owner: 01-foundation.
 6. When a burial has no location, the register shall list it under "Location to confirm" apart from the four states and never give it coordinates from a name match.
 7. When a plot list row asserts Taken or Reserved without matching domain evidence, the register shall keep it unchecked and "Needs checking".
 8. When a reservation is released, the register shall require a date and a reason. When reservations conflict or a burial would exceed capacity, the register shall stop before commit. A queue request shall never count as a reservation.
+9. When a burial has a year or a month and no full day, the register shall check overlap from the earliest day that date could mean, so a reservation that ended before that day does not refuse it. The stored claim and the stored date stay as entered. A burial with an unknown date has no earliest day and is checked against the whole timeline.
 
 ## R9 Events, operations and revisions
 
@@ -109,6 +110,7 @@ Tests: T09, T21. Owner: 01-foundation.
 7. When events are replayed from the start, the register shall produce a state identical to the stored current state.
 8. When a correction is recorded, the register shall append a new event naming the corrected event and a reason, and never change the stored bytes of an earlier event.
 9. When a commit completes, the register shall notify other open tabs of the new revision. When a second tab holds an older schema version, the register shall ask it to close or reload.
+10. When a screen that saves (import, map setup, trace, plot details, restore) shows a stale or a failed save, it shall offer the buttons of R9.5 and R9.6 inside that screen. A staged import shall keep its rows, its column choices, its left out rows and its fixed cells as a draft on the device, offer them again after a refresh, and check them again against the latest register when the keeper opens it.
 
 ## R10 Backdated changes
 
@@ -186,6 +188,8 @@ Tests: T22, T23, T28. Owner: 03-churchyard, 04-allotment.
 7. When a public label or instruction contains a known private full name or contact string, the register shall flag the field and offer a neutral alias before producing the file.
 8. When the register prints a visitor sheet, the register shall build it from the visitor object alone in a separate document.
 9. When an offer is recorded for a plot, the register shall drop that plot from any later availability file.
+10. When a family file is built, the register shall check the public name of each approved burial. Unless it is the burial's recorded name itself, it shall hold no living person's name, no unapproved burial's name and no contact (an at sign, or seven or more digits). The burial's own recorded name is left out of this check. A failed check builds no file and names the field "names".
+11. When a public label is checked against private names, the register shall also match any single word of at least three letters of a living person's name or an unapproved burial's name, and shall treat a single word name as a private name.
 
 ## R16 Committee projection
 
@@ -198,6 +202,7 @@ Tests: T24, T28. Owner: 05-exchange.
 5. When a rule applies to a subject, the register shall emit at most one issue per subject and rule, with a stable random issue key and subject key.
 6. When a relevant source field of an open issue changes, the register shall increase its fact version by one.
 7. When the as of date changes, the register shall add or drop facts that depend on it, even at the same revision.
+8. When a site name or a label for a review file is checked, the register shall refuse a word of at least three letters that is part of any person's name or of the private site title, as well as a whole private string. A word is matched as a whole word, ignoring case and accents.
 
 ## R17 Review rules
 
@@ -214,10 +219,10 @@ Tests: T24, T25, T26. Owner: 05-exchange.
 
 1. When a return slip (`plot.slip.v1`) is opened, the register shall look up each decision by the full tuple `(siteKey, lineageId, issueKey, factVersion)` and never by date alone.
 2. When the slip's site key or lineage differs from the open site, the register shall refuse the whole slip and change nothing.
-3. When a decision's fact version is older than the current fact, the register shall show "Source has changed" for that row.
+3. When a decision's fact version is not the same as the current fact (older or newer), the register shall show "Source has changed" for that row.
 4. When a decision's issue is no longer open, the register shall show "Issue already closed" for that row.
 5. When a decision's action ID was already received, the register shall show "Already received" and change nothing.
-6. When a decision matches the current open fact, the register shall show "Ready to check".
+6. When a decision's fact version equals the current open fact, the register shall show "Ready to check". A fact version above the current one is never ready.
 7. When a keeper presses "Record receipt", the register shall record receipt events only and never change occupancy, debt, inscription or any other canonical field.
 8. When a keeper presses "Open matching record", the register shall open the normal staff form with the latest state.
 9. When the same slip is opened twice, the register shall record nothing new the second time.
@@ -266,6 +271,7 @@ Tests: T28, T31, T36. Owner: 06-access-and-release.
 1. When any register, visitor file or Desk page runs, it shall make no network request beyond loading its own static files, and need no login.
 2. When private data exists, the register shall keep it out of URLs, filenames, logs, localStorage keys, caches, image metadata and the clipboard by default.
 3. When a visitor file is opened from disk with the network blocked, it shall be readable, searchable with script on and findable with browser Find with script off.
+4. When a keeper searches a register, the register shall keep the search text in the browser history entry (`history.state`) and never in the address. An address that carries a `q` parameter shall not be read as a search. Back and a reload shall still find the search.
 
 ## R23 Words, layout and access
 
@@ -275,6 +281,8 @@ Tests: T29, T35. Owner: 06-access-and-release and each feature spec.
 2. When any screen is shown at 360 by 640 or 1920 by 1080, the register shall keep a 16 px edge, a 12 px gap between targets, 44 by 44 px targets and at least 12 px text, with no horizontal page scroll.
 3. When reduced motion is set by the system or the app, the register shall run no animation. The app setting wins when set.
 4. When normal text is shown, the register shall meet a 4.5 to 1 contrast ratio, and 3 to 1 for meaningful graphics and focus rings.
+5. When no register of the keeper's own exists, the first screen shall make "Start a register" the one main action, show the practice register as a plain choice, say in one line who the app is for and that records stay on this device, and show "Restart walkthrough" only after the walkthrough was started. On a phone the header and menu shall be compact and the app name shall show once.
+6. When the site map is shown at 360 by 640, the map and its key shall come before the zoom controls and the map shall start in the upper half of the first screen. A plot chooser shall never show a blank choice. A zoom control that cannot act shall be disabled and the zoom level shall be said in words.
 
 ## R24 Proof data and independent totals
 

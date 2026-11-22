@@ -61,6 +61,19 @@ function churchPrivateStrings(state: ChurchState): string[] {
   return [...words];
 }
 
+/** The names of people a label must not hold even one word of: living people, the deceased, and approved public names. */
+function churchPrivateNames(state: ChurchState): string[] {
+  const names = new Set<string>();
+  const add = (text: string | undefined): void => {
+    const name = (text ?? "").trim();
+    if (name !== "") names.add(name);
+  };
+  for (const person of Object.values(state.people)) add(person.displayName);
+  for (const burial of Object.values(state.burials)) add(burial.recordedName);
+  for (const approval of Object.values(state.approvals)) add(approval.name);
+  return [...names];
+}
+
 /** The staff screen of the record behind a check. An unplaced burial goes to the unplaced list. */
 function churchReviewLink(state: ChurchState, source: { rule: string; subjectId: string }): string | undefined {
   if (source.rule === "placement_missing") {
@@ -79,5 +92,6 @@ function churchReviewLink(state: ChurchState, source: { rule: string; subjectId:
 export const churchReviewSupport: ReviewSupport<ChurchState> = {
   sources: churchReviewSources,
   privateStrings: churchPrivateStrings,
+  privateNames: churchPrivateNames,
   link: churchReviewLink,
 };

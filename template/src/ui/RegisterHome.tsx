@@ -13,7 +13,7 @@ const UNPLACED = "unplaced";
 export function RegisterHome() {
   const { app, t, route, navigate } = useShell();
   const open = useRegister();
-  const query = route.query.get("q") ?? "";
+  const query = route.search;
   const [text, setText] = useState(query);
   const base = `#/r/${open.site.id}`;
 
@@ -43,7 +43,7 @@ export function RegisterHome() {
   const rowOf = (plotId: string) => rows.find((r) => r.plot.plotId === plotId);
   const submit = (event: FormEvent) => {
     event.preventDefault();
-    navigate(`/r/${open.site.id}${text.trim() === "" ? "" : `?q=${encodeURIComponent(text.trim())}`}`);
+    navigate(`/r/${open.site.id}`, text.trim() === "" ? undefined : { search: text.trim() });
   };
   const clear = () => {
     setText("");

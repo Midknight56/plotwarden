@@ -137,6 +137,21 @@ describe("planning an export from Lantern Fold", () => {
       expect(label("x".repeat(41))).toEqual([{ field: `label:${burialH1}`, code: "over_limit" }]);
     });
 
+    // Review finding 4 (R16.2, R16.3): one word of a name, or of the private site title, is private too.
+    it("refuses a label or a site name that holds one word of a person's name or of the site title", () => {
+      const label = (text: string) => fields({ labels: { [burialH1]: text } });
+      const bad = [{ field: `label:${burialH1}`, code: "private_string" }];
+      expect(label("Gladwyn grave")).toEqual(bad);
+      expect(label("by Perrin")).toEqual(bad);
+      expect(label("Odalys bed")).toEqual(bad);
+      expect(label("Quillmoss")).toEqual(bad);
+      expect(fields({ alias: "Lantern churchyard" })).toEqual([{ field: "alias", code: "private_string" }]);
+    });
+
+    it("still accepts neutral words that no name holds", () => {
+      expect(fields({ alias: "Lower churchyard", labels: { [burialH1]: "Bed by the yew", [memorial]: "Stone near the path" } })).toEqual([]);
+    });
+
     it("reports every bad field at once, in the order alias then labels", () => {
       const got = fields({ alias: "Lantern Fold", labels: { [burialH1]: "£5", [memorial]: "Mirel Quillmoss" } });
       expect(got.map((f) => f.field)).toEqual(["alias", `label:${burialH1}`, `label:${memorial}`]);
@@ -386,6 +401,28 @@ describe("reading a return slip in Thimble Beds", () => {
     // Today after the review date is read as today.
     const later = readSlipFor({ bytes: slipFor("2026-04-21"), site: env.site, state: env.state, adapter, today: "2026-05-01" });
     expect(later.ok && later.rows.map((r) => r.status)).toEqual(["ready"]);
+  });
+});
+
+describe("labels in Thimble Beds hold no word of a person's name (R16.2, review finding 4)", () => {
+  it("refuses one word of a holder or applicant name, and a single word name", async () => {
+    const env = await GardenEnv.create();
+    await buildThimble(env);
+    await env.must([{ type: "add_applicant", applicationId: app("thorne"), personId: gid("person:Thorne"), name: "Thorne", joinedOn: "2026-02-01" } as AllotCommand], "2026-02-01");
+    await env.must([{ type: "make_offer", offerId: gid("offer:b03"), applicationId: app("tavi"), spaceId: gid("space:B03:1"), claimId: claim("hold:b03"), replyBy: "2026-04-18" } as AllotCommand], "2026-04-04");
+    const adapter = allotAdapter as unknown as ExchangeAdapter;
+    const offer = gid("offer:b03");
+    const result = (text: string, alias = "Site 2") => {
+      const got = planExchange({ site: env.site, state: env.state, revision: env.revision, adapter, asOf: ON, alias, labels: { [offer]: text }, mint });
+      return got.ok ? [] : got.code === "invalid" ? got.fields : [{ field: got.code, code: got.code }];
+    };
+    const bad = [{ field: `label:${offer}`, code: "private_string" }];
+    expect(result("Bramblequill bed")).toEqual(bad);
+    expect(result("Stonecrop plot")).toEqual(bad);
+    expect(result("Thorne bed")).toEqual(bad);
+    expect(result("Marlo")).toEqual(bad);
+    expect(result("Row by the hut", "Thimble gardens")).toEqual([{ field: "alias", code: "private_string" }]);
+    expect(result("Bed by the hut")).toEqual([]);
   });
 });
 

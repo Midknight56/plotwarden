@@ -5,7 +5,7 @@ import type { FormEvent } from "react";
 import { buildSheet } from "../../../template/src/map/sheet";
 import { search } from "../../../template/src/search";
 import type { SearchEntry, SearchName } from "../../../template/src/search";
-import { Button, ButtonLink, TextField } from "../../../template/src/ui/controls";
+import { Button, ButtonLink, TextField, keepSearch } from "../../../template/src/ui/controls";
 import { formatPartialDate } from "../../../template/src/ui/copy";
 import { plotRows } from "../../../template/src/ui/plotView";
 import { useShell } from "../../../template/src/ui/shellContext";
@@ -22,7 +22,7 @@ export function ChurchyardHome() {
   const { t, route, navigate } = useShell();
   const open = useChurch();
   const base = `#/r/${open.site.id}`;
-  const query = route.query.get("q") ?? "";
+  const query = route.search;
   const plotParam = route.query.get("plot") ?? "";
   const [text, setText] = useState(query);
   const holder = useRef<HTMLDivElement>(null);
@@ -67,10 +67,7 @@ export function ChurchyardHome() {
     if (plotParam !== "") heading.current?.focus({ preventScroll: false });
   }, [plotParam]);
 
-  const go = (q: string, plot = "") => {
-    const parts = [q === "" ? "" : `q=${encodeURIComponent(q)}`, plot === "" ? "" : `plot=${plot}`].filter(Boolean).join("&");
-    navigate(`/r/${open.site.id}${parts === "" ? "" : `?${parts}`}`);
-  };
+  const go = (q: string, plot = "") => navigate(`/r/${open.site.id}${plot === "" ? "" : `?plot=${plot}`}`, q === "" ? undefined : { search: q });
   const submit = (event: FormEvent) => {
     event.preventDefault();
     go(text.trim());
@@ -171,7 +168,11 @@ export function ChurchyardHome() {
                           ) : (
                             <ButtonLink href={`${base}/burial/${hit.recordId}`}>{t("openBurial")}</ButtonLink>
                           )}
-                          {nowhere ? null : <ButtonLink href={`${base}?q=${encodeURIComponent(query)}&plot=${hit.plotId}`}>{t("showOnMap")}</ButtonLink>}
+                          {nowhere ? null : (
+                            <ButtonLink href={`${base}?plot=${hit.plotId}`} onClick={(e) => keepSearch(e, () => go(query, hit.plotId))}>
+                              {t("showOnMap")}
+                            </ButtonLink>
+                          )}
                         </div>
                       </li>
                     );

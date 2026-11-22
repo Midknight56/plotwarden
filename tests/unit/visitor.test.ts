@@ -6,7 +6,7 @@ import type { FamilyFile } from "../../template/src/output/privacy";
 import { buildFamilyFile, isStalePreview } from "../../apps/churchyard-register/src/projection";
 import type { ChurchCommand } from "../../apps/churchyard-register/src/types";
 import { APPROVED_NAME, CONTACT, LIVING_HOLDERS, OTHER_OCCUPANT, VISITOR_CANARIES } from "../helpers/privacyCanaries";
-import { ChurchEnv, WALK_PATH_ID, id, plotId } from "../helpers/churchEnv";
+import { ChurchEnv, WALK_PATH_ID, id, plotId, spaceId } from "../helpers/churchEnv";
 import { buildFold } from "../helpers/lanternFold";
 import { AVAILABILITY_WORD_KEYS, availabilityFileName, buildAvailabilityHtml } from "../../template/src/output/availabilityHtml";
 import { parseAvailability } from "../../template/src/output/privacy";
@@ -215,6 +215,60 @@ describe("T22 public words (C5.1, C5.4)", () => {
     const contact = build();
     if (!contact.ok) expect(contact.flagged.map((f) => f.field)).toContain("gateName");
     expect(contact.ok).toBe(false);
+  });
+
+  // Review finding 3 (R15.1, R15.7, R4.1): the public name of a burial is a typed field, so it is checked too.
+  it("flags an approved public name that holds a living person or a contact, and builds no file", async () => {
+    const withName = (name: string): ChurchCommand => ({ type: "approve_burial", burialId: MIREL, includeYear: false, name });
+    for (const name of [LIVING_HOLDERS[0], `${LIVING_HOLDERS[1]} ring 07700900123`, `Mirel Quillmoss, ring 07700900123`, `Mirel Quillmoss ${CONTACT}`, CONTACT]) {
+      await env.must([withName(name)]);
+      const out = build();
+      expect(out.ok, name).toBe(false);
+      if (!out.ok) expect(out.flagged.map((f) => f.field), name).toEqual(["names"]);
+    }
+  });
+
+  it("flags an approved public name that is the name of a burial that was not approved", async () => {
+    await env.must([{ type: "approve_burial", burialId: MIREL, includeYear: false, name: OTHER_OCCUPANT }]);
+    const out = build();
+    expect(out.ok).toBe(false);
+    if (!out.ok) expect(out.flagged.map((f) => f.field)).toEqual(["names"]);
+  });
+
+  it("still accepts the burial's own recorded name and a neutral variation of it", async () => {
+    expect(build().ok).toBe(true);
+    await env.must([{ type: "approve_burial", burialId: MIREL, includeYear: false, name: "M. Quillmoss" }]);
+    const out = build();
+    expect(out.ok).toBe(true);
+    if (out.ok) expect(out.file.burials[0]?.name).toBe("M. Quillmoss");
+  });
+
+  // Review finding 4 (R15.7): one word of a living name is enough to flag a public label.
+  it("flags a public label that holds a single word name, or one word of a living full name", async () => {
+    const holder = (ref: string, code: string, name: string): ChurchCommand => ({
+      type: "record_reservation",
+      reservationId: id(`reservation:${ref}`),
+      holderId: id(`holder:${ref}`),
+      holderName: name,
+      spaceId: spaceId(code),
+      claimId: id(`claim:${ref}`),
+      start: "2026-03-01",
+      sourceRef: ref,
+    });
+    await env.must([holder("LF-R3", "Y03", "Thorne")]);
+    await env.must([settings({ gateName: "Thorne gate" })]);
+    const single = build();
+    expect(single.ok).toBe(false);
+    if (!single.ok) expect(single.flagged.map((f) => f.field)).toEqual(["gateName"]);
+
+    await env.must([holder("LF-R8", "Y08", "Ada Fenwick")]);
+    await env.must([settings({ gateName: "Lantern Gate", directions: "Look for the Fenwick yew." })]);
+    const part = build();
+    expect(part.ok).toBe(false);
+    if (!part.ok) expect(part.flagged.map((f) => f.field)).toEqual(["directions"]);
+
+    await env.must([settings({ gateName: "Lantern Gate", directions: DIRECTIONS })]);
+    expect(build().ok).toBe(true);
   });
 
   it("says what is missing: a public site name, a gate on the map, a public gate name", async () => {
@@ -559,6 +613,21 @@ describe("T22 what is missing and what is flagged (A6.4, R15.7)", () => {
   });
 
   it("passes a neutral word", async () => {
+    await garden.must([gardenSettings({ instructions: "Ask at the hut." })]);
+    expect(gbuild().ok).toBe(true);
+  });
+
+  // Review finding 4 (R15.7): a single word name, or one word of a full name, is a private string.
+  it("flags a public word that holds a single word applicant name or one word of a full name", async () => {
+    await garden.must([{ type: "add_applicant", applicationId: gapp("thorne"), personId: gperson("Thorne"), name: "Thorne", joinedOn: "2026-02-01" } as AllotCommand], "2026-02-01");
+    await garden.must([gardenSettings({ instructions: "Ask at Thorne gate." })]);
+    const single = gbuild();
+    expect(single.ok).toBe(false);
+    if (!single.ok) expect(single.flagged.map((f) => f.field)).toEqual(["instructions"]);
+    await garden.must([gardenSettings({ instructions: "Ask for the Stonecrop bed." })]);
+    const part = gbuild();
+    expect(part.ok).toBe(false);
+    if (!part.ok) expect(part.flagged.map((f) => f.field)).toEqual(["instructions"]);
     await garden.must([gardenSettings({ instructions: "Ask at the hut." })]);
     expect(gbuild().ok).toBe(true);
   });

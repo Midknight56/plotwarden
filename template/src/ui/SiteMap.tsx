@@ -272,12 +272,18 @@ export function SiteMap() {
         <ButtonLink href={`${base}/map/edit`}>{t("editMap")}</ButtonLink>
       </div>
 
+      {sheet.empty ? <p>{t("noMapYet")}</p> : null}
+      <div ref={holder} className="sheet-scroll" role="region" aria-label={t("siteMap")} tabIndex={0}>
+        <SheetSvg model={sheet} label={t("mapDescription")} />
+      </div>
+      <MapKey />
+
       <div className="no-print stack">
         <SelectField
           label={t("choosePlot")}
           value={selected}
           onChange={(value) => navigate(`/r/${open.site.id}/map${value === "" ? "" : `?plot=${value}`}`, { replace: true })}
-          options={[{ value: "", label: "" }, ...rows.map((r) => ({ value: r.plot.plotId, label: r.line }))]}
+          options={[{ value: "", label: t("noPlotChosen") }, ...rows.map((r) => ({ value: r.plot.plotId, label: r.line }))]}
         />
         {chosen === undefined ? null : (
           <section className="card stack" aria-label={t("selectedPlot")}>
@@ -287,6 +293,7 @@ export function SiteMap() {
             </div>
           </section>
         )}
+        <p>{t("zoomLevel", { percent: Math.round(zoom * 100) })}</p>
         <div className="actions">
           <Button onClick={() => setZoom((z) => Math.min(4, z + 0.5))} disabled={zoom >= 4}>
             {t("zoomIn")}
@@ -299,12 +306,6 @@ export function SiteMap() {
           </Button>
         </div>
       </div>
-
-      {sheet.empty ? <p>{t("noMapYet")}</p> : null}
-      <div ref={holder} className="sheet-scroll" role="region" aria-label={t("siteMap")} tabIndex={0}>
-        <SheetSvg model={sheet} label={t("mapDescription")} />
-      </div>
-      <MapKey />
 
       <div className="actions no-print">
         <Button onClick={print}>{t("printSiteMap")}</Button>

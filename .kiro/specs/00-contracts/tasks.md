@@ -5,7 +5,7 @@ Spec 00 writes contracts, fixtures of expected values and project setup. It writ
 ## Tasks in this spec
 
 - [x] 0.1 Write steering, agent profiles and hooks (R25). Validate both profiles with `kiro-cli agent validate`. T IDs: none (checked by the validator).
-- [ ] 0.1a Create `.kiro/settings/mcp.json` with `plot-inspector` disabled, exactly as in D13. The agent cannot write `.kiro/settings/` (a fixed Kiro rule), so a person creates it. T IDs: none (feeds T33).
+- [x] 0.1a Create `.kiro/settings/mcp.json` with `plot-inspector` disabled, exactly as in D13. The agent cannot write `.kiro/settings/` (a fixed Kiro rule), so a person creates it. T IDs: none (feeds T33). Note: the settings file was added by hand, not by the agent. It names one server, `plot-inspector`, with `disabled: true`, and the server file it points to (`dist/inspector/server.mjs`) does not exist yet.
 - [x] 0.2 Work the hand totals for Lantern Fold, Thimble Beds and the 200 record paper book in `tests/fixtures/expected/hand-totals.md` before any code (R24). Feeds T12, T07, T13, T17, T18, T20, T22, T24, T30.
 - [x] 0.3 Fix identity, partial date, source key, queue tie and protected field contracts (R1 to R12, D2, D4, D5, D7). Feeds T02, T03, T06, T07, T12, T13, T14, T16, T17, T21.
 - [x] 0.4 Fix the template and adapter contract and the import direction (R14, D1, D3). Feeds T01, T34.

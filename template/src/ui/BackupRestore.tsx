@@ -3,10 +3,11 @@
 import { useContext, useState } from "react";
 import { backupFilename, compareLineage, exportBackup, restoreBackup, verifyBackup } from "../data/backup";
 import type { RestoreResult, VerifiedBackup } from "../data/backup";
+import { buildRecoveryFile } from "../data/drafts";
 import { writeTime } from "../calendar";
 import type { DomainError } from "../types";
 import { Button, ButtonLink, Notice, TextField } from "./controls";
-import { downloadBytes } from "./download";
+import { downloadBytes, downloadText } from "./download";
 import { errorMessage } from "./messages";
 import { RegisterContext, useShell } from "./shellContext";
 import { Status } from "./Status";
@@ -44,7 +45,7 @@ function BackUp() {
         <ButtonLink href={`${base}/restore`}>{t("restoreBackup")}</ButtonLink>
         <ButtonLink href={base}>{t("backToRegister")}</ButtonLink>
       </div>
-      <Status status={status} />
+      <Status status={status} actions={{ tryAgain: () => setStatus({ phase: "idle" }) }} />
       {ready === undefined ? null : (
         <div className="stack">
           <Notice tone="good">{t("backupWritten")}</Notice>
@@ -71,7 +72,7 @@ function Facts({ title, lines }: { title: string; lines: string[] }) {
 }
 
 function Restore({ inRegister }: { inRegister: boolean }) {
-  const { app, db, t, bumpSites } = useShell();
+  const { app, db, t, bumpSites, newId, now } = useShell();
   const open = useContext(RegisterContext);
   const [verified, setVerified] = useState<VerifiedBackup | undefined>();
   const [bytesRead, setBytesRead] = useState(false);
@@ -160,6 +161,25 @@ function Restore({ inRegister }: { inRegister: boolean }) {
   const same = verified !== undefined && open !== null && verified.site.id === open.site.id && verified.site.lineageId === open.site.lineageId;
   const relation = same && verified !== undefined && open !== null ? compareLineage(open.events, verified.events) : undefined;
 
+  // What the keeper has put in is the backup file they chose, which stays where it is, and the site name they typed.
+  // A failed restore leaves both on this screen. The recovery file holds the typed name, for the site the backup is of.
+  // Another tab cannot make a restore stale, so there is no "Keep my draft" here.
+  const recovery = () => {
+    const file = buildRecoveryFile({
+      draftId: newId(),
+      siteId: verified?.site.id ?? open?.site.id ?? "none",
+      kind: app.adapter.kind,
+      baseRevision: open?.revision ?? 0,
+      rawRows: [{ typedName: typed }],
+      mapping: { screen: "restore" },
+      currentRow: 0,
+      commands: [],
+      pageImageNeedsReselect: false,
+      savedAt: now().toISOString(),
+    });
+    downloadText(file.filename, file.text, "application/json");
+  };
+
   return (
     <section className="stack">
       <h1>{t("restoreBackup")}</h1>
@@ -193,7 +213,7 @@ function Restore({ inRegister }: { inRegister: boolean }) {
           {bytesRead ? <p>{t("chooseAnotherFile")}</p> : null}
         </div>
       )}
-      <Status status={status} />
+      <Status status={status} actions={{ tryAgain: () => setStatus({ phase: "idle" }), downloadRecovery: recovery }} />
 
       {done === undefined ? null : (
         <div className="stack">

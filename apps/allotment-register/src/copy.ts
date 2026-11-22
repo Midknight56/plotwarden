@@ -11,6 +11,7 @@ export const ALLOT_COPY: Readonly<Record<string, string>> = {
   appTitle: "Allotment Register",
   // The library and the desk
   libraryPrompt: "Offer the next free plot or start your register.",
+  libraryWho: "For the secretary of an allotment garden. Records stay on this device.",
   openWalkthrough: "Open Thimble Beds",
   restartWalkthrough: "Restart walkthrough",
   walkthroughNote: "Thimble Beds is a practice register. Nothing you do here touches your own registers.",
@@ -79,6 +80,7 @@ export const ALLOT_COPY: Readonly<Record<string, string>> = {
   backToWaitingList: "Back to the waiting list",
   // The offer
   chooseFreePlot: "Choose a free plot",
+  offerHeading: "Plot and applicant",
   offerTo: "Offer to",
   joinedLabel: "Joined",
   replyBy: "Reply by",

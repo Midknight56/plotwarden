@@ -55,3 +55,9 @@ T35 stays open in 06 for the full copy gate. T23 stays open in 03 and 04 for rep
 - The churchyard adapter replaces `tests/helpers/paperAdapter.ts` with its own burial rules and sheets (spec 03). The allotment adapter does the same for waiting list, tenancies and fees (spec 04).
 - Dense map print as an overview with numbered section sheets, the visitor HTML and the family and availability previews are specs 03 and 04. This spec ships one sheet and its print page.
 - Explicit linking of a layout plot to an existing plot of a different code is not built. A layout import matches by section and code only (R26.5).
+
+## Repair 07 (findings of an independent review)
+
+- [x] 2.23 A search stays out of the address (R22.4). Files: `template/src/ui/{shellContext,RegisterShell,RegisterHome,controls}.tsx`, `apps/*/src/{ChurchyardHome,AllotmentHome,Burial}.tsx`, `tests/helpers/screens.ts`, browser `warden-family.spec.ts`, `secretary-season.spec.ts`, `paper-entry.spec.ts`.
+- [x] 2.24 A staged import and the screens that save keep a draft (R9.5, R9.6, R9.10, R26.7). Files: `template/src/data/{importDraft,importBatch,fastEntry}.ts`, `template/src/ui/{screenDraft,ImportWizard,MapEditor,TraceEditor,PlotDetails,BackupRestore,FastEntry}.tsx`, `tests/unit/importDraft.test.ts`, browser `paper-entry.spec.ts` and `draft-actions.spec.ts`. T IDs: T07.
+- [x] 2.25 First use and the map screen (R23.5, R23.6). Files: `template/src/ui/{Library,SiteMap,TraceEditor,RegisterShell,register.css,copyScreens}`, `apps/*/src/{copy.ts,theme.css,Offer.tsx}`, browser `warden-family.spec.ts` and `secretary-season.spec.ts`.

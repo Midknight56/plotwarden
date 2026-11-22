@@ -19,6 +19,7 @@ import type { MessageContext } from "./messages";
 import { plotRows } from "./plotView";
 import { useRegister, useShell } from "./shellContext";
 import type { AnyCommand, RunOutcome } from "./shellContext";
+import { DraftOffer, useScreenDraft } from "./screenDraft";
 import { SheetSvg } from "./SiteMap";
 import { useElementWidth } from "./SiteMap";
 import { Status } from "./Status";
@@ -32,6 +33,21 @@ function targetOf(value: string | null): Target {
 }
 
 const whole = (text: string): number | undefined => (/^-?\d{1,9}$/.test(text.trim()) ? Number(text.trim()) : undefined);
+
+/** The points of a drawing as plain text, "east,north;east,north", for a draft. */
+const pointsToText = (points: readonly (readonly [number, number])[]): string => points.map((p) => `${p[0]},${p[1]}`).join(";");
+
+/** The points of a draft. A part that is not two whole numbers is left out. */
+function pointsFromText(text: string | undefined): Point[] {
+  const points: Point[] = [];
+  for (const part of (text ?? "").split(";")) {
+    const [a, b, ...rest] = part.split(",");
+    const e = whole(a ?? "");
+    const n = whole(b ?? "");
+    if (e !== undefined && n !== undefined && rest.length === 0) points.push([e, n]);
+  }
+  return points;
+}
 
 /** The natural size of an image, once it has loaded. */
 function useImageSize(url: string | undefined): { width: number; height: number } | undefined {
@@ -59,6 +75,7 @@ export function TraceEditor() {
   const backdrop = open.state.map.backdrop;
 
   const [target, setTarget] = useState<Target>(targetOf(route.query.get("target")));
+  const kept = useScreenDraft("trace_edit");
   const [name, setName] = useState("");
   const [plotId, setPlotId] = useState("");
   const [east, setEast] = useState("");
@@ -134,6 +151,7 @@ export function TraceEditor() {
     setBusy(false);
     if (outcome.ok) {
       opId.current = undefined;
+      void kept.discard();
       setStatus({ phase: "saved", text: done });
       return true;
     }
@@ -389,7 +407,7 @@ export function TraceEditor() {
           value={plotId}
           error={fieldErrors.plot}
           onChange={(v) => setPlotId(v)}
-          options={[{ value: "", label: "" }, ...rows.map((r) => ({ value: r.plot.plotId, label: r.line }))]}
+          options={[{ value: "", label: t("noPlotChosen") }, ...rows.map((r) => ({ value: r.plot.plotId, label: r.line }))]}
         />
       ) : (
         <TextField label={t("name")} value={name} error={fieldErrors.name} onChange={setName} autoComplete="off" />
@@ -452,7 +470,27 @@ export function TraceEditor() {
             </Button>
           )}
         </div>
-        <Status status={status} actions={{ tryAgain: () => setStatus({ phase: "idle" }), openLatest: () => void open.reload(), keepEditing: () => setStatus({ phase: "idle" }) }} />
+        <Status
+          status={status}
+          actions={{
+            tryAgain: () => setStatus({ phase: "idle" }),
+            openLatest: () => void open.reload(),
+            keepEditing: () => setStatus({ phase: "idle" }),
+            ...kept.actions(() => ({ target, name, plotId, east, north, points: pointsToText(draft.points) }), setStatus),
+          }}
+        />
+        <DraftOffer
+          draft={kept}
+          onResume={(saved) => {
+            setTarget(targetOf(saved["target"] ?? null));
+            setName(saved["name"] ?? "");
+            setPlotId(saved["plotId"] ?? "");
+            setEast(saved["east"] ?? "");
+            setNorth(saved["north"] ?? "");
+            setDraft({ points: pointsFromText(saved["points"]) });
+            setReady(false);
+          }}
+        />
       </div>
 
       <section className="stack" aria-label={t("referencePlan")}>

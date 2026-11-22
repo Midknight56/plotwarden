@@ -20,6 +20,7 @@ Every production file below has a test listed in `tasks.md`.
 | `template/src/data/mapping.ts` | Heading match, column mapping, per cell checks | data |
 | `template/src/data/csvExport.ts` | Cell escaping and CSV text | data |
 | `template/src/data/importBatch.ts` | `SheetImporter`, `stageImport`, row actions, `commitImport`, `uniqueKeysFor` | data |
+| `template/src/data/importDraft.ts` | A staged import as a draft: table, column choices, left out rows, conflict choices and fixed cells, as plain text (repair 07) | data |
 | `template/src/data/fastEntry.ts` | Fast entry session, repeat aids, paste, draft and recovery file reading | data |
 | `template/src/data/images.ts` | Header guards, orientation, normalise, metadata scan and strip, captions | data |
 | `template/src/data/backup.ts` | `.pkr.zip` write, verify, migrate, restore, file classification | data |
@@ -36,6 +37,7 @@ Every production file below has a test listed in `tasks.md`.
 | `template/src/ui/FastEntry.tsx` | Rows beside a page | ui |
 | `template/src/ui/ReferencePage.tsx` | The pinned page photo and its controls | ui |
 | `template/src/ui/ImportWizard.tsx` | Import steps: file or paste, separator, column match, date order | ui |
+| `template/src/ui/screenDraft.tsx` | One draft for each screen that saves: keep, offer again, discard, recovery file (repair 07) | ui |
 | `template/src/ui/ImportReview.tsx` | The shared review of an import and of typed rows: counts, row cards, Fix row, conflict choices | ui |
 | `template/src/ui/BackupRestore.tsx` | Backup, restore, recovery | ui |
 | `template/src/ui/Settings.tsx`, `Help.tsx` | Settings and help | ui |
@@ -310,7 +312,7 @@ interface RegisterApp<S extends BaseState, C extends { type: string }, E extends
 
 The adapter's `commands` list must hold `BASE_COMMAND_TYPES` and its `decide` must call `decideBase` for them. Words come from `COPY`. `adapter.labels` may replace a word by its key.
 
-Routes (hash): `#/` library, `#/new`, `#/settings`, `#/help`, `#/r/<siteId>` home, `/map`, `/list`, `/plot/<plotId>`, `/map/edit`, `/map/trace`, `/add`, `/add/one`, `/add/fast`, `/add/import`, `/backup`, `/restore`, `/settings`, `/help`. The filter, the selected plot and the search text live in the hash query (`?q=`, `?state=`, `?plot=`) so that Back keeps them. The query never holds a private value other than what the keeper typed in the search box, which stays in the local hash only. Scroll position is saved in `history.state` on leave and restored on return.
+Routes (hash): `#/` library, `#/new`, `#/settings`, `#/help`, `#/r/<siteId>` home, `/map`, `/list`, `/plot/<plotId>`, `/map/edit`, `/map/trace`, `/add`, `/add/one`, `/add/fast`, `/add/import`, `/backup`, `/restore`, `/settings`, `/help`. The filter and the selected plot live in the hash query (`?state=`, `?plot=`) so that Back keeps them. The search text never goes in the address: it lives in `history.state` as `{ q }` beside `scrollY`. `navigate(to, { search })` pushes an entry with that state, a click on a link that must keep the search goes through `keepSearch`, and an address that carries `q` is not read as a search (R22.4). The query never holds a private value. Scroll position is saved in `history.state` on leave and restored on return.
 
 `useLoaded(siteId)` opens the site row, reads the events, replays with `register.replay`, and holds `{ site, state, events, revision }`. `dispatch(commands, options)` runs each command with `register.run` on an evolving state, builds the drafts, calls `commit` with `uniqueKeysFor`, then updates the state, or maps the failure to `Status`. The operation ID of an intent is minted when the intent starts and reused for a retry. While a commit is in flight, `dispatch` returns the same promise for a repeat press.
 

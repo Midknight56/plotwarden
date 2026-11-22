@@ -93,3 +93,22 @@ export async function goHome(page: Page, title: string): Promise<void> {
 export function upload(name: string, text: string, mimeType = "text/csv"): { name: string; mimeType: string; buffer: Buffer } {
   return { name, mimeType, buffer: Buffer.from(text, "utf8") };
 }
+
+/**
+ * R22.2 after a search: no address in the session history holds the searched text, in any encoding, and no `q`
+ * parameter. The text lives in `history.state`, so Back and a reload still find it there.
+ */
+export async function expectSearchOutOfAddress(page: Page, text: string): Promise<void> {
+  const seen = await page.evaluate(() => {
+    const nav = (window as unknown as { navigation?: { entries(): { url: string | null }[] } }).navigation;
+    return { href: location.href, entries: nav === undefined ? [] : nav.entries().map((e) => e.url ?? ""), state: JSON.stringify(history.state) };
+  });
+  const addresses = [seen.href, page.url(), ...seen.entries];
+  const words = text.split(/\s+/).filter((w) => w !== "");
+  for (const address of addresses) {
+    const decoded = decodeURIComponent(address).toLowerCase();
+    expect(/[?&]q=/.test(address), `a q parameter in ${address}`).toBe(false);
+    for (const word of words) expect(decoded.includes(word.toLowerCase()), `"${word}" in the address ${address}`).toBe(false);
+  }
+  expect(seen.state, "the search text is kept in history.state").toContain(text);
+}
