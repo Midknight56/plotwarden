@@ -1,5 +1,5 @@
 // Photos: header guards, orientation, normalise, metadata scan and strip, captions. No React.
-// A file is judged by its bytes, never by its name or its declared type.
+// A file is decided by its bytes, never by its name or its declared type.
 import { LIMITS, checkLimit, checkText } from "../limits";
 import { err, ok } from "../types";
 import type { DomainError, Result, Uuid } from "../types";

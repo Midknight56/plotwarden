@@ -45,6 +45,17 @@ export default defineConfig({
       stderr: "pipe",
     },
     {
+      // The assembled site, as the static host serves it. It needs `npm run build:apps` and `npm run assemble:site`
+      // first. Without them the server refuses to start and says so. Nothing builds it here, so no build races
+      // the other servers over `dist/apps`.
+      command: "npm run preview",
+      url: "http://127.0.0.1:4174/",
+      reuseExistingServer: false,
+      timeout: 60_000,
+      stdout: "ignore",
+      stderr: "pipe",
+    },
+    {
       command: "npm run allot:build && npm run allot:preview",
       url: "http://127.0.0.1:4178/",
       reuseExistingServer: false,

@@ -2,12 +2,35 @@
 
 Plotwarden keeps plot registers on the keeper's own device. There is no server, no login and no sync. Everything runs in the browser and is saved in that browser's own storage.
 
-<!--
-JUDGING BLOCK: reserved place. Nothing is written here yet.
-A later step adds the judging notes between the two markers below.
--->
-<!-- JUDGING BLOCK START -->
-<!-- JUDGING BLOCK END -->
+**Live site:** PLACEHOLDER. The person who publishes the site fills in its address here. It is not live yet.
+
+**Film:** PLACEHOLDER. The person who publishes the film fills in its address here. There is no film yet.
+
+## Judging criteria at a glance
+
+### In short
+
+A warden can find a burial from a paper record and give a family a map. A garden secretary can offer an empty bed and record its rent. We used Kiro to build both registers from one template.
+
+### Potential Impact
+
+Wardens can enter a page beside its photograph or bring in a spreadsheet. Families can take a map home. Garden committees can keep the waiting order and see what each holder paid. Check it in the [guide to the two registers](docs/judge-guide.md).
+
+### Technological Implementation
+
+Kiro worked from written rules for plot spaces, waiting order and visitor details. A reload of a register page with the network off showed the not found page until a test about the address fragment failed first, and then the offline worker was fixed. Check it in the [Kiro build record](docs/kiro-evidence.md).
+
+### Design
+
+The entrance, row and plot code match on screen and on paper. A visitor can search by name or use the plot list. A secretary sees the next applicant beside the available bed. Check it in the [phone views and printed sheets](docs/verification.md), and the [proof pictures](docs/acceptance/layout).
+
+### Innovation/Idea
+
+A burial can stay in one place for generations. A garden plot can change hands every season. One template handles both histories and gives each visitor only the details the keeper selects. Check it in the two apps, [Churchyard Register](apps/churchyard-register) and [Allotment Register](apps/allotment-register), and in the [market stall guide](docs/make-your-own.md).
+
+### Presentation
+
+Follow a warden to a burial, watch a secretary offer a plot, then follow a committee check back to its source. Check it in the captioned film. The film link is the placeholder above.
 
 ## What it is
 
@@ -53,6 +76,21 @@ npm run allot:build && npm run allot:preview      # http://127.0.0.1:4178/
 
 The servers listen on `127.0.0.1` only, on fixed ports. Stop one with Ctrl+C.
 
+The whole site, the hub and both registers, runs from source with `npm run dev` on `http://127.0.0.1:4173/`.
+
+## The site
+
+The site is the hub, both registers, two sample visitor sheets and the Review Desk preview, as static files. To build it:
+
+```
+npm run build:apps
+npm run lock:desk -- --desk <the dist/preview folder of the Review Desk checkout>    # once, on purpose
+npm run assemble:site -- --desk <the dist/preview folder of the Review Desk checkout>
+npm run preview                                                                       # http://127.0.0.1:4174/
+```
+
+`lock:desk` writes `release/desk-preview.lock.json`, which pins the Desk version, git revision and the hash of each preview file. `assemble:site` only reads it. It stops, and writes nothing, if the preview differs by one byte. `docs/judge-guide.md` is a two minute path through the result.
+
 ## Make your own register
 
 `docs/make-your-own.md` makes a third register, a market stall register, from the same template, with no change to the template:
@@ -78,11 +116,14 @@ npm run test:conformance
 npm run test:oracle
 node scripts/check-imports.mjs
 npm run test:browser
+npm run check:public && npm run check:licenses && npm run check:links && npm run check:release
 ```
 
 - The unit, property, conformance and oracle tests run in Vitest. Fees, queue order and tenure at a date are also checked against `scripts/oracle.py`, which uses only the Python standard library.
 - The browser tests run headless with Playwright, one worker, at 360 by 640 and 1920 by 1080. They start their own servers on `127.0.0.1` and stop them. This repository does not install a browser, so a Chromium that Playwright can find must already be present. They cover both registers (entry, layout of every route and at 200 percent zoom, accessibility with axe and the keyboard alone, recovery from two tabs, a full store, a cancelled import and a broken backup) and the market example.
 - `node scripts/check-imports.mjs` fails the build when a layer imports something it must not. For example, the template never imports an app.
+- The browser specs of the site (`release`, `share-print`, `judge-guide`) need the assembled site, so run `npm run build:apps` and `npm run assemble:site` first. They cover direct entry and refresh on every page, the content policy, the offline cache, the two sample visitor files, and the print documents on A4 and Letter.
+- `npm run check:public`, `check:licenses`, `check:links` and `check:release` check public text, notices, links, and the built site with its proof pictures.
 - No test makes a network request.
 
 ## Privacy
@@ -96,9 +137,11 @@ Records stay in the keeper's browser. The app makes no network call while it run
 | `template/` | The shared foundation: records, dates, status, storage, files and screens |
 | `apps/` | The two registers |
 | `examples/` | The market stall example that the generator copies |
+| `site/` | The hub, the two sample visitor pages and the service worker |
+| `release/` | The lock that pins the Review Desk preview |
 | `tools/`, `powers/` | The local inspector and its skills only power |
 | `scripts/` | Import checks, the oracle, the export of the committee files and the app generator |
-| `docs/` | The build log, the guide to a third register and the proof pictures |
+| `docs/` | The guides, the build log and the proof pictures. Start with `docs/judge-guide.md`, `docs/kiro-evidence.md`, `docs/verification.md` and `docs/make-your-own.md`. Also `docs/architecture.md`, `docs/privacy.md`, `docs/backup-format.md`, `docs/exchange-format.md` and `docs/rights.md` |
 | `tests/` | Unit, property, conformance, oracle and browser tests |
 | `.kiro/specs/` | The requirements, design and tasks of each part |
 

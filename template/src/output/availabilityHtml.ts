@@ -88,7 +88,7 @@ html.has-script .js-block{display:flex;flex-direction:column;gap:6px}
 .sel-inner{fill:none;stroke:${ink};stroke-width:3}
 .tab{fill:#F3E3A3;stroke:${ink};stroke-width:2}
 .tab-text{font-weight:700}
-@media print{.day{background:#FFF;border-bottom:2px solid #000}.js-only,.js-block{display:none!important}ul.list li{border-color:#000;background:#FFF}}
+@media print{.day{background:#FFF;border-bottom:2px solid #000}.js-only,.js-block{display:none!important}ul.list li{border-color:#000;background:#FFF}ul.list li.on{background:#EEE}.map{background:#FFF}.bed{fill:#EEE}.walk{stroke:#BBB}.tab{fill:#DDD}}
 `.trim();
 }
 

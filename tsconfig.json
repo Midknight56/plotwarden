@@ -14,6 +14,7 @@
     "isolatedModules": true,
     "skipLibCheck": true,
     "noEmit": true,
+    "allowImportingTsExtensions": true,
     "jsx": "react-jsx",
     "resolveJsonModule": true
   },
@@ -22,6 +23,8 @@
     "template/src/**/*.tsx",
     "apps/*/src/**/*.ts",
     "apps/*/src/**/*.tsx",
+    "site/**/*.ts",
+    "site/**/*.tsx",
     "examples/*/src/**/*.ts",
     "examples/*/src/**/*.tsx",
     "tools/**/*.ts",

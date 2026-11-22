@@ -1,6 +1,6 @@
 # 06 Access and release: tasks
 
-Each task writes its test first, sees it fail on the missing behaviour (a stub that compiles and throws "not implemented", never a missing module), then writes the smallest complete code. A task is ticked only when its test passes. Expected values come from `tests/fixtures/expected/hand-totals.md` and the plan's worked examples. T IDs repeat the owner table in spec 00. Tasks marked **next task** are not built in 07b.
+Each task writes its test first, sees it fail on the missing behaviour (a stub that compiles and throws "not implemented", never a missing module), then writes the smallest complete code. A task is ticked only when its test passes. Expected values come from `tests/fixtures/expected/hand-totals.md` and the plan's worked examples. T IDs repeat the owner table in spec 00. Tasks 6.17 to 6.22 were built in task 08, after the first half.
 
 For the browser specs the screens already existed, so the first run is a run against real screens. It found faults, which are listed in design Z-D12 and were fixed in the app with each check kept.
 
@@ -20,12 +20,12 @@ For the browser specs the screens already existed, so the first run is a run aga
 - [x] 6.14 Browser: recovery. Files: `tests/browser/recovery.spec.ts`. T IDs: browser. Z14.
 - [x] 6.15 Fix what the browser specs found, in the app, with no check loosened. Files: `template/src/ui/{RegisterShell,Dialog,Status,register.css,copyScreens}.tsx`, `template/src/map/sheet.ts`, `apps/*/src/{AllotmentHome,ChurchyardHome}.tsx`, `apps/allotment-register/src/theme.css`, `tests/unit/sheet.test.ts`, `tests/helpers/measureLayout.ts`. T IDs: as found. Z17.
 - [x] 6.16 Log, README and exit gate. Files: `docs/kiro-log.md`, `README.md`, this file. T IDs: none.
-- [ ] 6.17 **Next task.** Hub, visitor landing pages, `site/`. Files: `site/*`. T IDs: none.
-- [ ] 6.18 **Next task.** Service worker, versioned cache, update flow. Files: `site/src/sw.ts`, `scripts/build-sw.mjs`, `tests/unit/offline.test.ts`. T IDs: T31. Z4.
-- [ ] 6.19 **Next task.** Assembly, release checks, freeze. Files: `scripts/{assemble-site,check-release,check-public,check-links}.mjs`, `release/desk-preview.lock.json`, `tests/unit/release.test.ts`. T IDs: T36. Z10.
-- [ ] 6.20 **Next task.** Browser: share and print. Files: `tests/browser/share-print.spec.ts`. T IDs: browser. Z15.
-- [ ] 6.21 **Next task.** Browser: release. Files: `tests/browser/release.spec.ts`. T IDs: browser. Z16.
-
+- [x] 6.17 Hub, visitor landing pages, `site/`. Files: `site/{index.html,vite.config.ts}`, `site/src/{main,Home,VisitorLanding}.tsx`, `site/src/{copy,site.css}`, `site/visitor/{family,seeker}/index.html`, `site/public/{_headers,404.html}`, `tools/site/{visitorFiles,siteServer}.ts`, `scripts/build-visitor.mjs`, `vite.config.ts`, `package.json` (`hub:build`, `build:visitor`, `build:apps`), `tests/unit/siteCopy.test.ts`. T IDs: T35 support. Z10.
+- [x] 6.18 Service worker, versioned cache, update flow. Files: `site/src/{sw,swCore,swRegister,registerMain}.ts`, `scripts/build-sw.mjs`, `tests/unit/offline.test.ts`. T IDs: T31. Z4.
+- [x] 6.19 Assembly, release checks, freeze. Files: `scripts/{assemble-site,lock-desk,build-sw,check-release,check-public,check-licenses,check-links}.mjs`, `scripts/lib/{files,desk,site,siteScan,headers,inventory,publicText}.mjs` and `.d.mts`, `release/desk-preview.lock.json`, `THIRD_PARTY_NOTICES.md`, `package.json` (`lock:desk`, `assemble:site`, `build:sw`, `check:*`), `tests/unit/release.test.ts`. T IDs: T36. Z10.
+- [x] 6.20 Browser: share and print. Files: `tests/browser/share-print.spec.ts`, `template/src/output/{visitorHtml,availabilityHtml}.ts` (gray print rules), `tests/unit/visitor.test.ts`. T IDs: browser. Z15.
+- [x] 6.21 Browser: release. Files: `tests/browser/release.spec.ts`, `tests/helpers/siteOrigin.ts`, `playwright.config.ts` (the site on 4174), `docs/acceptance/layout/site/**`. T IDs: browser. Z16.
+- [x] 6.22 Public docs and the path in the guide. Files: `docs/{judge-guide,kiro-evidence,architecture,privacy,backup-format,exchange-format,verification,rights}.md`, `README.md`, `tests/browser/judge-guide.spec.ts`. T IDs: browser. Z18.
 ## Not settled in spec 06
 
 - **The inspector is built and not switched on.** `.kiro/settings/mcp.json` still has `"disabled": true` for `plot-inspector`, because the agent cannot write that folder. It is ready: `npm run build:inspector` writes `dist/inspector/server.mjs`, and a test starts that file as a process and talks to it. A person sets `"disabled": false`. No tool was called through a real Kiro session, so the reviewer profile's use of the three tools is untried.
@@ -36,6 +36,17 @@ For the browser specs the screens already existed, so the first run is a run aga
 - **The resource times are from fake IndexedDB in Node on one machine,** an AMD Ryzen 9 9950X with Node 24.19: worst of six runs 12.4 ms for a 200 row preview, 8.1 ms for its commit and 1.8 ms for a search over 2,000 plots. A real browser store was not timed, so the reference machine figures of R21.4 are met by this run and not by a recorded browser run.
 - **The 100,000 event limit is tested by setting the stored counter,** not by writing 100,000 events. The domain record limit is tested on a state built with 19,999 and 20,000 records, not through a database.
 - **The market example does not enforce the domain record limit,** has no practice register, no availability screen and no committee checks. The guide says so. The generated app was built and run only inside this checkout, and the dev server of a generated copy was not started by a test. The example's own build and preview were.
-- **The hub, the visitor landing pages, the service worker, the cache, the assembly and the release checks are the next task.** The Z4, Z10, Z15 and Z16 requirements are contracts only. No page was printed.
+- **The hub, the visitor landing pages, the service worker, the cache, the assembly and the release checks are built (tasks 6.17 to 6.22).** What they did not show is listed below, under "Not settled in the release half". No page was printed.
 - **Old proof pictures.** The full browser run re-took the pictures of the earlier specs in `docs/acceptance/layout/`. git shows many of them as changed. Which changes are real was not checked picture by picture, and they were not restored. The new pictures of every route are in `docs/acceptance/layout/routes/`, as small JPEG files: the phone size for every route, the desktop size for a chosen set.
 - **`tests/helpers/measureLayout.ts` changed once,** in `focusRingContrast`: a ring drawn past an `outline-offset` is compared with what is behind the control, not with the control's own fill (design Z-D12). The ring colour, and every other measure, are as they were.
+
+## Not settled in the release half
+
+- **The Desk preview is a copy of a build made 30 seconds before its last commit.** `release/desk-preview.lock.json` pins the revision that the Desk checkout named when the lock was written, and the hash of each file of the preview. It does not show that the preview was built from exactly that commit. The preview was not rebuilt. The Desk repository was only read.
+- **No live address.** Nothing was deployed. The README holds placeholders for the live site and the film. The headers file was read by the local preview server, and by no real host. Whether a real host sends the same headers is not observed.
+- **The worker update was simulated by changing one file on disk.** The browser does not let a test intercept the worker's own update request, so `release.spec.ts` rewrites `dist/site/sw.js` for the length of one test and puts the original bytes back. The step where the old pages close and the new worker takes over is covered by unit tests of `swCore.ts` with in memory fakes, and was not driven in a browser.
+- **A first visit has no worker in charge until the next load.** The worker never claims a page. The offline specs reload once before they go offline.
+- **Print is a PDF made by the browser from the document, not a page on paper.** Paper size is read from the PDF's page boxes. Grayscale is a pixel check in a browser started with coloured text smoothing off, because with it on the edges of letters carry red and blue fringes. Dense map sheets (more than 60 plots), repeated headings and page numbers were not measured in the browser.
+- **Only headless Chromium on one Windows machine.** No Firefox, no WebKit, no real phone, no screen reader. The service worker was not tried in another browser.
+- **Public text checks cover files, not the film or the story.** `check:public` reads the repository and the built pages. It does not read any text kept elsewhere.
+- **Not covered here:** the real host test of the Review Desk, the Desk's own browser specs, and the timing of the site on any device.

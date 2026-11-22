@@ -6,7 +6,22 @@ Plotwarden is MIT licensed (see `LICENSE`). It uses the packages below. Each is 
 
 | Package | Version | Licence | Use |
 |---|---|---|---|
+| react | 19.3.1 | MIT | Screens of both registers and of the site |
+| react-dom | 19.3.1 | MIT | Draws those screens in the browser |
+| scheduler | 0.28.0 | MIT | Used by react-dom |
 | zod | 4.6.7 | MIT | Closed schemas for visitor files |
+| fflate | 0.8.3 | MIT | Backup archives (zip) |
+
+## Inside the Review Desk preview
+
+The Review Desk is built in its own repository. The site holds a copy of its standalone preview at `/review/`, pinned by `release/desk-preview.lock.json`. The preview bundles its own copy of React and the packages below. They are listed in the lock, and `npm run check:licenses` reads that list.
+
+| Package | Version | Licence | Use |
+|---|---|---|---|
+| react | 18.3.1 | MIT | Screens of the Desk preview |
+| react-dom | 18.3.1 | MIT | Draws those screens in the browser |
+| scheduler | 0.23.2 | MIT | Used by react-dom |
+| zod | 4.6.7 | MIT | Closed schemas for review files and return slips |
 
 ## Development and test only
 
@@ -31,4 +46,4 @@ axe-core and its Playwright wrapper are used only by the browser specs, from `no
 
 Python is used only through its standard library, in `scripts/oracle.py`.
 
-Packages for CSV (Papa Parse), archives (fflate), React and axe-core are added by the specs that use them, and listed here when they are.
+`npm run check:licenses` fails when a package that ships in the apps or in the Desk preview has no row here, or a row with another version or another licence than the package states.

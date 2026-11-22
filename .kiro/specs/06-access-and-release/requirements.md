@@ -2,7 +2,7 @@
 
 This spec covers what makes the two registers safe to put in front of a person: a full privacy scan, preferences, the practice registers, limits, the local inspector and its power, the third use recipe, the copy catalog, and the browser specs for entry, layout, access and recovery. It implements R22, R23, R24, R14.5 and R25.2 of spec 00 and may not contradict them.
 
-It is built in two halves. This task (07b) builds the first half. The second half is marked **next task** and is not built here: the hub and visitor landing pages in `site/`, the service worker and offline cache (T31), the release assembly and freeze (T36), and the browser specs `share-print.spec.ts` and `release.spec.ts`. Their requirements are written here so the next task starts from a contract.
+It was built in two halves. Task 07b built the first half. Task 08 built the second: the hub and visitor landing pages in `site/`, the service worker and offline cache (T31), the release assembly and checks (T36), the browser specs `share-print.spec.ts` and `release.spec.ts`, and the public docs.
 
 Terms. **Canary** is an invented private string that must never reach a public or committee file, a log, a key or a file name. **Fixture** is one of three invented in memory registers the inspector knows: `lantern-fold`, `thimble-beds`, `market-stalls`. **Resolved motion** is the motion the page runs after the system and the app setting are combined. **Practice register** is a walkthrough site in its own workspace.
 
@@ -44,12 +44,14 @@ Tests: T30 (`tests/unit/walkthrough.test.ts`), browser `entry-library.spec.ts`. 
 
 ## Z4 Offline cache
 
-Tests: T31 (`tests/unit/offline.test.ts`). Implements R22.1, R22.3. **Next task. Not built here.**
+Tests: T31 (`tests/unit/offline.test.ts`). Implements R22.1, R22.3. Built in task 08.
 
 1. When a keeper has loaded an app once and then goes offline, a fresh navigation to the app shall open it from a versioned cache of static files.
 2. When a new version is published, the old and new shell files shall never mix. A page that is open shall say "A new version is ready. Save your work before reopening."
 3. When the cache is read, it shall hold no record, no backup, no visitor file and no request that carried a private value.
 4. When a downloaded visitor file is opened cold with the network off, it shall be readable and searchable.
+5. When a page of the site is asked for with an address that has a fragment (`#/r/<id>`), the worker shall answer it as the page without the fragment, because a host never receives a fragment.
+6. When a request has a query, a body method or a range, or is for another origin, a `blob:` address or a `data:` address, the worker shall leave it to the network and store nothing from it.
 
 ## Z5 Limits, the rest
 
@@ -106,11 +108,16 @@ Tests: T35 (`tests/unit/copy.test.ts`). Implements R23.1, R31.12. Built now.
 
 ## Z10 Release
 
-Tests: T36 (`tests/unit/release.test.ts`), browser `release.spec.ts`. Implements R22. **Next task. Not built here.**
+Tests: T36 (`tests/unit/release.test.ts`), browser `release.spec.ts`. Implements R22. Built in task 08.
 
 1. When the site is assembled, a wrong Desk preview digest shall stop it.
 2. When a direct route is reloaded on the static build, it shall not be blank.
 3. When an app build is scanned, it shall hold no billing endpoint and no remote asset.
+4. When `assemble:site` runs, it shall read `release/desk-preview.lock.json` and never write it. The lock is written by `lock:desk` alone, and not replaced without `--replace`.
+5. When a page of the built site is checked, exactly one content policy shall match it, and it shall name no outside origin and allow no inline or eval script. The two sample visitor files shall carry the policy that they hold for themselves.
+6. When the site is checked, it shall hold fewer than 500 files and under 5 MiB, and no folder or file that a host would run.
+7. When the release is checked, every route of both registers shall have a phone proof picture, every page of the site a phone and a desktop picture, and each shall be a picture as wide as its viewport.
+8. When the repository is checked, public text shall hold no dash between words, no name of a model or its maker, no word about entering or winning and no local path, every shipped package shall have its row in the notices, and every link of the README and `docs/` shall resolve.
 
 ## Z11 Browser: entry and library
 
@@ -121,7 +128,7 @@ Tests: `tests/browser/entry-library.spec.ts`, both apps, both sizes. Implements 
 3. When the address holds an unknown route, the page shall say "Page not found" and "Open registers" shall work, with focus on the heading.
 4. When a register is removed, the typed site name shall be required and focus shall return to a sensible control.
 
-The hub at `/` and the direct entry directories are **next task**.
+The hub at `/` and the direct entry directories are covered by `release.spec.ts` (Z16).
 
 ## Z12 Browser: layout
 
@@ -155,11 +162,31 @@ Tests: `tests/browser/recovery.spec.ts`, both apps, both sizes. Implements R9, R
 
 ## Z15 Browser: share and print
 
-Tests: `tests/browser/share-print.spec.ts`. **Next task. Not built here.**
+Tests: `tests/browser/share-print.spec.ts`, both sizes. Built in task 08.
+
+1. When the private report of each register and the two visitor print documents are taken from the register's print frame, each shall make a PDF whose page boxes are A4 or US Letter, as the Settings paper says, with no sideways overflow, and no script, link, form or address in the document.
+2. When those documents are drawn in print media in a browser with coloured text smoothing off, no more than 0.05 percent of their pixels shall be a colour that is not a gray.
+3. When a visitor print document and its PDF are searched for the private canaries of its fixture, none shall be found. The staff documents shall hold the keeper's own names and figures.
+4. When a visitor file is downloaded from a register and opened from disk with the network off, it shall be readable and searchable, and shall make no request. It shall print to A4 and to Letter, and its PDF shall hold no canary.
+5. A page on paper is not claimed. The document is checked as the PDF that the browser makes.
 
 ## Z16 Browser: release
 
-Tests: `tests/browser/release.spec.ts`. **Next task. Not built here.**
+Tests: `tests/browser/release.spec.ts`, both sizes. Built in task 08.
+
+1. When each direct entry (`/`, `/churchyard/`, `/allotments/`, `/review/`, `/visitor/family/`, `/visitor/seeker/` and the two sample files) is opened and refreshed, it shall be a page with a heading, make no request beyond the site, have no failed request, no missing picture and no console error, and ask for no login.
+2. When a folder is asked for without its slash it shall go to the folder. When an address is not a page it shall be the 404 page with the status 404, and lead back to the start.
+3. When the hub, its About route, the 404 page and each visitor page are measured, the layout measures shall pass at both sizes, and a proof picture of each shall be saved in `docs/acceptance/layout/site/`.
+4. When the headers of each page are read, there shall be one policy, with no outside origin.
+5. When the service worker is in charge, its cache shall hold exactly the files of its manifest. Every page shall open with the network off, a register started offline shall be kept, and the cache shall hold nothing from it. When a new version is published, the page shall say so and both caches shall stay while the old page is open.
+
+## Z18 The public docs
+
+Tests: `tests/browser/judge-guide.spec.ts`, `check:links`, `check:public`. Built in task 08.
+
+1. When `docs/judge-guide.md` is followed, each step shall work on the built site. The spec runs the steps.
+2. When the README is read, its criteria block shall have the heading and the five criterion names of the plan, a "Check it" link for each, and clear placeholders for the live site and the film.
+3. When `docs/kiro-evidence.md` and `docs/verification.md` are read, each claim shall be one that the repository shows. A result that was not observed shall be named as not observed.
 
 ## Z17 What the first runs of the browser specs found
 

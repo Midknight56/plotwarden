@@ -1,0 +1,214 @@
+/* The look of the hub and the two visitor pages. The same paper and ink as the registers, the same sky strip,
+   plain edges and large targets. Edge inset 16 px, gap 12 px or more, target 44 by 44 px, text 16 px.
+   Nothing here moves, so there is no motion to reduce. Ink #22252C on ivory #FAF5E9. */
+
+:root {
+  --ink: #22252c;
+  --paper: #faf5e9;
+  --muted: #4a4d55;
+  --field: #fffef8;
+  --sky: #232a5c;
+  --leaf: #2f6b4f;
+  --focus: #0b4faf;
+}
+
+@media (prefers-contrast: more) {
+  :root {
+    --ink: #000000;
+    --paper: #ffffff;
+    --muted: #000000;
+    --field: #ffffff;
+    --focus: #0000cc;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+}
+
+h1,
+h2,
+h3,
+.brand {
+  margin: 0;
+  line-height: 1.25;
+  font-family: Georgia, "Times New Roman", serif;
+  letter-spacing: 0.01em;
+}
+
+h1 {
+  font-size: 28px;
+}
+
+h2 {
+  font-size: 22px;
+}
+
+h3 {
+  font-size: 18px;
+}
+
+p,
+ul {
+  margin: 0;
+}
+
+p,
+li,
+h1,
+h2,
+h3 {
+  overflow-wrap: anywhere;
+}
+
+.plain {
+  list-style: none;
+  padding: 0;
+}
+
+/* The sky strip. Its first row holds the lantern and nothing else, so no word ever sits on a picture. */
+.sky {
+  border-bottom: 2px solid var(--ink);
+}
+
+.sky::before {
+  content: "";
+  display: block;
+  height: 72px;
+  border-bottom: 3px solid var(--ink);
+  background: url("../../assets/gate-lantern.svg") no-repeat right 16px top 0 / auto 100%, var(--sky);
+}
+
+.sky-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+}
+
+.brand {
+  font-size: 22px;
+  font-weight: 700;
+}
+
+nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+main {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+  max-width: 64rem;
+  margin: 0 auto;
+  padding: 24px 16px;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.tagline {
+  font-size: 18px;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+}
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 8px 16px;
+  border: 2px solid var(--ink);
+  background: var(--ink);
+  color: var(--paper);
+  font-weight: 700;
+  text-align: center;
+  text-decoration: none;
+}
+
+.button.secondary {
+  background: var(--field);
+  color: var(--ink);
+}
+
+a:focus-visible,
+h1:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 3px;
+}
+
+h1:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* The choices. One column on a phone, three across on a wide page. Each has a bar of its own colour. */
+.choices {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+}
+
+.choice {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  min-width: 0;
+  padding: 16px;
+  border: 2px solid var(--ink);
+  border-left-width: 10px;
+  background: var(--field);
+}
+
+.choice.church {
+  border-left-color: var(--sky);
+}
+
+.choice.garden {
+  border-left-color: var(--leaf);
+}
+
+.choice.desk {
+  border-left-color: var(--muted);
+}
+
+@media (min-width: 900px) {
+  .choices {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+noscript {
+  display: block;
+  padding: 16px;
+}

@@ -292,6 +292,15 @@ describe("T22 public words (C5.1, C5.4)", () => {
 import { FAMILY_WORD_KEYS, buildFamilyHtml, visitorFileName } from "../../template/src/output/visitorHtml";
 import { FAMILY_WORDS } from "../helpers/familyWords";
 
+
+/** The rules of the `@media print` block of a visitor file's own style. */
+function printRules(html: string): string {
+  const start = html.indexOf("@media print{");
+  expect(start, "the file has print rules").toBeGreaterThan(-1);
+  return html.slice(start, html.indexOf("</style>", start));
+}
+
+const GRAY = "#(?:([0-9a-f]{2})\\1\\1|([0-9a-f])\\2\\2)\\b";
 describe("T22 the family page (C5.7)", () => {
   const page = (file: FamilyFile = built().file) => buildFamilyHtml(file, FAMILY_WORDS);
 
@@ -305,6 +314,10 @@ describe("T22 the family page (C5.7)", () => {
     expect(html).toContain('<html lang="en-GB">');
   });
 
+  it("prints in grays: the colours of the map that are tan on screen are gray in the print rules (found in the browser, 6.20)", () => {
+    const rules = printRules(page());
+    for (const part of [".walk{stroke", ".tab{fill"]) expect(rules, part).toMatch(new RegExp(`${part.replace(/[{.]/g, "\\$&")}:${GRAY}`, "i"));
+  });
   it("carries its own data as closed JSON that parses back to the same file", () => {
     const file = built().file;
     const html = page(file);
@@ -665,6 +678,12 @@ describe("T22 the availability page (A6.6)", () => {
   });
   const page = (file: AvailabilityFile = gbuilt().file) => buildAvailabilityHtml(file, AVAILABILITY_WORDS);
 
+  it("prints in grays: the colours of the map that are green or yellow on screen are gray in the print rules (found in the browser, 6.20)", () => {
+    const rules = printRules(page());
+    for (const part of [".map{background", ".bed{fill", ".walk{stroke", ".tab{fill", "ul.list li.on{background"]) {
+      expect(rules, part).toMatch(new RegExp(`${part.replace(/[{.]/g, "\\$&")}:${GRAY}`, "i"));
+    }
+  });
   it("is sealed: a strict policy, no remote address, no form, no image, one data block and one script", () => {
     const html = page();
     expect(html).toMatch(/<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:; form-action 'none'; base-uri 'none'">/);

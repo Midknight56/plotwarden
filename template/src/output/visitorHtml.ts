@@ -100,7 +100,7 @@ html.has-script .js-only{display:inline-flex;align-items:center;justify-content:
 .sel-inner{fill:none;stroke:${ink};stroke-width:3}
 .tab{fill:#E4D9BE;stroke:${ink};stroke-width:2}
 .tab-text{font-weight:700}
-@media print{.sky{background:#FFF;color:#000;border-bottom:2px solid #000}.sky p{color:#000}.js-only,.search{display:none!important}ul.list li{border-color:#000;background:#FFF}body.only-selected ul.list li:not(.on){display:none}}
+@media print{.sky{background:#FFF;color:#000;border-bottom:2px solid #000}.sky p{color:#000}.js-only,.search{display:none!important}ul.list li{border-color:#000;background:#FFF}.walk{stroke:#BBB}.tab{fill:#DDD}body.only-selected ul.list li:not(.on){display:none}}
 `.trim();
 }
 
