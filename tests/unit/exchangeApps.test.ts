@@ -408,9 +408,9 @@ describe("Thimble Beds (hand totals 5.6, 6.3 and 6.4)", () => {
       expect(new Set(words).size).toBe(words.length);
     });
 
-    it("sends a late offer to the offers and a late fee to the payments", () => {
+    it("sends a late offer to the offers and a late fee to the payments of its own charge", () => {
       expect(allotReviewSupport.link(env.state, { rule: "offer_late", subjectId: offerId })).toBe("offer");
-      expect(allotReviewSupport.link(env.state, { rule: "fee_late", subjectId: b02Charge })).toBe("payments");
+      expect(allotReviewSupport.link(env.state, { rule: "fee_late", subjectId: b02Charge })).toBe(`payments/${b02Charge}`);
     });
 
     it("gives no route for a rule it does not own", () => {

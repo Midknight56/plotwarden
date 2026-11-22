@@ -364,7 +364,7 @@ describe("reading a return slip in Thimble Beds", () => {
     if (!built.ok) throw new Error("slip");
     const data = bytes(encodeSlip(built.slip).ok ? JSON.stringify(built.slip) : "");
     const first = readSlipFor({ bytes: data, site: env.site, state: env.state, adapter, today: ON });
-    expect(first.ok && first.rows.map((r) => [r.status, r.link])).toEqual([["ready", "offer"], ["ready", "payments"]]);
+    expect(first.ok && first.rows.map((r) => [r.status, r.link])).toEqual([["ready", "offer"], ["ready", `payments/${chargeId("B02:2025")}`]]);
     await env.must([{ type: "record_receipt", receiptId: gid("r:part"), chargeId: chargeId("B02:2025"), amount: 1000 }], ON);
     const second = readSlipFor({ bytes: data, site: env.site, state: env.state, adapter, today: ON });
     expect(second.ok && second.rows.map((r) => r.status)).toEqual(["ready", "changed"]);

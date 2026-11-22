@@ -43,11 +43,26 @@ The hub says what Plotwarden is and offers three choices: **Open Churchyard Regi
 ## 3. Review Desk preview
 
 1. From the hub choose **Open Review Desk preview**.
-2. Choose **Choose file** and pick the `committee-review-2026-04-20.json` file from step 1.7. Choose **Add register**. The Desk says "Added Site 1. 2 open checks."
-3. Choose **Open the first item**, then **Mark checked**. It says "Decision saved on this device."
-4. Choose **Return slips**, then **Download return slip for Site 1**. The slip holds no name and no text.
+2. Choose **Choose file** and pick the `committee-review-2026-04-20.json` file from step 1.7. Choose **Add register**. The Desk says "Added Churchyard · Site 1. 2 open checks."
+3. Choose **Open the first item**, then **Mark checked**. It says "Decision saved on this device." Choose **Back to meeting list**. On the card "Churchyard · Site 1 · Record 2 · Uncertain reading" choose **Open item**, then **Mark checked**.
+4. Choose **Return slips**, then **Download return slip for Churchyard · Site 1**. The file is `committee-return-` and the date. The slip holds no name and no text.
+5. Open the hub again. Choose **Open Churchyard Register**, then **Open Lantern Fold**.
+6. Choose **Committee review**, then **Open return slip** and pick the slip file from step 4. The rows "Record 1 · Check the location" and "Record 2 · Read the stone again" both read "Ready to check".
+7. On "Record 1 · Check the location" choose **Open matching record**. The list "Burials with no plot" opens. Go back, open the slip again, and on "Record 2 · Read the stone again" choose **Open matching record**. The "Burial record" opens.
 
 Without a file, **Open walkthrough** on the Desk home shows invented sites.
+
+### Thimble Beds
+
+This does the same for the garden. It follows section 2, so Thimble Beds holds what you did there.
+
+1. Open the hub again. Choose **Open Allotment Register**, then **Open Thimble Beds**.
+2. Choose **Committee review**, **Preview review file**, then **Download review file**. The file is `committee-review-2026-04-20.json`. It holds one check, a late fee.
+3. From the hub choose **Open Review Desk preview**. Choose **Choose file** and pick that file. Choose **Add register**. The Desk says "Added Allotments · Site 1. 1 open check."
+4. Choose **Meeting list**. On the card "Allotments · Site 1 · Record 1 · Due fee" choose **Open item**, then **Mark checked**.
+5. Choose **Return slips**, then **Download return slip for Allotments · Site 1**.
+6. Open the hub again. Choose **Open Allotment Register**, then **Open Thimble Beds**.
+7. Choose **Committee review**, then **Open return slip** and pick the slip file from step 5. The row "Record 1 · Check the payment" reads "Ready to check". Choose **Open matching record**. **Season fees** opens on the fee that raised the check.
 
 ## Then try these
 

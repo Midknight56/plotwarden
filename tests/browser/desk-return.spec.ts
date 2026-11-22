@@ -530,7 +530,7 @@ test.describe("Thimble Beds", () => {
     const fee = row(page, "Record 2 · Check the payment");
     for (const r of [offer, fee]) await expect(r.getByText("Ready to check", { exact: true })).toBeVisible();
     await expect(offer.getByRole("link", { name: "Open matching record" })).toHaveAttribute("href", /\/offer$/);
-    await expect(fee.getByRole("link", { name: "Open matching record" })).toHaveAttribute("href", /\/payments$/);
+    await expect(fee.getByRole("link", { name: "Open matching record" })).toHaveAttribute("href", /\/payments\/[0-9a-f-]+$/);
     await check(page, "garden-slip-ready");
 
     await page.getByRole("button", { name: "Record receipt", exact: true }).click();

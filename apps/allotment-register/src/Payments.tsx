@@ -1,7 +1,7 @@
 // Season fees. Each charge belongs to one tenancy in one season. The secretary records a payment already received
 // elsewhere, in whole pence, and the balance follows: it is never negative and never more than the charge. A payment
 // that is too large is refused and the input stays as it was. A payment is undone only by a reversal of its exact amount.
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { parseMoney } from "../../../template/src/money";
 import { Button, ButtonLink, Notice, TextField } from "../../../template/src/ui/controls";
@@ -58,7 +58,7 @@ function ReverseReceiptForm({ receipt, code, onDone }: { receipt: LedgerEntry; c
   );
 }
 
-function ChargeCard({ summary }: { summary: ChargeSummary }) {
+function ChargeCard({ summary, target }: { summary: ChargeSummary; target: boolean }) {
   const { t, newId } = useShell();
   const open = useAllot();
   const money = useMoney();
@@ -71,6 +71,14 @@ function ChargeCard({ summary }: { summary: ChargeSummary }) {
   const [note, setNote] = useState<string | undefined>();
   const receiptId = useRef(newId());
   const errors = { ...intent.fieldErrors, ...local };
+  const card = useRef<HTMLLIElement>(null);
+  // A committee check names this charge. The shell puts focus on the page heading and scrolls to the top when a page
+  // opens, so wait for that, then bring the charge into view. No animation, and focus stays where the shell put it.
+  useEffect(() => {
+    if (!target) return undefined;
+    const wait = window.setTimeout(() => card.current?.scrollIntoView({ block: "start" }), 0);
+    return () => window.clearTimeout(wait);
+  }, [target]);
 
   const charge = summary.charge;
   const tenancy = open.state.tenancies[charge.tenancyId];
@@ -111,7 +119,7 @@ function ChargeCard({ summary }: { summary: ChargeSummary }) {
   };
 
   return (
-    <li className="card">
+    <li ref={card} className="card" {...(target ? { "aria-current": "true" as const } : {})}>
       <h3>{t("chargeLine", { season: season?.name ?? "", plot: code, name: holder })}</h3>
       <p className={`badge ${summary.status === "overdue" ? "bad" : summary.status === "paid" ? "good" : ""}`}>{t(STATUS_KEYS[summary.status])}</p>
       {charge.waiver === undefined ? null : <p>{`${t("waiveFee")}: ${charge.waiver}`}</p>}
@@ -174,7 +182,8 @@ const reversalOf = (ledger: Record<string, LedgerEntry>, entryId: string): Ledge
 const reversalDate = (ledger: Record<string, LedgerEntry>, entryId: string): string => reversalOf(ledger, entryId)?.on ?? "";
 const reversalReason = (ledger: Record<string, LedgerEntry>, entryId: string): string => reversalOf(ledger, entryId)?.reason ?? "";
 
-export function PaymentsScreen() {
+/** `arg` is the charge a committee check names (`#/r/<site>/payments/<charge>`). Its season is shown even when it is a past one. */
+export function PaymentsScreen({ arg }: { arg?: string }) {
   const { t } = useShell();
   const open = useAllot();
   const base = `#/r/${open.site.id}`;
@@ -182,7 +191,10 @@ export function PaymentsScreen() {
   const [showPrevious, setShowPrevious] = useState(false);
   const seasons = useMemo(() => Object.values(open.state.seasons).sort((a, b) => (a.start < b.start ? 1 : -1)), [open.state.seasons]);
   const current = seasons.find((s) => s.start <= today && today < s.endExclusive) ?? seasons[0];
-  const shown = showPrevious ? seasons : current === undefined ? [] : [current];
+  const named = arg === undefined ? undefined : open.state.ledger[arg];
+  const namedCharge = named?.type === "charge" ? named.entryId : undefined;
+  const namedSeason = named?.type === "charge" ? named.seasonId : undefined;
+  const shown = showPrevious ? seasons : seasons.filter((s) => s === current || s.seasonId === namedSeason);
   const natural = (a: string, b: string) => a.localeCompare(b, "en", { numeric: true });
 
   return (
@@ -208,7 +220,7 @@ export function PaymentsScreen() {
             {charges.length === 0 ? <p>{t("noChargesInSeason")}</p> : null}
             <ul className="cards plain">
               {charges.map((s) => (
-                <ChargeCard key={s.charge.entryId} summary={s} />
+                <ChargeCard key={s.charge.entryId} summary={s} target={s.charge.entryId === namedCharge} />
               ))}
             </ul>
           </section>

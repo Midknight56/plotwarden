@@ -62,10 +62,10 @@ function allotPrivateNames(state: AllotState): string[] {
   return [...new Set(Object.values(state.people).map((p) => p.displayName.trim()).filter((n) => n !== ""))];
 }
 
-/** The staff screen of the record behind a check. */
+/** The staff screen of the record behind a check. A late fee goes to the season fees, named by its own charge, so a past season opens too. */
 function allotReviewLink(_state: AllotState, source: { rule: string; subjectId: string }): string | undefined {
   if (source.rule === "offer_late") return "offer";
-  if (source.rule === "fee_late") return "payments";
+  if (source.rule === "fee_late") return `payments/${source.subjectId}`;
   return undefined;
 }
 

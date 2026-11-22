@@ -119,3 +119,13 @@ The Desk is built in `plotwarden-review-desk`. It shall vendor the pinned copy w
 - **T26 `tests/persistence.test.ts`.** Desk decisions survive a route remount, a reload, disable and enable. A stale tab cannot overwrite another tab's decision. A failed save keeps the list and offers the slip download. Removing a site confirms its site and issue counts first.
 - **T27 `tests/manifest.test.ts`, `tests/provenance.test.ts`.** The manifest entry is `dist/host/index.mjs`. The bundle exports `DeskPage` as default and marks React and ReactDOM external. `check-provenance` recomputes the SHA 256 of every file under `vendor/exchange` and fails on any file not in `provenance.json`, any hash that differs, or an import outside `vendor/exchange`. The vendored `vectors.json` passes against the vendored module.
 - **Browser and host.** The Desk accepts the review files exported by both built apps (Lantern Fold: one unclear reading, one unplaced burial; Thimble Beds: one late offer, one late fee), shows the two sites side by side without mixing equal labels, and produces slips that this register reads as in X5. No Desk action starts an agent, a scheduled task or a network request.
+
+## X12 A slip made by the Desk opens its own record
+
+Tests: browser `judge-guide.spec.ts` at 360 by 640 and 1920 by 1080, on the assembled site. Implements X11 (Browser and host) end to end. Steps in `docs/judge-guide.md`, section 3.
+
+1. When a review file is downloaded from Lantern Fold on the assembled site, added in the Desk at `/review/`, marked checked there, and returned as a slip, the Committee review screen of Lantern Fold shall read the slip as "Ready to check" on the row of each decision. "Open matching record" on the row of the unplaced burial shall open "Burials with no plot". "Open matching record" on the row of the unclear reading shall open that "Burial record".
+2. When a review file is downloaded from Thimble Beds on the assembled site, added in the Desk, marked checked there, and returned as a slip, the Committee review screen of Thimble Beds shall read the slip as "Ready to check", and "Open matching record" on the late fee row shall open "Season fees".
+3. The slip in both cases is the file the Desk downloaded, read as it came. It is not built by the shared module in the test. The two registers and the Desk are opened from one origin, so the review file and the slip cross between them as files only.
+4. The guide shall say each of these steps in the same click for click style, and the spec shall fail if a word the spec clicks is missing from section 3 of the guide.
+5. The run shall make no request outside the site origin and shall log no console error.
