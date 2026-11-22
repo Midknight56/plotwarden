@@ -9,7 +9,7 @@ import type { Point } from "../../template/src/map/coordinates";
 import { emptyMap } from "../../template/src/map/edit";
 import type { MapState } from "../../template/src/map/edit";
 import { buildSheet } from "../../template/src/map/sheet";
-import type { SheetPlotInput } from "../../template/src/map/sheet";
+import type { Label, SheetModel, SheetPlotInput } from "../../template/src/map/sheet";
 
 const rect = (x0: number, y0: number, x1: number, y1: number): Point[] => [
   [x0, y0],
@@ -199,7 +199,10 @@ describe("sections, paths, gate and north", () => {
     });
 
   it("labels a section above its outline", () => {
-    const section = buildSheet({ map: m(), plots: plots2() }, { width: 400 }).sections[0];
+    // The path of the shared fixture lies on the top edge of this outline, so no label could sit above the outline
+    // and keep clear of that path (A12). This test is about the place above the outline, so it has the section alone.
+    const alone = map({ sections: { s: { sectionId: "s", name: "Paper", displayOrder: 0, outline: rect(0, 0, 200, 100) } }, north: 15 });
+    const section = buildSheet({ map: alone, plots: plots2() }, { width: 400 }).sections[0];
     expect(section?.name).toBe("Paper");
     expect(section?.label.text).toBe("Paper");
     expect(section?.label.x).toBeCloseTo(28, 6);
@@ -287,5 +290,196 @@ describe("the view", () => {
       expect(fromScreen(toScreen(p, sheet.view), sheet.view)).toEqual({ ok: true, value: p });
     }
     expect(toScreen([0, 0], sheet.view).map((n) => Math.round(n * 1000) / 1000)).toEqual([24, 224]);
+  });
+});
+
+// Labels keep clear of lines, tabs and each other (spec 04, A12). Seen in the churchyard map: the gate label
+// sat on the path dots and a section label touched the paper tab of the selected plot. The checks below
+// are written from the rule, with their own estimate of the size of a letter and their own distances.
+describe("labels keep clear (A12)", () => {
+  const LETTER = 7.4; // a little wider than the drawing assumes, so the check is the stricter one
+
+  interface Box {
+    x0: number;
+    y0: number;
+    x1: number;
+    y1: number;
+  }
+
+  const boxOf = (label: Label): Box => {
+    const w = label.text.length * LETTER * (label.size / 12);
+    const x0 = label.anchor === "start" ? label.x : label.anchor === "middle" ? label.x - w / 2 : label.x - w;
+    return { x0, y0: label.y - label.size, x1: x0 + w, y1: label.y + 3 };
+  };
+
+  const overlap = (a: Box, b: Box, gap = 0): boolean => a.x0 < b.x1 + gap && b.x0 < a.x1 + gap && a.y0 < b.y1 + gap && b.y0 < a.y1 + gap;
+
+  /** The shortest distance from a box to a line, found by walking along the line. */
+  function distance(box: Box, line: readonly (readonly [number, number])[]): number {
+    let best = Infinity;
+    for (let i = 0; i + 1 < line.length; i++) {
+      const a = line[i] as readonly [number, number];
+      const b = line[i + 1] as readonly [number, number];
+      const length = Math.hypot(b[0] - a[0], b[1] - a[1]);
+      const steps = Math.max(1, Math.ceil(length / 1));
+      for (let s = 0; s <= steps; s++) {
+        const x = a[0] + ((b[0] - a[0]) * s) / steps;
+        const y = a[1] + ((b[1] - a[1]) * s) / steps;
+        const dx = Math.max(box.x0 - x, 0, x - box.x1);
+        const dy = Math.max(box.y0 - y, 0, y - box.y1);
+        best = Math.min(best, Math.hypot(dx, dy));
+      }
+    }
+    return best;
+  }
+
+  const north = (m: SheetModel): Box => ({ x0: m.north.x - 14, y0: m.north.y - 18, x1: m.north.x + 14, y1: m.north.y + 12 });
+
+  function checkSheet(m: SheetModel, name: string): void {
+    const labels: { what: string; label: Label }[] = [];
+    for (const s of m.sections) labels.push({ what: `section ${s.name}`, label: s.label });
+    for (const p of m.paths) labels.push({ what: `path ${p.name}`, label: p.label });
+    if (m.gate !== undefined) labels.push({ what: "gate", label: m.gate.label });
+    for (const p of m.plots) if (p.label !== undefined) labels.push({ what: `plot ${p.code}`, label: p.label });
+    for (const { what, label } of labels) {
+      const b = boxOf(label);
+      expect(b.x0, `${name}: ${what} left edge`).toBeGreaterThanOrEqual(8);
+      expect(b.x1, `${name}: ${what} right edge`).toBeLessThanOrEqual(m.width - 8);
+      expect(b.y0, `${name}: ${what} top edge`).toBeGreaterThanOrEqual(8);
+      expect(b.y1, `${name}: ${what} bottom edge`).toBeLessThanOrEqual(m.height - 8);
+      if (m.tab !== undefined) {
+        const tab: Box = { x0: m.tab.x, y0: m.tab.y, x1: m.tab.x + m.tab.width, y1: m.tab.y + m.tab.height };
+        expect(overlap(b, tab, 3), `${name}: ${what} touches the tab`).toBe(false);
+      }
+      expect(overlap(b, north(m), 3), `${name}: ${what} touches the north arrow`).toBe(false);
+      for (const path of m.paths) {
+        expect(distance(b, path.points), `${name}: ${what} is too near the line of ${path.name}`).toBeGreaterThanOrEqual(3.5);
+      }
+      // The dashed outline of a section is a line too. Only a section's own name sits just above its own outline.
+      for (const section of m.sections) {
+        if (section.points === undefined || what === `section ${section.name}`) continue;
+        const closed = [...section.points, section.points[0] as readonly [number, number]];
+        expect(distance(b, closed), `${name}: ${what} is too near the outline of ${section.name}`).toBeGreaterThanOrEqual(2.5);
+      }
+      if (m.gate !== undefined && what !== "gate") {
+        expect(overlap(b, { x0: m.gate.x - 8, y0: m.gate.y - 8, x1: m.gate.x + 8, y1: m.gate.y + 8 }, 3), `${name}: ${what} touches the gate mark`).toBe(false);
+      }
+    }
+    for (let i = 0; i < labels.length; i++) {
+      for (let j = i + 1; j < labels.length; j++) {
+        const a = labels[i] as (typeof labels)[number];
+        const c = labels[j] as (typeof labels)[number];
+        expect(overlap(boxOf(a.label), boxOf(c.label), 1), `${name}: ${a.what} touches ${c.what}`).toBe(false);
+      }
+    }
+    if (m.gate !== undefined) {
+      const gate = boxOf(m.gate.label);
+      expect(overlap(gate, { x0: m.gate.x - 8, y0: m.gate.y - 8, x1: m.gate.x + 8, y1: m.gate.y + 8 }, 3), `${name}: the gate label touches the gate mark`).toBe(false);
+    }
+  }
+
+  const footprint = (index: number, columns: number, rowsSouth: number): Point[] => {
+    const x = 1000 + (index % columns) * 1100;
+    const y = index >= rowsSouth ? 2900 : 1200;
+    return rect(x, y, x + 900, y + 1100);
+  };
+
+  /** Lantern Fold as the churchyard draws it: twelve plots in two rows, a walk between them and a gate at its west end. */
+  function yew(): { m: MapState; inputs: SheetPlotInput[] } {
+    const shapes: Record<string, Point[]> = {};
+    const inputs: SheetPlotInput[] = [];
+    for (let i = 0; i < 12; i++) {
+      const code = `Y${String(i + 1).padStart(2, "0")}`;
+      shapes[code] = footprint(i, 6, 6);
+      inputs.push({ plotId: code, code, mark: { state: i % 3 === 0 ? "taken" : "free", needsChecking: false } });
+    }
+    const m = map({
+      shapes,
+      sections: { s: { sectionId: "s", name: "Yew Walk", displayOrder: 0, outline: rect(600, 800, 7800, 4400) } },
+      paths: { p: { pathId: "p", name: "Yew Walk", points: [[700, 2600], [7600, 2600]] } },
+      gate: { name: "Main gate", at: [500, 2600] },
+      north: 0,
+    });
+    return { m, inputs };
+  }
+
+  /** Thimble Beds: two rows of three beds, a grass walk and a gate on the west edge. */
+  function beds(): { m: MapState; inputs: SheetPlotInput[] } {
+    const shapes: Record<string, Point[]> = {};
+    const inputs: SheetPlotInput[] = [];
+    for (let i = 0; i < 6; i++) {
+      const code = `B0${i + 1}`;
+      shapes[code] = rect(1000 + (i % 3) * 1700, i >= 3 ? 3300 : 900, 2500 + (i % 3) * 1700, (i >= 3 ? 3300 : 900) + 1100);
+      inputs.push({ plotId: code, code, mark: { state: "free", needsChecking: false } });
+    }
+    const m = map({
+      shapes,
+      sections: {
+        a: { sectionId: "a", name: "Sunny Row", displayOrder: 0, outline: rect(600, 600, 6200, 2100) },
+        b: { sectionId: "b", name: "Shady Row", displayOrder: 1, outline: rect(600, 3200, 6200, 4600) },
+      },
+      paths: { p: { pathId: "p", name: "Grass Walk", points: [[700, 2650], [6100, 2650]] } },
+      gate: { name: "Main gate", at: [500, 2650] },
+      north: 0,
+    });
+    return { m, inputs };
+  }
+
+  const WIDTHS = [320, 360, 700, 1500];
+
+  it.each(WIDTHS)("keeps every label of the churchyard map clear at width %i, with the top plot selected", (width) => {
+    const { m, inputs } = yew();
+    checkSheet(buildSheet({ map: m, plots: inputs, selectedPlotId: "Y07" }, { width }), `yew ${width} Y07`);
+  });
+
+  it.each(WIDTHS)("keeps every label of the churchyard map clear at width %i, with a bottom plot selected and with none", (width) => {
+    const { m, inputs } = yew();
+    checkSheet(buildSheet({ map: m, plots: inputs, selectedPlotId: "Y01" }, { width }), `yew ${width} Y01`);
+    checkSheet(buildSheet({ map: m, plots: inputs }, { width }), `yew ${width} none`);
+  });
+
+  it.each(WIDTHS)("keeps every label of the bed plan clear at width %i", (width) => {
+    const { m, inputs } = beds();
+    for (const selected of ["B04", "B01", undefined]) {
+      checkSheet(buildSheet({ map: m, plots: inputs, ...(selected === undefined ? {} : { selectedPlotId: selected }) }, { width }), `beds ${width} ${selected ?? "none"}`);
+    }
+  });
+
+  it("moves the gate label off the dots of the path it stands on", () => {
+    const { m, inputs } = yew();
+    const sheet = buildSheet({ map: m, plots: inputs }, { width: 360 });
+    const gate = sheet.gate as NonNullable<SheetModel["gate"]>;
+    const walk = sheet.paths[0] as NonNullable<SheetModel["paths"][number]>;
+    expect(distance(boxOf(gate.label), walk.points)).toBeGreaterThanOrEqual(8);
+  });
+
+  it("moves a section label off the paper tab of the selected plot", () => {
+    const { m, inputs } = yew();
+    const sheet = buildSheet({ map: m, plots: inputs, selectedPlotId: "Y07" }, { width: 360 });
+    const tab = sheet.tab as NonNullable<SheetModel["tab"]>;
+    const label = boxOf((sheet.sections[0] as NonNullable<SheetModel["sections"][number]>).label);
+    expect(overlap(label, { x0: tab.x, y0: tab.y, x1: tab.x + tab.width, y1: tab.y + tab.height }, 3)).toBe(false);
+  });
+
+  it("never drops a label when no place is clear: the one with least overlap wins", () => {
+    const { m, inputs } = yew();
+    const sheet = buildSheet({ map: m, plots: inputs, selectedPlotId: "Y07" }, { width: 120, maxHeight: 140 });
+    expect(sheet.sections[0]?.label.text).toBe("Yew Walk");
+    expect(sheet.paths[0]?.label.text).toBe("Yew Walk");
+    expect(sheet.gate?.label.text).toBe("Main gate");
+    for (const label of [sheet.sections[0]?.label, sheet.paths[0]?.label, sheet.gate?.label]) {
+      expect(Number.isFinite(label?.x)).toBe(true);
+      expect(Number.isFinite(label?.y)).toBe(true);
+      expect(label?.size).toBeGreaterThanOrEqual(12);
+    }
+  });
+
+  it("places labels the same way every time", () => {
+    const { m, inputs } = yew();
+    const a = buildSheet({ map: m, plots: inputs, selectedPlotId: "Y07" }, { width: 360 });
+    const b = buildSheet({ map: m, plots: inputs, selectedPlotId: "Y07" }, { width: 360 });
+    expect(a.gate).toEqual(b.gate);
+    expect(a.sections).toEqual(b.sections);
+    expect(a.paths).toEqual(b.paths);
   });
 });

@@ -1,0 +1,409 @@
+/* The look of the Allotment Register: a daylight garden plan. Garden ink #1B312A on pale paper #F7F5E8, a
+   daylight band at the top, pale soil under the plan, grass walks, and beds with a strip of hatching and a square
+   peg that holds the plot code. The furrows and the shed live in the band, in the margin, in a row of their own
+   above the title, so no word and no control ever sits on a picture. */
+
+:root {
+  --sky: #cfe7df;
+  --leaf: #2f6b4f;
+  --soil: #efe6cc;
+  --grass: #cfe0b8;
+  --bedfill: #e3edcb;
+  --stone: #fffef6;
+  --band: 80px;
+  --muted: #3e5a4e;
+  --field: #fffef6;
+  --soft: #efe6cc;
+  --good: #dcebd3;
+  --bad: #f6e3dc;
+  --tab: #f3e3a3;
+}
+
+html[data-contrast="high"] {
+  --leaf: #1b312a;
+  --soil: #ffffff;
+  --grass: #bbbbbb;
+  --bedfill: #ffffff;
+  --stone: #ffffff;
+  --sky: #ffffff;
+  --muted: #000000;
+}
+
+html {
+  font-family: "Trebuchet MS", "Gill Sans", "Segoe UI", system-ui, sans-serif;
+}
+
+h1,
+h2,
+h3,
+header.app .brand {
+  font-family: "Trebuchet MS", "Gill Sans", "Segoe UI", system-ui, sans-serif;
+  letter-spacing: 0;
+}
+
+h1 {
+  color: var(--leaf);
+}
+
+/* The daylight band. Its first row holds the furrows and the shed and nothing else. */
+header.app {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: var(--band) auto auto;
+  gap: 0;
+  padding: 0;
+  border-bottom: 2px solid var(--ink);
+  background: var(--paper);
+}
+
+header.app::before {
+  content: "";
+  grid-row: 1;
+  height: var(--band);
+  border-bottom: 3px solid var(--ink);
+  background: var(--sky);
+}
+
+header.app .mist {
+  position: absolute;
+  inset: 0 0 auto 0;
+  z-index: 0;
+  height: var(--band);
+  pointer-events: none;
+  background: url("../../../assets/garden-margin.svg") repeat-x left bottom / 1200px 64px;
+  animation: bed-drift 240s linear infinite;
+}
+
+@keyframes bed-drift {
+  from {
+    background-position: 0 100%;
+  }
+  to {
+    background-position: -1200px 100%;
+  }
+}
+
+html[data-motion="reduce"] header.app .mist {
+  animation: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  header.app .mist {
+    animation: none;
+  }
+}
+
+html[data-contrast="high"] header.app::before {
+  background: #ffffff;
+}
+
+header.app .brand {
+  grid-row: 2;
+  padding: 12px 16px 0;
+  color: var(--leaf);
+  font-size: 24px;
+  font-weight: 800;
+}
+
+header.app nav {
+  grid-row: 3;
+  padding: 8px 16px 16px;
+}
+
+/* Seed packets: a green top edge and soft corners. */
+.card {
+  border-top: 10px solid var(--leaf);
+  border-radius: 12px;
+  background: var(--stone);
+}
+
+html[data-contrast="high"] .card {
+  border-top-color: var(--ink);
+}
+
+.button,
+button.button,
+a.button {
+  border-radius: 10px;
+}
+
+.button.primary {
+  background: var(--leaf);
+  border-color: var(--leaf);
+  color: var(--paper);
+}
+
+html[data-contrast="high"] .button.primary {
+  background: #000000;
+  border-color: #000000;
+}
+
+input:not([type="checkbox"]):not([type="radio"]),
+select,
+textarea {
+  border-radius: 8px;
+}
+
+dialog,
+.notice {
+  border-radius: 10px;
+}
+
+/* The plan sheet: pale soil, grass walks, beds. */
+.sheet-scroll {
+  border: 2px solid var(--ink);
+  border-radius: 12px;
+  background: var(--soil);
+}
+
+svg.sheet {
+  background: var(--soil);
+}
+
+.sheet .plot {
+  fill: var(--bedfill);
+  stroke: var(--ink);
+  stroke-width: 2;
+}
+
+.sheet .bed {
+  fill: var(--bedfill);
+}
+
+.sheet .plot.selected {
+  fill: var(--tab);
+}
+
+.sheet .hatch,
+.swatch .hatch,
+.bed-mark .hatch {
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 1.25;
+  opacity: 0.55;
+}
+
+.sheet .peg,
+.bed-mark .peg {
+  fill: var(--stone);
+  stroke: var(--ink);
+  stroke-width: 1.5;
+}
+
+.swatch .plot.bed {
+  fill: var(--bedfill);
+}
+
+.sheet .path {
+  fill: none;
+  stroke: var(--grass);
+  stroke-width: 14;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+svg.sheet .path-line {
+  display: inline;
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 1.25;
+  stroke-dasharray: 1 6;
+  stroke-linecap: round;
+}
+
+.sheet .section-outline {
+  stroke: var(--leaf);
+  stroke-dasharray: 8 5;
+  stroke-width: 1.75;
+}
+
+html[data-contrast="high"] .sheet .section-outline {
+  stroke: var(--ink);
+}
+
+.sheet .gate {
+  fill: var(--stone);
+  stroke: var(--ink);
+  stroke-width: 2;
+}
+
+.sheet .tab {
+  fill: var(--tab);
+}
+
+/* The desk: the two jobs side by side, then one main action, then the lists and the plan. */
+.hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+}
+
+.hero > * {
+  min-width: 0;
+}
+
+.hero-card h2 {
+  color: var(--leaf);
+  font-size: 18px;
+}
+
+html[data-contrast="high"] .hero-card h2 {
+  color: var(--ink);
+}
+
+.hero-body {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+}
+
+.big {
+  margin: 0;
+  font-size: 30px;
+  font-weight: 800;
+  line-height: 1.15;
+}
+
+.bed-mark {
+  flex: none;
+}
+
+.bed-mark .bed {
+  fill: var(--bedfill);
+  stroke: var(--ink);
+  stroke-width: 2;
+}
+
+.main-action .button {
+  min-width: 14rem;
+  font-size: 18px;
+}
+
+.garden-desk {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 24px;
+}
+
+.garden-desk > * {
+  min-width: 0;
+}
+
+@media (min-width: 48rem) {
+  .hero {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 60rem) {
+  .garden-desk {
+    grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+    align-items: start;
+  }
+}
+
+.summary-line {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.lead {
+  font-size: 18px;
+}
+
+.badge {
+  display: inline-block;
+  align-self: flex-start;
+  margin: 0;
+  padding: 2px 12px;
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  background: var(--soft);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.badge.bad {
+  background: var(--bad);
+  border-style: dashed;
+}
+
+.badge.good {
+  background: var(--good);
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  gap: 12px;
+  margin: 0;
+}
+
+.facts > div {
+  padding: 8px 12px;
+  border: 2px solid var(--ink);
+  border-radius: 8px;
+  background: var(--paper);
+}
+
+.facts dt {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.facts dd {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.indent {
+  padding-left: 16px;
+  border-left: 4px solid var(--grass);
+}
+
+.review {
+  padding: 16px;
+  border: 2px dashed var(--ink);
+  border-radius: 10px;
+  background: var(--paper);
+}
+
+.preview-frame {
+  padding: 16px;
+  border: 2px dashed var(--ink);
+  border-radius: 10px;
+}
+
+.table-scroll {
+  max-width: 100%;
+  overflow: auto;
+  border: 2px solid var(--ink);
+  border-radius: 8px;
+}
+
+table.report-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.report-table th,
+.report-table td {
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--ink);
+  text-align: left;
+  vertical-align: top;
+}
+
+.report-table th {
+  background: var(--soft);
+  font-size: 14px;
+}
+
+@media print {
+  header.app::before,
+  header.app .mist {
+    display: none;
+  }
+}

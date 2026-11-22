@@ -114,3 +114,15 @@ describe("restarting a walkthrough", () => {
     expect((await listSites(db)).filter((s) => s.title === "Broken")).toEqual([]);
   });
 });
+
+describe("the currency of a practice garden (spec 04, A9)", () => {
+  it("gives the practice site the currency its walkthrough names, and none when it names none", async () => {
+    const withMoney: Walkthrough = { ...practice, siteTitle: "Practice Beds", currency: "GBP" };
+    const made = await seedWalkthrough(db, register as never, withMoney, { newId });
+    expect(made.ok).toBe(true);
+    if (made.ok) expect((await readSite(db, made.value.id))?.currency).toBe("GBP");
+    const plain = await seedWalkthrough(db, register as never, practice, { newId });
+    expect(plain.ok).toBe(true);
+    if (plain.ok) expect((await readSite(db, plain.value.id))?.currency).toBeUndefined();
+  });
+});

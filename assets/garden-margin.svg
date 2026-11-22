@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 64" width="1200" height="64" role="img" aria-hidden="true" focusable="false" preserveAspectRatio="none">
+  <title>Furrows with seedlings, a tool shed and a garden gate under a daylight sky</title>
+  <defs>
+    <pattern id="ridge" width="24" height="12" patternUnits="userSpaceOnUse">
+      <path d="M0 8Q6 1 12 8T24 8V12H0Z" fill="#8B6A47"/>
+      <path d="M0 8Q6 1 12 8T24 8" fill="none" stroke="#A98558" stroke-width="2"/>
+    </pattern>
+    <g id="sprout">
+      <path d="M0 0V-9" stroke="#2F6B4F" stroke-width="2" stroke-linecap="round"/>
+      <path d="M0 -6Q-9 -9 -10 -15Q-2 -14 0 -6Z" fill="#4A9B66"/>
+      <path d="M0 -8Q8 -10 10 -17Q2 -16 0 -8Z" fill="#3A8456"/>
+    </g>
+  </defs>
+  <g fill="#FFFFFF" fill-opacity="0.9">
+    <ellipse cx="220" cy="15" rx="34" ry="7"/>
+    <ellipse cx="246" cy="10" rx="20" ry="7"/>
+    <ellipse cx="760" cy="12" rx="38" ry="7"/>
+    <ellipse cx="790" cy="8" rx="22" ry="6"/>
+    <ellipse cx="1040" cy="20" rx="28" ry="5"/>
+  </g>
+  <circle cx="470" cy="17" r="9" fill="#F2C94C"/>
+  <g stroke="#F2C94C" stroke-width="2" stroke-linecap="round">
+    <path d="M470 3V0M470 31V34M456 17H453M484 17H487M460 7L458 5M480 27L482 29M480 7L482 5M460 27L458 29"/>
+  </g>
+  <g>
+    <rect x="90" y="30" width="48" height="22" fill="#C79A5F"/>
+    <path d="M84 30L114 14L144 30Z" fill="#6B4A2B"/>
+    <rect x="106" y="38" width="14" height="14" fill="#7A5632"/>
+    <rect x="124" y="35" width="8" height="8" fill="#F7F5E8"/>
+  </g>
+  <g fill="#F1E8CC" stroke="#8B6A47" stroke-width="1.5">
+    <rect x="640" y="30" width="5" height="22"/>
+    <rect x="690" y="30" width="5" height="22"/>
+    <rect x="645" y="34" width="45" height="3"/>
+    <rect x="645" y="43" width="45" height="3"/>
+    <rect x="900" y="32" width="4" height="20"/>
+    <rect x="930" y="32" width="4" height="20"/>
+    <rect x="904" y="36" width="26" height="3"/>
+  </g>
+  <rect x="0" y="50" width="1200" height="14" fill="#6E5035"/>
+  <rect x="0" y="48" width="1200" height="12" fill="url(#ridge)"/>
+  <g>
+    <use href="#sprout" x="24" y="52"/>
+    <use href="#sprout" x="72" y="52"/>
+    <use href="#sprout" x="168" y="52"/>
+    <use href="#sprout" x="216" y="52"/>
+    <use href="#sprout" x="288" y="52"/>
+    <use href="#sprout" x="336" y="52"/>
+    <use href="#sprout" x="408" y="52"/>
+    <use href="#sprout" x="504" y="52"/>
+    <use href="#sprout" x="552" y="52"/>
+    <use href="#sprout" x="600" y="52"/>
+    <use href="#sprout" x="744" y="52"/>
+    <use href="#sprout" x="816" y="52"/>
+    <use href="#sprout" x="864" y="52"/>
+    <use href="#sprout" x="960" y="52"/>
+    <use href="#sprout" x="1008" y="52"/>
+    <use href="#sprout" x="1080" y="52"/>
+    <use href="#sprout" x="1152" y="52"/>
+  </g>
+</svg>

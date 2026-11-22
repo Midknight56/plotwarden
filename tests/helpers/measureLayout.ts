@@ -17,7 +17,7 @@ export interface MeasureOptions {
 
 /** Everything is measured inside the page, then sent back as plain data. */
 export async function measureLayout(page: Page, options: MeasureOptions = {}): Promise<Violation[]> {
-  return page.evaluate((opts) => {
+  const found = await page.evaluate((opts) => {
     const violations: { rule: string; element: string; detail: string }[] = [];
     const TOLERANCE = 0.5;
     const add = (rule: string, el: Element, detail: string) => {
@@ -175,6 +175,7 @@ export async function measureLayout(page: Page, options: MeasureOptions = {}): P
     }
     return violations;
   }, options);
+  return [...found, ...(await measureSheetLabels(page))];
 }
 
 /** The ink of the focus ring against the page, for one focused element. 3 to 1 is the floor. */
@@ -220,4 +221,136 @@ export function trackRequests(page: Page, origin = "http://127.0.0.1:4175/"): { 
     }
   });
   return log;
+}
+
+// ---- Sheet labels ------------------------------------------------------------------------------------
+// A label on a map must keep clear of the dots of a path, the paper tab, the north arrow, the gate mark and
+// every other label, and stay inside the drawing. The page is read once into plain data (`readSheetScene`),
+// and the data is checked here (`findLabelCollisions`), so the check can be tried without a browser.
+
+export interface SceneBox {
+  x0: number;
+  y0: number;
+  x1: number;
+  y1: number;
+}
+
+export interface SheetScene {
+  /** The drawing itself, from its own corner. */
+  frame: { width: number; height: number };
+  labels: { text: string; box: SceneBox }[];
+  lines: { name: string; points: [number, number][] }[];
+  /** The dashed outline of each section, closed. A section's own name sits just above its outline. */
+  outlines?: { name: string; points: [number, number][] }[];
+  tab?: SceneBox;
+  north?: SceneBox;
+  gate?: SceneBox;
+}
+
+/** Self contained: it runs inside the page and returns plain data. */
+export function readSheetScene(): SheetScene[] {
+  const scenes: SheetScene[] = [];
+  for (const svg of document.querySelectorAll<SVGSVGElement>("svg.sheet")) {
+    const origin = svg.getBoundingClientRect();
+    if (origin.width === 0 || origin.height === 0 || getComputedStyle(svg).display === "none") continue;
+    const rel = (el: Element): SceneBox => {
+      const r = el.getBoundingClientRect();
+      return { x0: r.left - origin.left, y0: r.top - origin.top, x1: r.right - origin.left, y1: r.bottom - origin.top };
+    };
+    const scene: SheetScene = { frame: { width: origin.width, height: origin.height }, labels: [], lines: [] };
+    for (const text of svg.querySelectorAll<SVGTextElement>("text")) {
+      if (text.classList.contains("tab-text") || (text.textContent ?? "").trim() === "") continue;
+      scene.labels.push({ text: (text.textContent ?? "").trim(), box: rel(text) });
+    }
+    for (const line of svg.querySelectorAll<SVGPolylineElement>("polyline.path-line")) {
+      const points = (line.getAttribute("points") ?? "")
+        .trim()
+        .split(/\s+/)
+        .map((pair) => pair.split(",").map(Number) as [number, number])
+        .filter((p) => p.length === 2 && Number.isFinite(p[0]) && Number.isFinite(p[1]));
+      scene.lines.push({ name: line.nextElementSibling?.textContent?.trim() ?? "path", points });
+    }
+    scene.outlines = [];
+    for (const outline of svg.querySelectorAll<SVGPolygonElement>("polygon.section-outline")) {
+      const points = (outline.getAttribute("points") ?? "")
+        .trim()
+        .split(/\s+/)
+        .map((pair) => pair.split(",").map(Number) as [number, number])
+        .filter((p) => p.length === 2 && Number.isFinite(p[0]) && Number.isFinite(p[1]));
+      if (points.length > 0) points.push(points[0] as [number, number]);
+      scene.outlines.push({ name: outline.nextElementSibling?.textContent?.trim() ?? "section", points });
+    }
+    const tab = svg.querySelector("rect.tab");
+    if (tab !== null) scene.tab = rel(tab);
+    const north = svg.querySelector("g.north");
+    if (north !== null) scene.north = rel(north);
+    const gate = svg.querySelector("rect.gate");
+    if (gate !== null) scene.gate = rel(gate);
+    scenes.push(scene);
+  }
+  return scenes;
+}
+
+const TOUCH = 1;
+
+function boxGap(a: SceneBox, b: SceneBox): number {
+  const dx = Math.max(0, a.x0 - b.x1, b.x0 - a.x1);
+  const dy = Math.max(0, a.y0 - b.y1, b.y0 - a.y1);
+  return Math.hypot(dx, dy);
+}
+
+function lineGap(box: SceneBox, points: readonly (readonly [number, number])[]): number {
+  let best = Infinity;
+  for (let i = 0; i + 1 < points.length; i++) {
+    const a = points[i] as readonly [number, number];
+    const b = points[i + 1] as readonly [number, number];
+    const steps = Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1])));
+    for (let s = 0; s <= steps; s++) {
+      const x = a[0] + ((b[0] - a[0]) * s) / steps;
+      const y = a[1] + ((b[1] - a[1]) * s) / steps;
+      best = Math.min(best, Math.hypot(Math.max(box.x0 - x, 0, x - box.x1), Math.max(box.y0 - y, 0, y - box.y1)));
+    }
+  }
+  return best;
+}
+
+/** The rules: no label touches a path line, the tab, the north arrow, the gate mark or another label, or leaves the drawing. */
+export function findLabelCollisions(scenes: readonly SheetScene[]): Violation[] {
+  const out: Violation[] = [];
+  const add = (rule: string, text: string, detail: string) => out.push({ rule, element: `sheet label "${text}"`, detail });
+  for (const scene of scenes) {
+    for (const { text, box } of scene.labels) {
+      if (box.x0 < -TOUCH || box.y0 < -TOUCH || box.x1 > scene.frame.width + TOUCH || box.y1 > scene.frame.height + TOUCH) {
+        add("label_clipped", text, `box ${Math.round(box.x0)},${Math.round(box.y0)} to ${Math.round(box.x1)},${Math.round(box.y1)} leaves the drawing`);
+      }
+      for (const line of scene.lines) {
+        const gap = lineGap(box, line.points);
+        if (gap < TOUCH) add("label_on_line", text, `${gap.toFixed(1)} px from the line of ${line.name}`);
+      }
+      // A section name sits just above its own outline by design. Every other label keeps off every outline.
+      for (const outline of scene.outlines ?? []) {
+        if (outline.name === text) continue;
+        const gap = lineGap(box, outline.points);
+        if (gap < TOUCH) add("label_on_outline", text, `${gap.toFixed(1)} px from the outline of ${outline.name}`);
+      }
+      if (scene.tab !== undefined && boxGap(box, scene.tab) < TOUCH) add("label_on_tab", text, "touches the code tab");
+      if (scene.north !== undefined && boxGap(box, scene.north) < TOUCH) add("label_on_north", text, "touches the north arrow");
+      if (scene.gate !== undefined && boxGap(box, scene.gate) < TOUCH) add("label_on_gate", text, "touches the gate mark");
+    }
+    for (let i = 0; i < scene.labels.length; i++) {
+      for (let j = i + 1; j < scene.labels.length; j++) {
+        const a = scene.labels[i] as SheetScene["labels"][number];
+        const b = scene.labels[j] as SheetScene["labels"][number];
+        if (boxGap(a.box, b.box) < TOUCH && a.box.x0 < b.box.x1 && b.box.x0 < a.box.x1 && a.box.y0 < b.box.y1 && b.box.y0 < a.box.y1) {
+          add("label_overlap", a.text, `overlaps the label "${b.text}"`);
+        }
+      }
+    }
+  }
+  return out;
+}
+
+/** Read every map on the page and report each label that touches a line, a tab, the north arrow, the gate or another label. */
+export async function measureSheetLabels(page: Page): Promise<Violation[]> {
+  return findLabelCollisions(await page.evaluate(readSheetScene));
 }

@@ -47,8 +47,8 @@ export interface ThemeTokens {
   ink: string;
   paper: string;
   accent?: string;
-  /** How a plot is drawn on the sheet. Absent means the footprint as it is. */
-  plotShape?: "arch";
+  /** How a plot is drawn on the sheet. Absent means the footprint as it is. A bed has a hatched strip and a peg. */
+  plotShape?: "arch" | "bed";
 }
 
 /** Design D3. An app supplies one of these. */

@@ -1,0 +1,8 @@
+{
+  "name": "@plotwarden/allotment-register",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Offer the next free plot or start your register. An allotment register that stays on the secretary's device.",
+  "license": "MIT",
+  "type": "module"
+}

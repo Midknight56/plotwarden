@@ -25,7 +25,10 @@
     "check:changed": "npm run typecheck && node scripts/check-imports.mjs && node scripts/changed-tests.mjs --git",
     "church:build": "vite build --config apps/churchyard-register/vite.config.ts",
     "church:preview": "vite preview --config apps/churchyard-register/vite.config.ts",
-    "church:dev": "vite --config apps/churchyard-register/vite.config.ts"
+    "church:dev": "vite --config apps/churchyard-register/vite.config.ts",
+    "allot:build": "vite build --config apps/allotment-register/vite.config.ts",
+    "allot:preview": "vite preview --config apps/allotment-register/vite.config.ts",
+    "allot:dev": "vite --config apps/allotment-register/vite.config.ts"
   },
   "dependencies": {
     "fflate": "0.8.3",

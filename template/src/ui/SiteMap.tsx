@@ -63,6 +63,20 @@ function archPath(box: { x: number; y: number; width: number; height: number }, 
   return `M${f(x0)} ${f(y1)}L${f(x0)} ${f(y0 + r)}A${f(w / 2)} ${f(r)} 0 0 1 ${f(x1)} ${f(y0 + r)}L${f(x1)} ${f(y1)}Z`;
 }
 
+/** True when a footprint is a rectangle whose sides run along the two axes. */
+function isRectangle(points: readonly (readonly [number, number])[]): boolean {
+  if (points.length !== 4) return false;
+  return new Set(points.map((p) => Math.round(p[0] * 10))).size === 2 && new Set(points.map((p) => Math.round(p[1] * 10))).size === 2;
+}
+
+/** A strip of short slanted strokes along the north edge of a bed. */
+function hatchPath(box: { x: number; y: number; width: number; height: number }): string {
+  const strokes: string[] = [];
+  const f = (n: number): number => Math.round(n * 10) / 10;
+  for (let x = box.x + 4; x + 8 <= box.x + box.width - 2; x += 6) strokes.push(`M${f(x)} ${f(box.y + 10)}L${f(x + 8)} ${f(box.y + 3)}`);
+  return strokes.join("");
+}
+
 /** Draw a sheet model. The screen and the print page use this one drawing. */
 export function SheetSvg({
   model,
@@ -80,6 +94,7 @@ export function SheetSvg({
   const { north } = model;
   const { app } = useShell();
   const arched = app.adapter.theme.plotShape === "arch";
+  const bedded = app.adapter.theme.plotShape === "bed";
   return (
     <svg
       className="sheet"
@@ -130,7 +145,11 @@ export function SheetSvg({
           ) : (
             <>
               {plot.selected ? <polygon className="plot-selected-outer" points={pointsOf(plot.points)} /> : null}
-              <polygon className={`plot${plot.mark.needsChecking ? " checking" : ""}${plot.selected ? " selected" : ""}`} points={pointsOf(plot.points)} />
+              <polygon className={`plot${bedded ? " bed" : ""}${plot.mark.needsChecking ? " checking" : ""}${plot.selected ? " selected" : ""}`} points={pointsOf(plot.points)} />
+              {bedded && isRectangle(plot.points) && plot.box.width >= 24 && plot.box.height >= 24 ? <path className="hatch" d={hatchPath(plot.box)} /> : null}
+              {bedded && plot.label !== undefined && !(plot.selected && model.tab !== undefined) ? (
+                <rect className="peg" x={plot.label.x - (plot.label.text.length * 7.4 + 10) / 2} y={plot.label.y - 14} width={plot.label.text.length * 7.4 + 10} height={20} />
+              ) : null}
               {plot.selected ? <polygon className="plot-selected-inner" points={pointsOf(plot.points)} /> : null}
             </>
           )}
@@ -178,6 +197,7 @@ const KEY_WORDS: Record<KeyState, { word: string; shape: string }> = {
 export function MapKey() {
   const { t, app } = useShell();
   const arched = app.adapter.theme.plotShape === "arch";
+  const bedded = app.adapter.theme.plotShape === "bed";
   const order: KeyState[] = ["free", "reserved", "taken", "unusable", "checking"];
   return (
     <ul className="map-key plain" aria-label={t("mapKey")}>
@@ -187,7 +207,10 @@ export function MapKey() {
             {arched ? (
               <path className={`plot${state === "checking" ? " checking" : ""}`} d={archPath({ x: 5, y: 3, width: 18, height: 22 })} />
             ) : (
-              <rect className={`plot${state === "checking" ? " checking" : ""}`} x="3" y="3" width="22" height="22" />
+              <>
+                <rect className={`plot${arched ? "" : bedded ? " bed" : ""}${state === "checking" ? " checking" : ""}`} x="3" y="3" width="22" height="22" />
+                {bedded ? <path className="hatch" d="M6 9L11 5M11 9L16 5M16 9L21 5" /> : null}
+              </>
             )}
             {state === "reserved" ? <line className="mark" x1="7" y1="21" x2="21" y2="7" /> : null}
             {state === "taken" ? <circle className="mark solid" cx="14" cy="14" r="5" /> : null}

@@ -7,7 +7,7 @@ import type { IsoInstant, LocalDate } from "../calendar";
 import type { DraftEvent } from "../events";
 import { createSite, mintId } from "../site";
 import { err, ok } from "../types";
-import type { Result, Site } from "../types";
+import type { Currency, Result, Site } from "../types";
 import { keySourceOfDraft, uniqueKeysFor } from "./importBatch";
 import { removeSite } from "./siteAdmin";
 import { commit, listSites, saveNewSite } from "./transaction";
@@ -16,6 +16,8 @@ export interface Walkthrough {
   /** The title of the practice site. It is also how the site is found again. */
   siteTitle: string;
   zone: string;
+  /** The currency of a practice garden. A churchyard names none. */
+  currency?: Currency;
   /** The date the practice register is read at. */
   today: LocalDate;
   /** The fixed write time of every batch. */
@@ -55,6 +57,7 @@ export async function seedWalkthrough(
     title: walkthrough.siteTitle,
     zone: walkthrough.zone,
     createdAt: walkthrough.startedAt,
+    ...(walkthrough.currency === undefined ? {} : { currency: walkthrough.currency }),
   });
   if (!made.ok) return made;
   const site = made.value;

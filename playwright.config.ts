@@ -35,5 +35,13 @@ export default defineConfig({
       stdout: "ignore",
       stderr: "pipe",
     },
+    {
+      command: "npm run allot:build && npm run allot:preview",
+      url: "http://127.0.0.1:4178/",
+      reuseExistingServer: false,
+      timeout: 180_000,
+      stdout: "ignore",
+      stderr: "pipe",
+    },
   ],
 });

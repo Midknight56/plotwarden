@@ -296,3 +296,99 @@ Place LF-H1 (Perrin Gladwyn) in Y03. Then: Taken plots 7, Free plots 2 (Y08, Y10
 ### 4.7 Part occupied plot
 
 A plot Z01 with two spaces and one burial in space 1: summary "Taken · 1 of 2 spaces used", available spaces 1, free plots 0. The report line reads "Z01, space 2 is free. Space 1 holds a burial."
+
+## 5 Thimble Beds fixture detail, season report and availability (added for spec 04, worked before the allotment code)
+
+Section 2 fixes the states, the queue and the fees. This section fixes the names, dates and layout the fixture needs, and the season report and the availability file. Everything here is **Assumed** and invented. The fixed review date is 2026-04-20. Money is in pence.
+
+### 5.1 Layout, people and dates
+
+Two sections. Sunny Row holds B01, B02, B03. Shady Row holds B04, B05, B06. One gate, "Main gate". One path, "Grass Walk", between the rows. Each plot has one space. Currency GBP, zone Europe/London.
+
+| Source ref | Plot | Holder | From |
+|---|---|---|---|
+| TB-T1 | B01 | Marlo Fennick | 2024-04-01 |
+| TB-T2 | B02 | Ada Stonecrop | 2025-04-01 |
+| TB-T4 | B04 | Ilse Burrowby | 2023-04-01 |
+
+B06 is Unusable from 2026-01-05 (reason "Subsidence"). B03 and B05 are confirmed empty. Applicants: Tavi Bramblequill (sequence 1) and Olin Reedwhorl (sequence 2), both joined 2026-01-10, no preferred section. The handover holder at B02 is Hale Pennywort.
+
+Seasons. Season 2025: 2025-04-01 to 2026-04-01 (end exclusive), due 2025-06-30, standard fee 3000. Season 2026: 2026-04-01 to 2027-04-01, due 2026-06-30, standard fee 3600.
+
+### 5.2 Counts at the start (2026-04-20)
+
+| Item | Working | Value |
+|---|---|---|
+| Plots | 2 sections of 3 | 6 |
+| Taken | B01, B02, B04 | 3 |
+| Free | B03, B05 | 2 |
+| Unusable | B06 | 1 |
+| Check | 3 + 2 + 1 | 6 |
+| Open tenancies | one per taken plot | 3 |
+| Applicants waiting | Tavi, Olin | 2 |
+| Next applicant | lowest sequence on the same date | Tavi Bramblequill |
+| Next free plot | first free code | B03 |
+| Charges | the Season 2025 charge on B02 only | 1 |
+| Charge amount | | 3000 |
+| Receipts | none | 0 |
+| B02 balance at 2026-04-20 | 3000 charged, 0 received | 3000, Overdue |
+| B03 charges | none | 0 |
+| `fee_late` issues at 2026-04-20 | B02 | 1 |
+| `offer_late` issues at 2026-04-20 | no offer yet | 0 |
+| Review issues | 0 + 1 | 1 |
+
+### 5.3 Queue scenarios used by the unit tests
+
+Three applicants. A joined 2026-01-10, sequence 1, prefers Shady Row. B joined 2026-01-10, sequence 2, no preference. C joined 2026-01-12, sequence 3, prefers Sunny Row. Application IDs are chosen so the ID order is C, B, A, the reverse of the sequence order.
+
+| Case | Expected |
+|---|---|
+| Queue order | A, B, C (date, then sequence, never ID) |
+| Offer B03 (Sunny Row) with no skip reasons | next is A, but A prefers Shady Row. The first applicant whose preference fits is B. A is recorded as "Preference does not fit". Offer to B accepted. |
+| Offer B03 to C | A and B are ahead. A does not fit. B fits, so B is an exceptional skip and needs a reason. Without a reason the offer is refused. With the reason it is recorded for B. |
+| A has an open offer, then offer B05 (Shady Row) | A is "Offer pending". B is the first eligible and fits. |
+| Same date import of D then E with no Tie order | D gets the lower sequence |
+| Same date import of D then E with Tie order 2 and 1 | E gets the lower sequence |
+| Decline with Keep place | the applicant is back at the same position |
+| Decline with Leave list | the applicant is out of the queue |
+
+### 5.4 Season report
+
+Season 2025 as at 2026-05-02: one charge row, B02, holder Ada Stonecrop, charged 3000, received 0, reversed 0, balance 3000. Fees charged 3000. Fees received 0. Balance due 3000.
+
+Season 2026 as at 2026-05-02, after the offer on B03 is accepted on 2026-04-20 and GBP 36.00 is charged, GBP 12.00 received on 2026-05-02 and GBP 24.00 received on 2026-06-01. Only the receipt of 2026-05-02 is counted as at 2026-05-02:
+
+| Item | Working | Value |
+|---|---|---|
+| Rows | the B03 tenancy only | 1 |
+| Charged | | 3600 |
+| Received | 1200 | 1200 |
+| Balance due | 3600 minus 1200 | 2400 |
+
+Season 2026 as at 2026-06-30 with both receipts: received 1200 + 2400 = 3600, balance due 0. After the GBP 12.00 receipt is reversed: received 3600, reversed 1200, fees received net 2400, balance due 1200.
+
+Plot handovers as at 2026-05-02 with the B02 handover on 2026-05-01: 1 (B02, Ada Stonecrop to Hale Pennywort). As at 2026-04-30: 0. Waiting list order as at 2026-05-02 after Tavi accepted: Olin Reedwhorl at position 1.
+
+Season 2026 with no charges applied: "No charges in this season."
+
+### 5.5 Availability file
+
+| State | Listed by the keeper | Free plots in the file | Neutral ground |
+|---|---|---|---|
+| Start | B03, B05 | B03, B05 = 2 | B01, B02, B04, B06 = 4 |
+| After the offer on B03 | B03, B05 | B05 = 1 | B01, B02, B03, B04, B06 = 5 |
+| After the offer on B03 and B05 not listed | B03 | 0 | 6 |
+
+Check: free plots plus neutral ground equals the six plots with a shape (2 + 4, 1 + 5, 0 + 6). Public words: site name "Thimble Beds", gate name "Thimble Gate", path "Grass Walk", sections "Sunny Row" and "Shady Row", instructions "Ask the secretary at the hut on Saturday morning. Say the plot code." Persons in the file: 0. Amounts in the file: 0. Queue positions in the file: 0.
+
+Privacy canaries that must be absent from every availability file byte and every review file byte: Tavi Bramblequill, Olin Reedwhorl, Marlo Fennick, Ada Stonecrop, Ilse Burrowby, Hale Pennywort, their contacts, the amounts 36.00, 30.00, 12.00 and 24.00 as written and as 3600, 3000, 1200 and 2400, and the receipt reference "TB-RCPT-1".
+
+### 5.6 Review facts
+
+| As at | Case | Facts |
+|---|---|---|
+| 2026-04-20 | start state | `fee_late` on the B02 charge = 1 |
+| 2026-04-20 | offer on B03 made 2026-04-04 with reply by 2026-04-18, not accepted | `offer_late` on B03 + `fee_late` on B02 = 2 |
+| 2026-04-18 | same offer | `offer_late` 0, because the reply date itself is not late |
+| 2026-06-30 | the B02 charge, due 2025-06-30, fully paid | 0 |
+| any | an offer with no reply date | 0 |

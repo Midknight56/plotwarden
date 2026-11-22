@@ -10,6 +10,9 @@ import { APPROVED_NAME, VISITOR_CANARIES } from "../helpers/privacyCanaries";
 import { ChurchEnv, WALK_PATH_ID, id } from "../helpers/churchEnv";
 import { FAMILY_WORDS } from "../helpers/familyWords";
 import { buildFold } from "../helpers/lanternFold";
+import { reportCsv, reportTable, seasonReport } from "../../apps/allotment-register/src/fees";
+import { GardenEnv, id as gid } from "../helpers/gardenEnv";
+import { SEASON_2025, SEASON_2026, app as gapp, buildThimble, chargeId, claim as gclaim, person as gperson, tenancy as gtenancy } from "../helpers/thimbleBeds";
 
 const DIRECTIONS = "Enter at Lantern Gate. Follow Yew Walk to row Y. Look for Y07.";
 const A4: PrintOptions = { paper: "A4", orientation: "portrait" };
@@ -162,5 +165,149 @@ describe("T23 the private report print (C6.7)", () => {
 
   it("is legible in grayscale", () => {
     for (const [r, g, b] of colours(buildReportPrint(table, A4))) expect(r === g && g === b).toBe(true);
+  });
+});
+
+describe("T23 the season report (spec 04, A5, hand totals 5.4)", () => {
+  // The words are keys here, so the numbers are what is tested. The copy test checks the real words.
+  const say = (key: string, values?: Record<string, string | number>): string =>
+    values === undefined ? key : `${key}(${Object.entries(values).map(([k, v]) => `${k}=${v}`).join(",")})`;
+  const OFFER = gid("offer:b03");
+  const B03 = chargeId("B03:2026");
+  let garden: GardenEnv;
+
+  /** Hand totals 2.2, 2.3 and 2.5: the B03 offer, Season 2026, two receipts and the B02 handover. */
+  async function gardenYear(): Promise<void> {
+    garden = await GardenEnv.create();
+    await buildThimble(garden);
+    await garden.must([{ type: "make_offer", offerId: OFFER, applicationId: gapp("tavi"), spaceId: gid("space:B03:1"), claimId: gclaim("hold:b03"), replyBy: "2026-04-18" }], "2026-04-04");
+    await garden.must([{ type: "accept_offer", offerId: OFFER, tenancyId: gtenancy("B03"), claimId: gclaim("tenancy:B03") }], "2026-04-10");
+    await garden.must([{ type: "new_season", ...SEASON_2026 }], "2026-04-01");
+    await garden.must([{ type: "apply_charges", seasonId: SEASON_2026.seasonId, items: [{ chargeId: B03, tenancyId: gtenancy("B03") }] }], "2026-04-10");
+    await garden.must([{ type: "record_receipt", receiptId: gid("receipt:one"), chargeId: B03, amount: 1200, ref: "TB-RCPT-1" }], "2026-05-02");
+    await garden.must([{ type: "record_receipt", receiptId: gid("receipt:two"), chargeId: B03, amount: 2400 }], "2026-06-01");
+    await garden.must(
+      [{ type: "hand_over", tenancyId: gtenancy("B02"), newTenancyId: gid("tenancy:B02:new"), claimId: gclaim("tenancy:B02:new"), personId: gperson("Hale Pennywort"), holderName: "Hale Pennywort" }],
+      "2026-05-01",
+    );
+  }
+
+  const report = (seasonId: string, asOf: string) => seasonReport(garden.state, { seasonId, asOf, revision: garden.revision });
+
+  it("Season 2026 as at 2026-05-02 has one row: 3600 charged, 1200 received, 2400 due", async () => {
+    await gardenYear();
+    const r = report(SEASON_2026.seasonId, "2026-05-02");
+    expect(r.rows).toHaveLength(1);
+    expect(r.rows[0]).toMatchObject({ plotCode: "B03", holder: "Tavi Bramblequill", charged: 3600, received: 1200, reversed: 0, balance: 2400, status: "part_paid" });
+    expect(r.totals).toEqual({ charged: 3600, received: 1200, balanceDue: 2400 });
+    expect(r.empty).toBe(false);
+    expect(r).toMatchObject({ basis: "current_corrections", asOf: "2026-05-02", currency: "GBP" });
+  });
+
+  it("Season 2026 as at 2026-06-30 has both receipts and nothing due", async () => {
+    await gardenYear();
+    const r = report(SEASON_2026.seasonId, "2026-06-30");
+    expect(r.rows[0]).toMatchObject({ received: 3600, balance: 0, status: "paid" });
+    expect(r.totals).toEqual({ charged: 3600, received: 3600, balanceDue: 0 });
+  });
+
+  it("counts a reversed receipt net, and shows the reversal beside it", async () => {
+    await gardenYear();
+    await garden.must([{ type: "reverse_entry", reversalId: gid("rev:one"), entryId: gid("receipt:one"), reason: "Entered on the wrong plot" }], "2026-07-01");
+    const r = report(SEASON_2026.seasonId, "2026-07-01");
+    expect(r.rows[0]).toMatchObject({ charged: 3600, received: 3600, reversed: 1200, balance: 1200 });
+    expect(r.totals).toEqual({ charged: 3600, received: 2400, balanceDue: 1200 });
+    // As at a date before the reversal, the report is as it was.
+    expect(report(SEASON_2026.seasonId, "2026-06-30").totals).toEqual({ charged: 3600, received: 3600, balanceDue: 0 });
+  });
+
+  it("opens Season 2025 with the holder of that time, not today's holder, and the old balance of 3000", async () => {
+    await gardenYear();
+    const r = report(SEASON_2025.seasonId, "2026-05-02");
+    expect(r.rows).toHaveLength(1);
+    expect(r.rows[0]).toMatchObject({ plotCode: "B02", holder: "Ada Stonecrop", charged: 3000, received: 0, balance: 3000, status: "overdue" });
+    expect(r.totals).toEqual({ charged: 3000, received: 0, balanceDue: 3000 });
+  });
+
+  it("counts nothing twice through a change of holder: two seasons and a handover add up to every charge", async () => {
+    await gardenYear();
+    await garden.must([{ type: "apply_charges", seasonId: SEASON_2026.seasonId, items: [{ chargeId: chargeId("B02:new"), tenancyId: gid("tenancy:B02:new") }] }], "2026-05-02");
+    const s26 = report(SEASON_2026.seasonId, "2026-05-02");
+    const s25 = report(SEASON_2025.seasonId, "2026-05-02");
+    expect(s26.rows.map((x) => [x.plotCode, x.holder])).toEqual([["B02", "Hale Pennywort"], ["B03", "Tavi Bramblequill"]]);
+    expect(s26.totals.charged + s25.totals.charged).toBe(Object.values(garden.state.ledger).filter((e) => e.type === "charge").reduce((n, e) => n + e.minorUnits, 0));
+    expect(s26.totals).toEqual({ charged: 7200, received: 1200, balanceDue: 6000 });
+  });
+
+  it("lists the plot handovers up to the date, and the waiting list as it stood", async () => {
+    await gardenYear();
+    expect(report(SEASON_2026.seasonId, "2026-05-02").handovers).toEqual([{ plotCode: "B02", on: "2026-05-01", from: "Ada Stonecrop", to: "Hale Pennywort" }]);
+    expect(report(SEASON_2026.seasonId, "2026-04-30").handovers).toEqual([]);
+    expect(report(SEASON_2026.seasonId, "2026-05-02").waiting).toEqual([{ position: 1, name: "Olin Reedwhorl", joinedOn: "2026-01-10", pending: false }]);
+    expect(report(SEASON_2026.seasonId, "2026-04-05").waiting.map((w) => [w.position, w.name, w.pending])).toEqual([
+      [1, "Tavi Bramblequill", true],
+      [2, "Olin Reedwhorl", false],
+    ]);
+    expect(report(SEASON_2026.seasonId, "2026-01-09").waiting).toEqual([]);
+  });
+
+  it("says there are no charges for a season that has none", async () => {
+    garden = await GardenEnv.create();
+    await buildThimble(garden);
+    await garden.must([{ type: "new_season", ...SEASON_2026 }], "2026-04-01");
+    const r = report(SEASON_2026.seasonId, "2026-04-20");
+    expect(r.empty).toBe(true);
+    expect(r.rows).toEqual([]);
+    expect(r.totals).toEqual({ charged: 0, received: 0, balanceDue: 0 });
+    expect(reportTable(garden.state, r, say).sections[0]?.emptyText).toBe("noChargesInSeason");
+  });
+
+  it("makes a table with the scope, the totals in the currency, and the three parts", async () => {
+    await gardenYear();
+    const table = reportTable(garden.state, report(SEASON_2026.seasonId, "2026-05-02"), say);
+    expect(table.title).toBe("seasonReport");
+    expect(table.subtitle).toBe("privateRegisterReport");
+    expect(table.scope).toEqual(["seasonLine(season=Season 2026)", "reportAsAtLine(date=2026-05-02)", `reportBasis(date=2026-05-02,revision=${garden.revision})`]);
+    expect(table.totals).toEqual([
+      { label: "feesCharged", value: "GBP 36.00" },
+      { label: "feesReceived", value: "GBP 12.00" },
+      { label: "balanceDue", value: "GBP 24.00" },
+    ]);
+    expect(table.sections.map((s) => s.heading)).toEqual(["seasonFees", "plotHandovers", "waitingListOrder"]);
+    expect(table.sections[0]?.rows).toEqual([["B03", "Tavi Bramblequill", "GBP 36.00", "GBP 12.00", "GBP 0.00", "GBP 24.00", "feePartPaid"]]);
+    expect(table.sections[1]?.rows).toEqual([["B02", "2026-05-01", "Ada Stonecrop", "Hale Pennywort"]]);
+    expect(table.sections[2]?.rows).toEqual([["1", "Olin Reedwhorl", "2026-01-10"]]);
+    expect(table.footer).toBe("reportPrivateFooter");
+  });
+
+  it("prints with repeated headings and no script, from the table alone", async () => {
+    await gardenYear();
+    const html = buildReportPrint(reportTable(garden.state, report(SEASON_2026.seasonId, "2026-05-02"), say), A4);
+    expect(html).toContain("<thead>");
+    expect(html).toContain("<h1>seasonReport</h1>");
+    expect(html).toContain("Tavi Bramblequill");
+    expect(html).not.toMatch(/<script/i);
+    expect(html).toContain("break-inside:avoid");
+  });
+
+  it("writes a CSV with the byte order mark, a heading row, a row for each part, and escapes a formula", async () => {
+    await gardenYear();
+    await garden.must([{ type: "end_tenancy", tenancyId: gtenancy("B01") }], "2026-05-03");
+    await garden.must([{ type: "record_tenancy", tenancyId: gid("tenancy:B01:2"), claimId: gclaim("tenancy:B01:2"), personId: gid("person:formula"), holderName: "=HYPERLINK(\"x\")", spaceId: gid("space:B01:1"), start: "2026-05-03", sourceRef: "TB-F" }]);
+    await garden.must([{ type: "apply_charges", seasonId: SEASON_2026.seasonId, items: [{ chargeId: chargeId("B01:f"), tenancyId: gid("tenancy:B01:2") }] }], "2026-05-03");
+    const csv = reportCsv(garden.state, report(SEASON_2026.seasonId, "2026-05-03"), say);
+    expect(csv.startsWith("\uFEFF")).toBe(true);
+    const lines = csv.slice(1).trimEnd().split("\r\n");
+    expect(lines[0]).toBe("partHeading,plotLabel,holderHeading,amountCharged,amountReceived,reversedHeading,stillDue,statusHeading,dateHeading,detailHeading");
+    expect(lines).toHaveLength(1 + 2 + 1 + 1);
+    expect(csv).toContain("\"'=HYPERLINK(\"\"x\"\")\"");
+    expect(csv).not.toMatch(/,=HYPERLINK/);
+    expect(lines[1]).toContain("GBP 36.00");
+  });
+
+  it("is built the same after a reload", async () => {
+    await gardenYear();
+    const again = seasonReport(await garden.reload(), { seasonId: SEASON_2026.seasonId, asOf: "2026-05-02", revision: garden.revision });
+    expect(again).toEqual(report(SEASON_2026.seasonId, "2026-05-02"));
   });
 });

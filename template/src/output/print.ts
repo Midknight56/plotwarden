@@ -2,7 +2,10 @@
 // the family print from the visitor object alone, the private report from a plain table model.
 // Black, white and grays only, so a page stays legible in grayscale. No script.
 import { escapeHtml, familyMapSvg, fillWords, plotsOfSection } from "./familyMap";
-import type { FamilyFile } from "./privacy";
+import { availabilityMapSvg, freePlotsOfSection } from "./availabilityMap";
+import { checkAvailabilityWords } from "./availabilityHtml";
+import type { AvailabilityWords } from "./availabilityHtml";
+import type { AvailabilityFile, FamilyFile } from "./privacy";
 import { checkWords } from "./visitorHtml";
 import type { FamilyWords } from "./visitorHtml";
 
@@ -49,6 +52,10 @@ tr{break-inside:avoid;page-break-inside:avoid}
 .sel-inner{fill:none;stroke:#000;stroke-width:3}
 .tab{fill:#ddd;stroke:#000;stroke-width:2}
 .tab-text{font-weight:700}
+.bed{fill:#fff;stroke:#000;stroke-width:2}
+.hatch{fill:none;stroke:#444;stroke-width:1.25}
+.peg{fill:#fff;stroke:#000;stroke-width:1.5}
+.ground{fill:none;stroke:#888;stroke-width:1}
 .sheet{break-inside:avoid}
 .note{font-size:10pt;color:#444}`;
 
@@ -124,4 +131,42 @@ export function buildReportPrint(table: ReportTable, options: PrintOptions): str
     .join("");
   const body = `<header><h1>${escapeHtml(table.title)}</h1><p>${escapeHtml(table.subtitle)}</p>${table.scope.map((s) => `<p>${escapeHtml(s)}</p>`).join("")}</header>${totals}${sections}<footer><p class="note">${escapeHtml(table.footer)}</p></footer>`;
   return document_(table.title, options, body);
+}
+
+/** The availability print: its own document, built from the availability object alone. */
+export function buildAvailabilityPrint(file: AvailabilityFile, words: AvailabilityWords, options: PrintOptions): string {
+  checkAvailabilityWords(words);
+  const asAt = fillWords(words.asAt, { date: file.asOf });
+  const sectionLabel = (sectionId: string): string => file.sections.find((s) => s.id === sectionId)?.label ?? "";
+
+  const head = `<header><h1>${escapeHtml(file.siteTitle)}</h1><p>${escapeHtml(words.pageTitle)} · ${escapeHtml(asAt)}</p></header>`;
+  const entrance = `<section><h2>${escapeHtml(words.entrance)}</h2><p>${escapeHtml(file.gate.name)}</p></section>`;
+  const ask = `<section><h2>${escapeHtml(words.askSecretary)}</h2>${file.instructions === "" ? "" : `<p>${escapeHtml(file.instructions)}</p>`}</section>`;
+  const index =
+    file.freePlots.length === 0
+      ? `<section><h2>${escapeHtml(words.availablePlots)}</h2><p>${escapeHtml(words.noPlots)}</p></section>`
+      : `<section><h2>${escapeHtml(words.availablePlots)}</h2><table><thead><tr><th>${escapeHtml(words.plot)}</th><th>${escapeHtml(words.section)}</th></tr></thead><tbody>${file.freePlots
+          .map((p) => `<tr><td>${escapeHtml(p.code)}</td><td>${escapeHtml(sectionLabel(p.sectionId))}</td></tr>`)
+          .join("")}</tbody></table></section>`;
+
+  const dense = file.freePlots.length + file.neutralGround.length > DENSE_PLOT_LIMIT;
+  let maps: string;
+  if (!dense) {
+    maps = `<section class="sheet" data-sheet="overview"><h2>${escapeHtml(words.mapLabel)}</h2>${availabilityMapSvg(file, { width: 640, label: words.mapLabel })}</section>`;
+  } else {
+    const sections = file.sections.filter((s) => freePlotsOfSection(file, s.id).length > 0);
+    const total = sections.length;
+    const overview = `<section class="sheet" data-sheet="overview" style="break-after:page"><h2>${escapeHtml(words.mapLabel)}</h2>${availabilityMapSvg(file, { width: 640, label: words.mapLabel, labels: false, sectionBoxes: true })}<h3>${escapeHtml(words.sections)}</h3><ol class="plain">${sections
+      .map((s, i) => `<li>${escapeHtml(s.label)} · ${escapeHtml(fillWords(words.sheet, { n: i + 1, total }))}</li>`)
+      .join("")}</ol></section>`;
+    const sheets = sections
+      .map((s, i) => {
+        const ids = new Set(freePlotsOfSection(file, s.id).map((p) => p.id));
+        const last = i === sections.length - 1;
+        return `<section class="sheet" data-sheet="section" style="${last ? "" : "break-after:page"}"><h2>${escapeHtml(s.label)}</h2><p>${escapeHtml(fillWords(words.sheet, { n: i + 1, total }))}</p>${availabilityMapSvg(file, { width: 640, label: s.label, plotIds: ids, context: false })}</section>`;
+      })
+      .join("");
+    maps = overview + sheets;
+  }
+  return document_(`${file.siteTitle} · ${words.pageTitle}`, options, `${head}${entrance}${ask}${index}${maps}`);
 }
