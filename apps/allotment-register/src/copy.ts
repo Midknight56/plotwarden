@@ -28,7 +28,6 @@ export const ALLOT_COPY: Readonly<Record<string, string>> = {
   reportsLink: "Reports",
   notFreeNow: "not free now",
   deskPlan: "Plan of the beds",
-  deskAtAGlance: "At a glance",
   freeCount: "{count} free",
   reservedCount: "{count} reserved",
   takenCount: "{count} taken",

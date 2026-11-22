@@ -121,6 +121,84 @@ test.describe("the first view", () => {
   });
 });
 
+test.describe("the first search, the groups of links and the counts", () => {
+  test("a practice register offers one example button with the code of the next free plot, and pressing it searches", async ({ page }) => {
+    const requests = trackRequests(page, APP);
+    await openBeds(page);
+    const example = page.getByRole("button", { name: "Try B03", exact: true });
+    await expect(example).toHaveCount(1);
+    await expect(page.getByRole("button", { name: /^Try / })).toHaveCount(1);
+    await check(page, "desk-example");
+    await example.click();
+    await expect(page.getByLabel("Name or plot code", { exact: true })).toHaveValue("B03");
+    await expect(page.getByRole("listitem").filter({ hasText: "B03 · Sunny Row · Free" })).toHaveCount(1);
+    await expectSearchOutOfAddress(page, "B03");
+    await check(page);
+
+    // The example follows the register: once B03 is let, the next free plot is B05.
+    await page.getByRole("button", { name: "Clear search" }).click();
+    await giveB03ToTavi(page);
+    await expect(page.getByRole("button", { name: "Try B05", exact: true })).toHaveCount(1);
+    await expect(page.getByRole("button", { name: "Try B03", exact: true })).toHaveCount(0);
+    expect(requests.external).toEqual([]);
+  });
+
+  test("a register the keeper started never shows the example button", async ({ page }) => {
+    await page.goto("/");
+    await page.getByRole("link", { name: "Start a register" }).click();
+    await page.getByLabel("Site name").fill("Hill Allotments");
+    await page.getByLabel("Local time zone").selectOption("Europe/London");
+    await page.getByLabel("Currency").selectOption("GBP");
+    await page.getByRole("button", { name: "Create register" }).click();
+    await expect(page.getByRole("heading", { level: 1, name: "Hill Allotments" })).toBeVisible();
+    await expect(page.getByRole("button", { name: /^Try / })).toHaveCount(0);
+    await check(page, "desk-own");
+  });
+
+  test("puts the links of the desk in three named groups, Records, Share and Site, and every landmark has its own name", async ({ page }) => {
+    await openBeds(page);
+    const groups = [
+      { name: "Records", links: ["Waiting list · 2", "Current tenancies", "Season fees", "Add records"] },
+      { name: "Share", links: ["Make an availability map", "Reports", "Committee review"] },
+      { name: "Site", links: ["Map", "Plot list", "Back up"] },
+    ];
+    const main = page.locator("main");
+    for (const group of groups) {
+      const nav = main.getByRole("navigation", { name: group.name, exact: true });
+      await expect(nav, group.name).toHaveCount(1);
+      await expect(nav.getByRole("heading", { level: 2, name: group.name, exact: true })).toBeVisible();
+      expect(await nav.getByRole("link").allInnerTexts(), group.name).toEqual(group.links);
+    }
+    const names = await page.evaluate(() => [...document.querySelectorAll("nav")].map((n) => n.getAttribute("aria-label") ?? document.getElementById(n.getAttribute("aria-labelledby") ?? "")?.textContent ?? ""));
+    expect(new Set(names).size).toBe(names.length);
+    expect(names).toEqual(expect.arrayContaining(["Records", "Share", "Site"]));
+    await check(page, "desk-groups");
+  });
+
+  test("shows how many plots are free, reserved, taken and unusable as one line of plain text, not as boxes that look like buttons", async ({ page }) => {
+    await openBeds(page);
+    const tally = page.locator("main p.tally");
+    await expect(tally).toHaveCount(1);
+    await expect(tally).toHaveText("2 free · 0 reserved · 3 taken · 1 unusable");
+    // Hand totals 2.1: taken B01 B02 B04, free B03 B05, unusable B06.
+    const read = await tally.evaluate((el) => {
+      const style = getComputedStyle(el);
+      return {
+        border: style.borderTopWidth,
+        background: style.backgroundColor,
+        cursor: style.cursor,
+        inNav: el.closest("nav") !== null,
+        controls: el.querySelectorAll("a, button, input, [tabindex], li").length,
+      };
+    });
+    expect(read).toEqual({ border: "0px", background: "rgba(0, 0, 0, 0)", cursor: "auto", inNav: false, controls: 0 });
+    // The desk has no list of boxes: no element with the box look of the reports.
+    await expect(page.locator("main .counts")).toHaveCount(0);
+    await expect(page.getByRole("navigation", { name: "At a glance" })).toHaveCount(0);
+    await check(page);
+  });
+});
+
 test.describe("the desk", () => {
   test("shows the next free plot and the next applicant, with one main action and a plan of beds", async ({ page }) => {
     const requests = trackRequests(page, APP);

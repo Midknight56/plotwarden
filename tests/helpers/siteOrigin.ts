@@ -1,6 +1,6 @@
 // What the browser specs of the assembled site share. Test helper. The template never imports it.
 import { expect } from "@playwright/test";
-import type { Page, Response } from "@playwright/test";
+import type { Locator, Page, Response } from "@playwright/test";
 import { measureLayout } from "./measureLayout";
 import { sizeOf } from "./routes";
 
@@ -10,6 +10,27 @@ export const SITE = "http://127.0.0.1:4174/";
 /** The two sample visitor files, as the build names them. */
 export const FAMILY_FILE = "family-map-2026-04-20.html";
 export const SEEKER_FILE = "availability-map-2026-04-20.html";
+
+/** The two register cards of the hub. */
+export type HubRegister = "churchyard" | "allotment";
+const HUB_CARD: Readonly<Record<HubRegister, string>> = { churchyard: "Churchyard Register", allotment: "Allotment Register" };
+
+/** The card of one register on the hub. Each card holds its own two buttons. */
+export function hubCard(page: Page, which: HubRegister): Locator {
+  return page.getByRole("article", { name: HUB_CARD[which], exact: true });
+}
+
+/** From the hub, press "Try the practice register" on one card. One press. */
+export async function tryPracticeFromHub(page: Page, which: HubRegister): Promise<void> {
+  await page.goto("/");
+  await hubCard(page, which).getByRole("link", { name: "Try the practice register" }).click();
+}
+
+/** From the hub, press "Start your own" on one card. */
+export async function startOwnFromHub(page: Page, which: HubRegister): Promise<void> {
+  await page.goto("/");
+  await hubCard(page, which).getByRole("link", { name: "Start your own" }).click();
+}
 
 /** Everything a page logs that a person would call a fault: a console error or warning, and a script error. */
 export function trackFaults(page: Page): { faults: string[] } {

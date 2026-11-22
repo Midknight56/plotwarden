@@ -27,6 +27,7 @@
     "build:inspector": "vite build --config tools/inspector/vite.config.ts && vite build --config tools/inspector/vite.config.ts --mode cli",
     "hub:build": "vite build --config site/vite.config.ts",
     "build:visitor": "node scripts/build-visitor.mjs --out dist/apps/hub",
+    "build:maps": "node scripts/build-practice-maps.mjs",
     "build:apps": "npm run church:build && npm run allot:build && npm run hub:build && npm run build:visitor",
     "build:sw": "node scripts/build-sw.mjs --site dist/site",
     "lock:desk": "node scripts/lock-desk.mjs",

@@ -225,10 +225,28 @@ Tests: `tests/unit/changedTests.test.ts` (group "the hook log"). Implements R25.
 6. A run with `--list` runs no test and writes no line. When the line cannot be written, the script shall print one warning and keep the exit code it had.
 7. `.local/` is not tracked, so the log stays on the machine. The log is evidence of a run of the script, not of who started it. A line with the event `direct` was not started by a hook.
 
+## Z21 First screens
+
+Tests: `tests/unit/siteCopy.test.ts`, browser `release.spec.ts`, `warden-family.spec.ts`, `secretary-season.spec.ts`, `layout.spec.ts`, `judge-guide.spec.ts`. Implements R23.1, R24.1 and R24.3. Built in task 16-first-screens.
+
+A first time reader shall see what the product does and one thing to press in five seconds. This is a design target. No person has been timed, so it is not a result.
+
+1. When the hub opens, the first line under its heading shall read exactly "Find a burial. Offer a garden plot. Keep the history of both." The sentence "Plotwarden keeps plot registers on the keeper's own device." stays under it.
+2. When the hub shows the Churchyard Register and the Allotment Register, each card shall hold its name, one line, a small drawing of its practice map, and two buttons: "Try the practice register" and "Start your own". The Review Desk card keeps its one link, "Open Review Desk preview", and has no drawing. The hub shall no longer hold "Open Churchyard Register" or "Open Allotment Register".
+3. When a drawing is made, the shared sheet (`template/src/map/sheet.ts` and `SheetSvg`) shall draw it from the practice data of Lantern Fold and Thimble Beds, as the same plots, states, gate and paths that the practice register shows. It shall be inline SVG text. It shall use no image file, no `<img>`, no address and no request. It shall have an accessible name from the site catalog. It shall hold no person name. Because the site may not import the registers, `tools/site/practiceMaps.ts` makes the markup, `scripts/build-practice-maps.mjs` writes it to `site/src/practiceMaps.ts`, and a unit test fails when that file differs from a fresh build.
+4. When "Try the practice register" is pressed on the hub, one press shall open the practice register of that card on its home route, with the map drawn. The link is `<app>/#/practice`. The route shall open the practice register as the library button does, never twice, and replace its own history entry so Back returns to the hub. In an app with no practice register the route shall say "Page not found".
+5. When "Start your own" is pressed, the app shall open its "Start a register" form (`<app>/#/new`).
+6. When a practice register is open, the search box shall offer one example button. In the churchyard it reads "Try Quillmoss". In the garden it reads "Try " and the code of the next free plot. Pressing it shall fill the search box and run the search, and the result shall read "Mirel Quillmoss · Y07 · Yew Walk" in the churchyard. In the garden with no free plot there shall be no button. A register that the keeper started shall never show the button.
+7. When a desk is shown, its links shall sit in three named groups, "Records", "Share" and "Site", each a navigation landmark named by its visible heading. Churchyard: Records holds Record a burial, Reserve a space, Unplaced burials and Add records. Share holds Make a family map, Reports and Committee review. Site holds Map, Plot list and Back up. Garden: Records holds Waiting list, Current tenancies, Season fees and Add records. Share holds Make an availability map, Reports and Committee review. Site holds Map, Plot list and Back up.
+8. When the garden desk shows how many plots are free, reserved, taken and unusable, the counts shall be one line of plain text with the middle dot between them. They shall not be a navigation, a list of boxes or anything that looks like a button.
+9. When any of these screens is measured at 360 by 640 and 1920 by 1080, every layout measure of Z12 shall pass with no exclusion.
+10. When `docs/judge-guide.md` names the new buttons, `judge-guide.spec.ts` shall click them in the order the guide gives.
+
 ---
 
 ## Not claimed
 
+- No person has timed the five second target of Z21.
 - No real person has used these screens. The checks here are browser assertions, unit tests and one person's review of pictures. A screen reader was not used.
 - Only headless Chromium on one Windows machine was used. Firefox, WebKit and a real phone were not.
 - A browser print dialog is not a printed page. Print is checked by the document handed to a hidden frame.

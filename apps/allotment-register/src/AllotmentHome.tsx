@@ -6,7 +6,7 @@ import { buildSheet } from "../../../template/src/map/sheet";
 import { siteTotalsAt } from "../../../template/src/status";
 import { search } from "../../../template/src/search";
 import type { SearchEntry, SearchName } from "../../../template/src/search";
-import { Button, ButtonLink, TextField, keepSearch } from "../../../template/src/ui/controls";
+import { Button, ButtonLink, LinkGroup, TextField, keepSearch } from "../../../template/src/ui/controls";
 import { plotRows } from "../../../template/src/ui/plotView";
 import { useShell } from "../../../template/src/ui/shellContext";
 import { MapKey, SheetSvg, useElementWidth } from "../../../template/src/ui/SiteMap";
@@ -57,6 +57,8 @@ export function AllotmentHome() {
   const overdue = Object.values(open.state.offers).filter((o) => isOverdue(o, today));
   const sectionOf = (sectionId: string | undefined): string => (sectionId === undefined ? t("noSection") : (open.state.map.sections[sectionId]?.name ?? t("noSection")));
   const ready = nextPlot !== undefined && nextRow !== undefined;
+  // The practice register offers one search to try. A register that the keeper started never does.
+  const practice = open.site.workspace === "walkthrough";
 
   const records = useMemo(() => allotRecords(open.state), [open.state]);
   const hits = useMemo(() => {
@@ -177,52 +179,14 @@ export function AllotmentHome() {
 
       <div className="garden-desk">
         <div className="stack">
-          <nav aria-label={t("deskAtAGlance")}>
-            <ul className="counts plain" aria-label={t("deskAtAGlance")}>
-              <li>{t("freeCount", { count: totals.plots.byPrimary.free })}</li>
-              <li>{t("reservedCount", { count: totals.plots.byPrimary.reserved })}</li>
-              <li>{t("takenCount", { count: totals.plots.byPrimary.taken })}</li>
-              <li>{t("unusableCount", { count: totals.plots.byPrimary.unusable })}</li>
-            </ul>
-          </nav>
-          <nav aria-label={t("searchThisRegister")}>
-            <ul className="actions plain">
-              <li>
-                <ButtonLink href={`${base}/waiting`}>{queue.length === 0 ? t("waitingList") : `${t("waitingList")} · ${queue.length}`}</ButtonLink>
-              </li>
-              <li>
-                <ButtonLink href={`${base}/tenancy`}>{t("currentTenancies")}</ButtonLink>
-              </li>
-              <li>
-                <ButtonLink href={`${base}/payments`}>{t("seasonFees")}</ButtonLink>
-              </li>
-              <li>
-                <ButtonLink href={`${base}/seeker`}>{t("makeAvailabilityMap")}</ButtonLink>
-              </li>
-              <li>
-                <ButtonLink href={`${base}/report`}>{t("reportsLink")}</ButtonLink>
-              </li>
-              <li>
-                <ButtonLink href={`${base}/exchange`}>{t("committeeReview")}</ButtonLink>
-              </li>
-            </ul>
-          </nav>
-          <nav aria-label={t("registerLinks")}>
-            <ul className="actions plain">
-              <li>
-                <ButtonLink href={`${base}/map`}>{t("mapLink")}</ButtonLink>
-              </li>
-              <li>
-                <ButtonLink href={`${base}/list`}>{t("plotListLink")}</ButtonLink>
-              </li>
-              <li>
-                <ButtonLink href={`${base}/add`}>{t("addRecords")}</ButtonLink>
-              </li>
-              <li>
-                <ButtonLink href={`${base}/backup`}>{t("backUp")}</ButtonLink>
-              </li>
-            </ul>
-          </nav>
+          <p className="tally">
+            {[
+              t("freeCount", { count: totals.plots.byPrimary.free }),
+              t("reservedCount", { count: totals.plots.byPrimary.reserved }),
+              t("takenCount", { count: totals.plots.byPrimary.taken }),
+              t("unusableCount", { count: totals.plots.byPrimary.unusable }),
+            ].join(" · ")}
+          </p>
 
           <section className="stack" aria-labelledby="find-heading">
             <h2 id="find-heading">{t("searchHeading")}</h2>
@@ -242,6 +206,16 @@ export function AllotmentHome() {
                     {t("clearSearch")}
                   </Button>
                 )}
+                {practice && nextPlot !== undefined ? (
+                  <Button
+                    onClick={() => {
+                      setText(nextPlot.code);
+                      go(nextPlot.code);
+                    }}
+                  >
+                    {t("tryExample", { example: nextPlot.code })}
+                  </Button>
+                ) : null}
               </div>
             </form>
             {query.trim() === "" ? (
@@ -279,6 +253,43 @@ export function AllotmentHome() {
               </div>
             )}
           </section>
+
+          <LinkGroup id="group-records" title={t("groupRecords")}>
+            <li>
+              <ButtonLink href={`${base}/waiting`}>{queue.length === 0 ? t("waitingList") : `${t("waitingList")} · ${queue.length}`}</ButtonLink>
+            </li>
+            <li>
+              <ButtonLink href={`${base}/tenancy`}>{t("currentTenancies")}</ButtonLink>
+            </li>
+            <li>
+              <ButtonLink href={`${base}/payments`}>{t("seasonFees")}</ButtonLink>
+            </li>
+            <li>
+              <ButtonLink href={`${base}/add`}>{t("addRecords")}</ButtonLink>
+            </li>
+          </LinkGroup>
+          <LinkGroup id="group-share" title={t("groupShare")}>
+            <li>
+              <ButtonLink href={`${base}/seeker`}>{t("makeAvailabilityMap")}</ButtonLink>
+            </li>
+            <li>
+              <ButtonLink href={`${base}/report`}>{t("reportsLink")}</ButtonLink>
+            </li>
+            <li>
+              <ButtonLink href={`${base}/exchange`}>{t("committeeReview")}</ButtonLink>
+            </li>
+          </LinkGroup>
+          <LinkGroup id="group-site" title={t("groupSite")}>
+            <li>
+              <ButtonLink href={`${base}/map`}>{t("mapLink")}</ButtonLink>
+            </li>
+            <li>
+              <ButtonLink href={`${base}/list`}>{t("plotListLink")}</ButtonLink>
+            </li>
+            <li>
+              <ButtonLink href={`${base}/backup`}>{t("backUp")}</ButtonLink>
+            </li>
+          </LinkGroup>
         </div>
 
         <div className="stack">

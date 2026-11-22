@@ -352,6 +352,45 @@ Standard input is read in every mode but `--list`. For `--git` it is read for th
 
 The test of the line with a failing file runs the real runner on a small root made under `.local/`, so the count comes from a real summary. The other cases use a fake runner that prints a summary. The time is checked between two readings of the clock around the run.
 
+## Z-D15 First screens (Z21)
+
+### Files
+
+| File | Owns | Test |
+|---|---|---|
+| `site/src/copy.ts` | New keys: `jobLine`, `tryPractice`, `startOwn`, `churchyardMapLabel`, `allotmentMapLabel`. `churchyardOpen` and `allotmentOpen` are removed | `siteCopy.test.ts` |
+| `site/src/Home.tsx` | The job line, and two register cards with a drawing and two links | `siteCopy.test.ts`, `release.spec.ts` |
+| `site/src/practiceMaps.ts` | Generated. Two strings of SVG markup, `PRACTICE_MAPS.church` and `PRACTICE_MAPS.garden`. Never edited by hand | `siteCopy.test.ts` (freshness) |
+| `site/src/site.css` | The sheet look for the two drawings, the card layout | `release.spec.ts` layout |
+| `tools/site/practiceMaps.ts` | `buildPracticeMaps()`: runs the fixtures `lantern-fold` and `thimble-beds` through the real adapters, builds the sheet with `buildSheet` at 272 px, draws it with `SheetSvg` inside a stub shell value that holds only the plot shape, and returns the markup | `siteCopy.test.ts` |
+| `scripts/build-practice-maps.mjs` | Bundles the tool as `build-visitor.mjs` does and writes `site/src/practiceMaps.ts`. `npm run build:maps` | `siteCopy.test.ts` |
+| `template/src/ui/Library.tsx` | `usePracticeRegister()`, shared by the library button and the new `PracticeEntry` | `entry-library.spec.ts`, `release.spec.ts` |
+| `template/src/ui/RegisterShell.tsx` | Route `#/practice` | `release.spec.ts` |
+| `template/src/ui/copyScreens.ts` | `groupRecords`, `groupShare`, `groupSite`, `tryExample`, `openingPractice` | `copy.test.ts`, `paperCopy.test.ts` |
+| `apps/*/src/{ChurchyardHome,AllotmentHome}.tsx` | The example button, the three groups, the plain counts | `warden-family.spec.ts`, `secretary-season.spec.ts`, `layout.spec.ts` |
+| `apps/churchyard-register/src/walkthrough.ts` | `LANTERN_EXAMPLE = "Quillmoss"` | `warden-family.spec.ts` |
+| `template/src/ui/register.css` | `.tally` (plain text) and `.group-heading` | `layout.spec.ts` |
+
+### The drawings
+
+The site may import nothing outside `site/` (`check-imports`, rule `site-layer`), and a runtime import of the registers would put their rules and their schema library into the hub script. So the drawing is made when the project is built, not when the page opens. `buildPracticeMaps` is the one place that joins the site and the registers. It lives in `tools/`, which may import both. The plots, their states and the gate come from the practice data through `plotSummaryAt`, as `plotRows` does for the register, so the hub drawing and the desk drawing cannot disagree about a plot. The sheet is built at 272 px. A card on a 360 px phone holds 284 px, and the 2 px frame takes 4, so the drawing keeps its own size and its text is never drawn under 12 px. A `viewBox` is added so a tool can read the scale. The frame has `overflow-x: auto`, so on a page narrower than the drawing, as at 200 percent zoom on a phone, the frame scrolls and the page does not. The drawing is never shrunk and never hidden.
+
+`site/src/practiceMaps.ts` is committed. `siteCopy.test.ts` rebuilds the markup and compares, so a change to the sheet or to the practice data fails until `npm run build:maps` is run. The page sets the markup with `dangerouslySetInnerHTML` from that constant. The constant is code, not input, and holds no script.
+
+### One press
+
+`#/practice` is a library route. `PracticeEntry` calls `usePracticeRegister().open()` once on mount, shows "Opening register." while it runs, then calls `navigate("/r/<id>", { replace: true })`. An app with no `walkthrough` renders `NotFound`. A failure shows the storage notice and the link "Registers". The hub links are plain anchors, `churchyard/#/practice` and `allotments/#/practice`. A fragment is never sent to the host and the worker ignores it, so the link works offline.
+
+On a phone the map sits under the search, as before. After one press the register home is open and the map is drawn on it. The map is one scroll away on a phone, and beside the search on a wide screen. The browser test reads the map after `scrollIntoViewIfNeeded` at 360 by 640 and checks it in the viewport at 1920 by 1080.
+
+### The example button
+
+The home screens read `open.site.workspace === "walkthrough"`. The button is `type="button"`, so it does not submit the form. It sets the field text and calls the same `go(text)` as Search, so the text stays in `history.state` and never in the address. The churchyard text is `LANTERN_EXAMPLE`. The garden text is the code of `free[0]`, the next free plot, so it follows the register: after B03 is offered, the button reads the code of the next one.
+
+### Groups and counts
+
+Each group is `<nav aria-labelledby="group-<name>">` over an `<h2 id="group-<name>" className="group-heading">`. The two old navigations named "Search this register" and "Links for this register" are gone, so no landmark repeats a name. The search form keeps the role `search`. The counts are one `<p className="tally">`: "2 free · 0 reserved · 3 taken · 1 unusable". It has no border and no fill, and it is not inside a navigation. The reports keep their `.counts` boxes, which are not on a desk.
+
 ## Z-D11 Evidence
 
 Each task row in `docs/kiro-log.md` names its red run and its green run. The log holds no local absolute path. Browser results say headless Chromium on one Windows machine. Results from a unit test, a browser assertion and a person's review of a picture are labelled apart. No claim about users, speed on other machines or other browsers is made.

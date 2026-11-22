@@ -14,9 +14,9 @@ import { fileURLToPath } from "node:url";
 import { expect, test } from "@playwright/test";
 import type { Page } from "@playwright/test";
 import { measureLayout, trackRequests } from "../helpers/measureLayout";
-import { openPractice, sizeOf } from "../helpers/routes";
+import { openPractice, sizeOf, storedSites } from "../helpers/routes";
 import { CHURCH, GARDEN } from "../helpers/routes";
-import { FAMILY_FILE, SEEKER_FILE, SITE, expectLayout, expectNoMissingPictures, saveProof, trackFailures, trackFaults } from "../helpers/siteOrigin";
+import { FAMILY_FILE, SEEKER_FILE, SITE, expectLayout, expectNoMissingPictures, hubCard, saveProof, startOwnFromHub, trackFailures, trackFaults, tryPracticeFromHub } from "../helpers/siteOrigin";
 
 test.use({ baseURL: SITE });
 
@@ -111,16 +111,41 @@ test.describe("direct entry and refresh", () => {
 });
 
 test.describe("the hub", () => {
-  test("says in one line what Plotwarden is, and offers the two registers and the Desk preview as clear choices", async ({ page }) => {
+  test("says the job first, then what Plotwarden is, and offers each register two buttons and the Desk preview one link", async ({ page }) => {
     const requests = trackRequests(page, SITE);
     await page.goto("/");
     await expect(page.getByRole("heading", { level: 1, name: "Plotwarden" })).toBeVisible();
+    const job = page.getByText("Find a burial. Offer a garden plot. Keep the history of both.", { exact: true });
+    await expect(job).toBeVisible();
     await expect(page.getByText("Plotwarden keeps plot registers on the keeper's own device.")).toBeVisible();
-    await expect(page.getByRole("link", { name: "Open Churchyard Register" })).toHaveAttribute("href", "churchyard/");
-    await expect(page.getByRole("link", { name: "Open Allotment Register" })).toHaveAttribute("href", "allotments/");
+    // The job line is the first paragraph, above the line about the device.
+    const [jobBox, deviceBox, headingBox] = await Promise.all([
+      job.boundingBox(),
+      page.getByText("Plotwarden keeps plot registers on the keeper's own device.").boundingBox(),
+      page.getByRole("heading", { level: 1, name: "Plotwarden" }).boundingBox(),
+    ]);
+    expect((jobBox?.y ?? 0) > (headingBox?.y ?? 0)).toBe(true);
+    expect((jobBox?.y ?? 0) < (deviceBox?.y ?? 0)).toBe(true);
+
+    for (const [which, folder] of [["churchyard", "churchyard/"], ["allotment", "allotments/"]] as const) {
+      const card = hubCard(page, which);
+      await expect(card).toBeVisible();
+      await expect(card.getByRole("link", { name: "Try the practice register" })).toHaveAttribute("href", `${folder}#/practice`);
+      await expect(card.getByRole("link", { name: "Start your own" })).toHaveAttribute("href", `${folder}#/new`);
+      // A small drawing of the practice map, drawn by the shared sheet: inline, with its name, no picture file.
+      const drawing = card.locator("svg.sheet");
+      await expect(drawing).toHaveCount(1);
+      await expect(drawing).toBeVisible();
+      await expect(drawing).toHaveAttribute("role", "img");
+      expect(await card.locator("img, image").count()).toBe(0);
+    }
+    await expect(page.getByRole("link", { name: "Open Churchyard Register" })).toHaveCount(0);
+    await expect(page.getByRole("link", { name: "Open Allotment Register" })).toHaveCount(0);
     await expect(page.getByRole("link", { name: "Open Review Desk preview" })).toHaveAttribute("href", "review/");
     await expect(page.getByRole("link", { name: "See the family map" })).toHaveAttribute("href", "visitor/family/");
     await expect(page.getByRole("link", { name: "See the plot seeker map" })).toHaveAttribute("href", "visitor/seeker/");
+    // One thing to press first: the practice buttons are the dark ones, and the start buttons are plain.
+    expect(await page.locator("a.button:not(.secondary)").count()).toBe(2);
     await expectLayout(page);
     await saveProof(page, "hub-home");
     expect(requests.external).toEqual([]);
@@ -157,11 +182,12 @@ test.describe("the hub", () => {
   test("keeps every choice reachable by keyboard alone", async ({ page }) => {
     await page.goto("/");
     const names: string[] = [];
-    for (let i = 0; i < 12; i++) {
+    for (let i = 0; i < 8; i++) {
       await page.keyboard.press("Tab");
       names.push(await page.evaluate(() => (document.activeElement?.textContent ?? "").trim()));
     }
-    for (const name of ["About", "Open Churchyard Register", "Open Allotment Register", "Open Review Desk preview", "See the family map", "See the plot seeker map"]) expect(names).toContain(name);
+    // Eight stops, in reading order: the menu, the two registers with two buttons each, the Desk and the two sheets.
+    expect(names).toEqual(["About", "Try the practice register", "Start your own", "Try the practice register", "Start your own", "Open Review Desk preview", "See the family map", "See the plot seeker map"]);
   });
 });
 
@@ -251,28 +277,67 @@ for (const kind of [
 
 test.describe("the registers and the Desk, from the hub", () => {
   for (const app of [
-    { ...CHURCH, path: "churchyard/", link: "Open Churchyard Register", proof: "church-entry" },
-    { ...GARDEN, path: "allotments/", link: "Open Allotment Register", proof: "allotments-entry" },
-  ]) {
-    test(`${app.title}: opens from the hub, opens its practice register, and a refresh keeps the page`, async ({ page }) => {
+    { ...CHURCH, which: "churchyard", path: "churchyard/", proof: "church-entry" },
+    { ...GARDEN, which: "allotment", path: "allotments/", proof: "allotments-entry" },
+  ] as const) {
+    test(`${app.title}: one press on the hub opens ${app.practice} with its map drawn, nothing leaves the site, and Back returns to the hub`, async ({ page }) => {
       const requests = trackRequests(page, SITE);
       const faults = trackFaults(page);
-      await page.goto("/");
-      await page.getByRole("link", { name: app.link }).click();
-      await expect(page).toHaveURL(`${SITE}${app.path}`);
-      await expect(page.getByRole("heading", { level: 1, name: app.title })).toBeVisible();
-      await expectLayout(page);
-      await saveProof(page, app.proof);
-
-      await page.getByRole("button", { name: `Open ${app.practice}` }).click();
+      await tryPracticeFromHub(page, app.which);
       await expect(page.getByRole("heading", { level: 1, name: app.practice })).toBeVisible();
       const where = page.url();
       expect(where).toContain(`${SITE}${app.path}#/r/`);
+      expect(where).not.toContain("practice");
+
+      // The map is drawn on the home of the register. On a phone it sits under the search, one scroll away.
+      const map = page.getByRole("img", { name: /Site map/ });
+      await map.scrollIntoViewIfNeeded();
+      await expect(map).toBeVisible();
+      await expect(map).toBeInViewport();
+      expect(await page.locator("svg.sheet .plot").count()).toBeGreaterThanOrEqual(6);
+      await expect(page.getByText("No map yet")).toHaveCount(0);
+      await expectLayout(page);
+
       await page.reload();
       await expect(page.getByRole("heading", { level: 1, name: app.practice })).toBeVisible();
       expect(page.url()).toBe(where);
+      // The entry replaced itself, so Back is the hub and not a second opening.
+      await page.goBack();
+      await expect(page.getByRole("heading", { level: 1, name: "Plotwarden" })).toBeVisible();
       expect(requests.external).toEqual([]);
       expect(faults.faults).toEqual([]);
+    });
+
+    test(`${app.title}: pressing Try the practice register twice gives one practice register`, async ({ page }) => {
+      await tryPracticeFromHub(page, app.which);
+      await expect(page.getByRole("heading", { level: 1, name: app.practice })).toBeVisible();
+      await tryPracticeFromHub(page, app.which);
+      await expect(page.getByRole("heading", { level: 1, name: app.practice })).toBeVisible();
+      const sites = await storedSites(page);
+      expect(sites.filter((s) => s.title === app.practice)).toHaveLength(1);
+      expect(sites.filter((s) => s.workspace === "own")).toHaveLength(0);
+    });
+
+    test(`${app.title}: Start your own opens the form that starts a register, and starts no practice register`, async ({ page }) => {
+      const requests = trackRequests(page, SITE);
+      const faults = trackFaults(page);
+      await startOwnFromHub(page, app.which);
+      await expect(page).toHaveURL(`${SITE}${app.path}#/new`);
+      await expect(page.getByRole("heading", { level: 1, name: "Start a register" })).toBeVisible();
+      await expect(page.getByLabel("Site name")).toBeVisible();
+      await expectLayout(page);
+      expect(await storedSites(page)).toEqual([]);
+      expect(requests.external).toEqual([]);
+      expect(faults.faults).toEqual([]);
+    });
+
+    test(`${app.title}: the entry page and the practice route are laid out well`, async ({ page }) => {
+      await page.goto(`/${app.path}`);
+      await expect(page.getByRole("heading", { level: 1, name: app.title })).toBeVisible();
+      await expectLayout(page);
+      await saveProof(page, app.proof);
+      await page.getByRole("button", { name: `Open ${app.practice}` }).click();
+      await expect(page.getByRole("heading", { level: 1, name: app.practice })).toBeVisible();
     });
   }
 

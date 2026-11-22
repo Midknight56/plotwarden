@@ -13,7 +13,7 @@ import { readExchangeFile } from "../../template/src/exchange/schema";
 import type { ReviewPacket } from "../../template/src/exchange/schema";
 import { measureLayout, trackRequests } from "../helpers/measureLayout";
 import { fillGrid } from "../helpers/screens";
-import { SITE, expectLayout, saveProof, trackFaults } from "../helpers/siteOrigin";
+import { SITE, expectLayout, hubCard, saveProof, trackFaults, tryPracticeFromHub } from "../helpers/siteOrigin";
 
 test.use({ baseURL: SITE });
 
@@ -44,9 +44,7 @@ const plain = (words: string): string => words;
 
 /** Section 2 of the guide: offer B03, accept it, charge 36 pounds, take 12 pounds. */
 async function runAllotmentPath(page: Page): Promise<void> {
-  await page.goto("/");
-  await page.getByRole("link", { name: "Open Allotment Register" }).click();
-  await page.getByRole("button", { name: "Open Thimble Beds" }).click();
+  await tryPracticeFromHub(page, "allotment");
   await expect(page.getByRole("heading", { level: 1, name: "Thimble Beds" })).toBeVisible();
 
   await page.getByRole("link", { name: "Make an offer" }).first().click();
@@ -125,16 +123,29 @@ async function openDeskSlip(page: Page, say: (words: string) => string, slipPath
 const returned = (page: Page) => page.getByRole("region", { name: "Review returned checks" });
 
 test.describe("the path in the guide", () => {
+  test("the hub says what the guide says: the job line, two buttons on each register card, and the Desk link", async ({ page }) => {
+    const say = guidePart("## Open the site", "## 1. Churchyard Register");
+    await page.goto("/");
+    await expect(page.getByText(say("Find a burial. Offer a garden plot. Keep the history of both."), { exact: true })).toBeVisible();
+    const tryWords = say("Try the practice register");
+    const startWords = say("Start your own");
+    for (const which of ["churchyard", "allotment"] as const) {
+      await expect(hubCard(page, which).getByRole("link", { name: tryWords })).toBeVisible();
+      await expect(hubCard(page, which).getByRole("link", { name: startWords })).toBeVisible();
+    }
+    await expect(page.getByRole("link", { name: say("Open Review Desk preview") })).toBeVisible();
+    await expect(page.getByRole("link", { name: say("See the family map") })).toBeVisible();
+    await expect(page.getByRole("link", { name: say("See the plot seeker map") })).toBeVisible();
+  });
+
   test("Churchyard Register: find Y07, make a family map, open it from disk, and download a review file", async ({ page, browser }, testInfo) => {
     const requests = trackRequests(page, SITE);
     const faults = trackFaults(page);
-    await page.goto("/");
-    await page.getByRole("link", { name: "Open Churchyard Register" }).click();
-    await page.getByRole("button", { name: "Open Lantern Fold" }).click();
+    await tryPracticeFromHub(page, "churchyard");
     await expect(page.getByRole("heading", { level: 1, name: "Lantern Fold" })).toBeVisible();
 
-    await page.getByLabel("Name or plot code", { exact: true }).fill("Quillmoss");
-    await page.getByRole("button", { name: "Search", exact: true }).click();
+    await page.getByRole("button", { name: "Try Quillmoss", exact: true }).click();
+    await expect(page.getByLabel("Name or plot code", { exact: true })).toHaveValue("Quillmoss");
     const card = page.getByRole("listitem").filter({ hasText: "Mirel Quillmoss · Y07 · Yew Walk" });
     await expect(card).toBeVisible();
     await card.getByRole("link", { name: "Show on map" }).click();
@@ -220,9 +231,7 @@ test.describe("the path in the guide", () => {
     const faults = trackFaults(page);
 
     // The review file, as in section 1.
-    await page.goto("/");
-    await page.getByRole("link", { name: "Open Churchyard Register" }).click();
-    await page.getByRole("button", { name: "Open Lantern Fold" }).click();
+    await tryPracticeFromHub(page, "churchyard");
     await expect(page.getByRole("heading", { level: 1, name: "Lantern Fold" })).toBeVisible();
     const made = await downloadReviewFile(page, testInfo, plain, "lantern-review.json");
     expect(made.packet.issues.map((i) => i.rule).sort()).toEqual(["placement_missing", "reading_unclear"]);
@@ -253,8 +262,7 @@ test.describe("the path in the guide", () => {
 
     // Back in the register: open the slip.
     await page.goto("/");
-    await page.getByRole("link", { name: say("Open Churchyard Register") }).click();
-    await page.getByRole("button", { name: say("Open Lantern Fold") }).click();
+    await hubCard(page, "churchyard").getByRole("link", { name: say("Try the practice register") }).click();
     await openDeskSlip(page, say, slip.path);
     const placement = returned(page).getByRole("listitem").filter({ hasText: "Record 1 · Check the location" });
     const reading = returned(page).getByRole("listitem").filter({ hasText: "Record 2 · Read the stone again" });
@@ -293,8 +301,7 @@ test.describe("the path in the guide", () => {
 
     // The review file.
     await page.goto("/");
-    await page.getByRole("link", { name: say("Open Allotment Register") }).click();
-    await page.getByRole("button", { name: say("Open Thimble Beds") }).click();
+    await hubCard(page, "allotment").getByRole("link", { name: say("Try the practice register") }).click();
     await expect(page.getByRole("heading", { level: 1, name: "Thimble Beds" })).toBeVisible();
     const made = await downloadReviewFile(page, testInfo, say, "thimble-review.json");
     expect(made.packet.issues.map((i) => [i.label, i.rule])).toEqual([["Record 1", "fee_late"]]);
@@ -314,8 +321,7 @@ test.describe("the path in the guide", () => {
 
     // Back in the register: open the slip.
     await page.goto("/");
-    await page.getByRole("link", { name: say("Open Allotment Register") }).click();
-    await page.getByRole("button", { name: say("Open Thimble Beds") }).click();
+    await hubCard(page, "allotment").getByRole("link", { name: say("Try the practice register") }).click();
     await openDeskSlip(page, say, slip.path);
     const row = returned(page).getByRole("listitem").filter({ hasText: "Record 1 · Check the payment" });
     await expect(row).toHaveCount(1);
@@ -353,8 +359,7 @@ test.describe("the path in the guide", () => {
 
     // 1. Start a register.
     await page.goto("/");
-    await page.getByRole("link", { name: say("Open Churchyard Register") }).click();
-    await page.getByRole("link", { name: say("Start a register") }).click();
+    await hubCard(page, "churchyard").getByRole("link", { name: say("Start your own") }).click();
     await page.getByLabel("Site name").fill(typed("Site name", "Paper Book"));
     await page.getByLabel("Local time zone").selectOption(typed("Local time zone", "Europe/London"));
     await page.getByRole("button", { name: say("Create register") }).click();

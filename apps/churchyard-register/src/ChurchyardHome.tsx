@@ -5,7 +5,7 @@ import type { FormEvent } from "react";
 import { buildSheet } from "../../../template/src/map/sheet";
 import { search } from "../../../template/src/search";
 import type { SearchEntry, SearchName } from "../../../template/src/search";
-import { Button, ButtonLink, TextField, keepSearch } from "../../../template/src/ui/controls";
+import { Button, ButtonLink, LinkGroup, TextField, keepSearch } from "../../../template/src/ui/controls";
 import { formatPartialDate } from "../../../template/src/ui/copy";
 import { plotRows } from "../../../template/src/ui/plotView";
 import { useShell } from "../../../template/src/ui/shellContext";
@@ -14,6 +14,7 @@ import { Status } from "../../../template/src/ui/Status";
 import { churchRecords } from "./adapter";
 import { useIntent, useChurch } from "./intent";
 import { unplacedBurials } from "./history";
+import { LANTERN_EXAMPLE } from "./walkthrough";
 
 /** A stand in plot ID for burials that have no plot. It is never shown. */
 const UNPLACED = "unplaced";
@@ -76,6 +77,12 @@ export function ChurchyardHome() {
     setText("");
     go("");
   };
+  // The practice register offers one search to try. A register that the keeper started never does.
+  const practice = open.site.workspace === "walkthrough";
+  const tryExample = () => {
+    setText(LANTERN_EXAMPLE);
+    go(LANTERN_EXAMPLE);
+  };
 
   const empty = rows.length === 0 && records.length === 0;
   const burialsHere = Object.values(open.state.burials).filter((b) => b.voided !== true && b.plotId === selectedId);
@@ -133,6 +140,7 @@ export function ChurchyardHome() {
                   {t("search")}
                 </Button>
                 {query === "" ? null : <Button onClick={clear}>{t("clearSearch")}</Button>}
+                {practice ? <Button onClick={() => tryExample()}>{t("tryExample", { example: LANTERN_EXAMPLE })}</Button> : null}
               </div>
             </form>
             <p>{t("searchScope", { site: open.site.title })}</p>
@@ -182,44 +190,42 @@ export function ChurchyardHome() {
             )}
           </section>
 
-          <nav aria-label={t("searchThisRegister")}>
-            <ul className="actions plain">
-              <li>
-                <ButtonLink href={`${base}/burial/new`}>{t("recordBurial")}</ButtonLink>
-              </li>
-              <li>
-                <ButtonLink href={`${base}/reserve`}>{t("reserveSpace")}</ButtonLink>
-              </li>
-              <li>
-                <ButtonLink href={`${base}/unplaced`}>{lost.length === 0 ? t("unplacedBurials") : `${t("unplacedBurials")} · ${lost.length}`}</ButtonLink>
-              </li>
-              <li>
-                <ButtonLink href={`${base}/family`}>{t("makeFamilyMap")}</ButtonLink>
-              </li>
-              <li>
-                <ButtonLink href={`${base}/report`}>{t("reportsLink")}</ButtonLink>
-              </li>
-              <li>
-                <ButtonLink href={`${base}/exchange`}>{t("committeeReview")}</ButtonLink>
-              </li>
-            </ul>
-          </nav>
-          <nav aria-label={t("registerLinks")}>
-            <ul className="actions plain">
-              <li>
-                <ButtonLink href={`${base}/map`}>{t("mapLink")}</ButtonLink>
-              </li>
-              <li>
-                <ButtonLink href={`${base}/list`}>{t("plotListLink")}</ButtonLink>
-              </li>
-              <li>
-                <ButtonLink href={`${base}/add`}>{t("addRecords")}</ButtonLink>
-              </li>
-              <li>
-                <ButtonLink href={`${base}/backup`}>{t("backUp")}</ButtonLink>
-              </li>
-            </ul>
-          </nav>
+          <LinkGroup id="group-records" title={t("groupRecords")}>
+            <li>
+              <ButtonLink href={`${base}/burial/new`}>{t("recordBurial")}</ButtonLink>
+            </li>
+            <li>
+              <ButtonLink href={`${base}/reserve`}>{t("reserveSpace")}</ButtonLink>
+            </li>
+            <li>
+              <ButtonLink href={`${base}/unplaced`}>{lost.length === 0 ? t("unplacedBurials") : `${t("unplacedBurials")} · ${lost.length}`}</ButtonLink>
+            </li>
+            <li>
+              <ButtonLink href={`${base}/add`}>{t("addRecords")}</ButtonLink>
+            </li>
+          </LinkGroup>
+          <LinkGroup id="group-share" title={t("groupShare")}>
+            <li>
+              <ButtonLink href={`${base}/family`}>{t("makeFamilyMap")}</ButtonLink>
+            </li>
+            <li>
+              <ButtonLink href={`${base}/report`}>{t("reportsLink")}</ButtonLink>
+            </li>
+            <li>
+              <ButtonLink href={`${base}/exchange`}>{t("committeeReview")}</ButtonLink>
+            </li>
+          </LinkGroup>
+          <LinkGroup id="group-site" title={t("groupSite")}>
+            <li>
+              <ButtonLink href={`${base}/map`}>{t("mapLink")}</ButtonLink>
+            </li>
+            <li>
+              <ButtonLink href={`${base}/list`}>{t("plotListLink")}</ButtonLink>
+            </li>
+            <li>
+              <ButtonLink href={`${base}/backup`}>{t("backUp")}</ButtonLink>
+            </li>
+          </LinkGroup>
         </div>
 
         <div className="stack">

@@ -19,12 +19,12 @@ npm run preview
 
 Then open `http://127.0.0.1:4174/`. The server listens on that address only. Stop it with Ctrl+C. The Review Desk is built in its own repository. Assembly checks its preview against `release/desk-preview.lock.json` and stops if one byte differs.
 
-The hub says what Plotwarden is and offers three choices: **Open Churchyard Register**, **Open Allotment Register** and **Open Review Desk preview**. Two links below them, **See the family map** and **See the plot seeker map**, open the two sample sheets that a visitor receives.
+The hub says what Plotwarden does in one line: Find a burial. Offer a garden plot. Keep the history of both. Each register has a card with a small drawing of its practice map and two buttons. **Try the practice register** opens the practice register in one press. **Start your own** opens the form that starts a register of your own. The third card has one link, **Open Review Desk preview**. Two links below the cards, **See the family map** and **See the plot seeker map**, open the two sample sheets that a visitor receives.
 
 ## 1. Churchyard Register
 
-1. Choose **Open Churchyard Register**, then **Open Lantern Fold**.
-2. In **Name or plot code** type `Quillmoss`. Choose **Search**.
+1. On the Churchyard Register card choose **Try the practice register**. Lantern Fold opens.
+2. Under **Name or plot code** choose **Try Quillmoss**. The box fills and the search runs. You can also type `Quillmoss` and choose **Search**. The button is only in a practice register. A register that you start yourself does not show it.
 3. The result reads "Mirel Quillmoss · Y07 · Yew Walk". Choose **Show on map**. The map marks Y07 in Yew Walk.
 4. Choose **Make a family map**, then **Preview as a visitor**. The preview shows only the name the warden approved.
 5. Choose **Download family copy**. The file is `family-map-2026-04-20.html`. Open it from your downloads folder. It is one file and it needs no connection.
@@ -33,7 +33,7 @@ The hub says what Plotwarden is and offers three choices: **Open Churchyard Regi
 
 ## 2. Allotment Register
 
-1. Open the hub again. Choose **Open Allotment Register**, then **Open Thimble Beds**.
+1. Open the hub again. On the Allotment Register card choose **Try the practice register**. Thimble Beds opens.
 2. Choose **Make an offer**, **Review offer**, then **Record offer**. The register says "B03 reserved for Tavi Bramblequill."
 3. Choose **Accept offer**. It says "Offer accepted. Tavi Bramblequill holds B03."
 4. Choose **Back to register**, **Season fees**, then **New season**. Fill in **Season name** `Season 2026`, **Start date** `2026-04-01`, **End date** `2027-04-01`, **Due date** `2026-06-30` and **Standard fee** `36.00`. Choose **New season**.
@@ -46,7 +46,7 @@ The hub says what Plotwarden is and offers three choices: **Open Churchyard Regi
 2. Choose **Choose file** and pick the `committee-review-2026-04-20.json` file from step 1.7. Choose **Add register**. The Desk says "Added Churchyard · Site 1. 2 open checks."
 3. Choose **Open the first item**, then **Mark checked**. It says "Decision saved on this device." Choose **Back to meeting list**. On the card "Churchyard · Site 1 · Record 2 · Uncertain reading" choose **Open item**, then **Mark checked**.
 4. Choose **Return slips**, then **Download return slip for Churchyard · Site 1**. The file is `committee-return-` and the date. The slip holds no name and no text.
-5. Open the hub again. Choose **Open Churchyard Register**, then **Open Lantern Fold**.
+5. Open the hub again. On the Churchyard Register card choose **Try the practice register**.
 6. Choose **Committee review**, then **Open return slip** and pick the slip file from step 4. The rows "Record 1 · Check the location" and "Record 2 · Read the stone again" both read "Ready to check".
 7. On "Record 1 · Check the location" choose **Open matching record**. The list "Burials with no plot" opens. Go back, open the slip again, and on "Record 2 · Read the stone again" choose **Open matching record**. The "Burial record" opens.
 
@@ -56,17 +56,17 @@ Without a file, **Open walkthrough** on the Desk home shows invented sites.
 
 This does the same for the garden. It follows section 2, so Thimble Beds holds what you did there.
 
-1. Open the hub again. Choose **Open Allotment Register**, then **Open Thimble Beds**.
+1. Open the hub again. On the Allotment Register card choose **Try the practice register**.
 2. Choose **Committee review**, **Preview review file**, then **Download review file**. The file is `committee-review-2026-04-20.json`. It holds one check, a late fee.
 3. From the hub choose **Open Review Desk preview**. Choose **Choose file** and pick that file. Choose **Add register**. The Desk says "Added Allotments · Site 1. 1 open check."
 4. Choose **Meeting list**. On the card "Allotments · Site 1 · Record 1 · Due fee" choose **Open item**, then **Mark checked**.
 5. Choose **Return slips**, then **Download return slip for Allotments · Site 1**.
-6. Open the hub again. Choose **Open Allotment Register**, then **Open Thimble Beds**.
+6. Open the hub again. On the Allotment Register card choose **Try the practice register**.
 7. Choose **Committee review**, then **Open return slip** and pick the slip file from step 5. The row "Record 1 · Check the payment" reads "Ready to check". Choose **Open matching record**. **Season fees** opens on the fee that raised the check.
 
 ## Then try these
 
-- Choose **Start a register** in either app. You can enter a page by hand, import a spreadsheet, or make a numbered section without drawing it.
+- Choose **Start your own** on either register card. You can enter a page by hand, import a spreadsheet, or make a numbered section without drawing it.
 - Turn off your network after the first load. The hub, both registers, the Desk preview and both sample sheets open again. A register you start offline is saved on your device.
 - Open **About** on the hub. It says which places are invented.
 
@@ -74,7 +74,7 @@ This does the same for the garden. It follows section 2, so Thimble Beds holds w
 
 This is the paper book of the Churchyard Register. It takes about two minutes and needs no paper. The records are invented. The browser test runs these steps on the built site.
 
-1. Open the hub again. Choose **Open Churchyard Register**, then **Start a register**. Fill in **Site name** `Paper Book`, choose **Local time zone** `Europe/London`, then choose **Create register**.
+1. Open the hub again. On the Churchyard Register card choose **Start your own**. Fill in **Site name** `Paper Book`, choose **Local time zone** `Europe/London`, then choose **Create register**.
 2. Choose **Add your map**. Fill in **Section name** `Paper`, **Prefix** `C`, **First number** `1`, **Digits** `3`, **Rows** `10`, **Columns** `20`, **Plot width** `40`, **Plot height** `30`, **Start east** `100` and **Start north** `100`. Choose **Preview plots**, then **Apply layout**. The register says "Map saved." and makes 200 plots, C001 to C200.
 3. Choose **Back to register**, **Add records**, **Import spreadsheet**, then **Download a practice book**. The file is `practice-book.csv`. It holds 200 invented records, and row 117 has no source ref. **Download column guide** beside it lists the columns.
 4. Choose **Choose CSV** and pick `practice-book.csv`. Under **Match columns**, the column headed Name is already matched to **Recorded name**. Choose **Review import**. The review says "Errors 1", "Ready 197" and "Location to confirm 2". **Import 199 records** is off. The card "Row 117" says "Check Source ref in row 117. Enter a value." Nothing has been written.

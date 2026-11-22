@@ -8,6 +8,7 @@ import type { Page } from "@playwright/test";
 import { findLabelCollisions, measureLayout, readSheetScene, trackRequests } from "../helpers/measureLayout";
 import { APPS, LIBRARY_ROUTES, openPractice, plotIdOf, proof, routeName, routesOf, settle, sizeOf, startOwn, storedEvents } from "../helpers/routes";
 import type { AppUnderTest } from "../helpers/routes";
+import { SITE, hubCard } from "../helpers/siteOrigin";
 
 const SHOTS = "docs/acceptance/layout/routes";
 
@@ -167,6 +168,38 @@ for (const app of APPS) {
       await proof(page, folder, "error-changed-in-another-tab");
     });
 
+    test("the desk with its example search run, and the desk of a register of its own, are laid out well", async ({ page }) => {
+      await openPractice(page, app);
+      await settle(page);
+      // The practice register shows its one example button. Press it and measure the answer on the page.
+      const example = page.getByRole("button", { name: app.key === "churchyard" ? "Try Quillmoss" : /^Try B\d+$/ });
+      await expect(example).toHaveCount(1);
+      await check(page, "practice desk, before the example");
+      await proof(page, folder, "desk-practice");
+      await example.click();
+      await expect(page.getByRole("heading", { level: 3, name: "Results" })).toBeVisible();
+      await check(page, "practice desk, after the example");
+      await proof(page, folder, "desk-practice-example");
+
+      // A register of the keeper's own has the same groups and no example button.
+      await startOwn(page, app, "Home Plot");
+      await settle(page);
+      await expect(page.getByRole("button", { name: /^Try / })).toHaveCount(0);
+      for (const name of ["Records", "Share", "Site"]) await expect(page.locator("main").getByRole("navigation", { name, exact: true })).toHaveCount(1);
+      await check(page, "own desk");
+      await proof(page, folder, "desk-own");
+    });
+
+    test("at 200 percent zoom the desk keeps every measure, with its groups and its example button", async ({ page }) => {
+      await openPractice(page, app);
+      const full = page.viewportSize() as { width: number; height: number };
+      await page.setViewportSize({ width: full.width / 2, height: full.height / 2 });
+      await page.reload();
+      await settle(page);
+      await expect(page.getByRole("button", { name: /^Try / })).toHaveCount(1);
+      await check(page, "200 percent, the desk with its example");
+    });
+
     test("long strings do not break the layout: a 100 character name made of words, and one with no break at all", async ({ page }) => {
       const words = "The Parish Churchyard of Saint Aldhelm and Saint Edburga with the Old Chapel of Ease, Lower Green";
       const unbroken = "W".repeat(100);
@@ -220,6 +253,55 @@ for (const app of APPS) {
     });
   });
 }
+
+// ---- The hub: the first screen of the whole site -----------------------------------------------------
+
+test.describe("the hub and its register cards", () => {
+  test.use({ baseURL: SITE });
+
+  test("is laid out well, with the job line, two cards with a drawing each, and no sideways scroll", async ({ page }) => {
+    const requests = trackRequests(page, SITE);
+    await page.goto("/");
+    await expect(page.getByRole("heading", { level: 1, name: "Plotwarden" })).toBeVisible();
+    await check(page, "hub");
+    // Each drawing keeps its text at 12 px or more and inside its card.
+    const drawings = await page.evaluate(() =>
+      [...document.querySelectorAll<SVGSVGElement>("article svg.sheet")].map((svg) => {
+        const card = svg.closest("article") as HTMLElement;
+        const s = svg.getBoundingClientRect();
+        const c = card.getBoundingClientRect();
+        return { inside: s.left >= c.left && s.right <= c.right, scale: s.width / svg.viewBox.baseVal.width };
+      }),
+    );
+    expect(drawings).toHaveLength(2);
+    for (const drawing of drawings) {
+      expect(drawing.inside).toBe(true);
+      expect(drawing.scale).toBeGreaterThanOrEqual(0.99);
+    }
+    // On a phone the cards are one under the other. On a wide screen they sit side by side.
+    const [church, garden] = await Promise.all([hubCard(page, "churchyard").boundingBox(), hubCard(page, "allotment").boundingBox()]);
+    if (sizeOf(page) === "phone") expect((garden?.y ?? 0) > (church?.y ?? 0) + (church?.height ?? 0) - 1).toBe(true);
+    else expect((garden?.x ?? 0) > (church?.x ?? 0) + (church?.width ?? 0) - 1).toBe(true);
+    // The first thing a reader needs, the job and a button to press, is in the first screen.
+    const firstButton = await hubCard(page, "churchyard").getByRole("link", { name: "Try the practice register" }).boundingBox();
+    expect((firstButton?.y ?? 9999) + (firstButton?.height ?? 0)).toBeLessThanOrEqual(page.viewportSize()?.height ?? 0);
+    expect(requests.external).toEqual([]);
+  });
+
+  test("keeps every measure at 200 percent zoom", async ({ page }) => {
+    const full = page.viewportSize() as { width: number; height: number };
+    await page.setViewportSize({ width: full.width / 2, height: full.height / 2 });
+    await page.goto("/");
+    await expect(page.getByRole("heading", { level: 1, name: "Plotwarden" })).toBeVisible();
+    await check(page, "hub at 200 percent");
+  });
+
+  test("keeps the drawings still: nothing on the hub moves", async ({ page }) => {
+    await page.goto("/");
+    const moving = await page.evaluate(() => [...document.querySelectorAll("*")].filter((el) => getComputedStyle(el).animationName !== "none" || getComputedStyle(el).transitionDuration.split(",").some((d) => d.trim() !== "0s")).length);
+    expect(moving).toBe(0);
+  });
+});
 
 // ---- Motion -----------------------------------------------------------------------------------------------
 

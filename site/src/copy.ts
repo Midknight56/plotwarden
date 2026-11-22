@@ -5,6 +5,7 @@
 
 export const SITE_COPY = {
   siteName: "Plotwarden",
+  jobLine: "Find a burial. Offer a garden plot. Keep the history of both.",
   tagline: "Plotwarden keeps plot registers on the keeper's own device.",
   chooseHeading: "Choose where to start",
   backToStart: "Back to start",
@@ -13,10 +14,12 @@ export const SITE_COPY = {
 
   churchyardName: "Churchyard Register",
   churchyardLine: "Find a burial, give a family a map, print a dated report.",
-  churchyardOpen: "Open Churchyard Register",
+  churchyardMapLabel: "Practice map of Lantern Fold",
   allotmentName: "Allotment Register",
   allotmentLine: "Offer the next free plot, record the rent, hand a plot on.",
-  allotmentOpen: "Open Allotment Register",
+  allotmentMapLabel: "Practice map of Thimble Beds",
+  tryPractice: "Try the practice register",
+  startOwn: "Start your own",
   deskName: "Plotwarden Review Desk",
   deskLine: "A committee reads the review files and returns a slip. This is a preview of the app.",
   deskOpen: "Open Review Desk preview",

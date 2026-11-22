@@ -3,6 +3,7 @@
 // host never asks the host for a path that is not there. Every word is in `copy.ts`.
 import type { ReactNode } from "react";
 import { SITE_COPY } from "./copy";
+import { PRACTICE_MAPS } from "./practiceMaps";
 
 export type HubRoute = "home" | "about" | "not-found";
 
@@ -40,14 +41,42 @@ export function Frame({ nav, children }: { nav?: ReactNode; children: ReactNode 
   );
 }
 
-function Choice({ tone, name, line, href, open }: { tone: "church" | "garden" | "desk"; name: string; line: string; href: string; open: string }) {
+/** The Review Desk: one link, no drawing. */
+function DeskChoice({ name, line, href, open }: { name: string; line: string; href: string; open: string }) {
   return (
-    <li className={`choice ${tone}`}>
+    <li className="choice desk wide">
       <h3>{name}</h3>
       <p>{line}</p>
-      <a className="button" href={href}>
+      <a className="button secondary" href={href}>
         {open}
       </a>
+    </li>
+  );
+}
+
+/**
+ * A register: its name, one line, two buttons and a small drawing of its practice map. The drawing is inline SVG
+ * text made by the shared sheet at build time (see `practiceMaps.ts`), so it needs no picture file and no request.
+ * Each link keeps its own words as the start of its accessible name and adds the register, so two links with the
+ * same words are told apart.
+ */
+function RegisterChoice({ tone, name, line, folder, map }: { tone: "church" | "garden"; name: string; line: string; folder: string; map: { markup: string } }) {
+  const heading = `choice-${tone}`;
+  return (
+    <li className={`choice ${tone}`}>
+      <article className="register-card" aria-labelledby={heading}>
+        <h3 id={heading}>{name}</h3>
+        <p>{line}</p>
+        <div className="actions">
+          <a className="button" href={`${folder}#/practice`} aria-label={`${SITE_COPY.tryPractice}, ${name}`}>
+            {SITE_COPY.tryPractice}
+          </a>
+          <a className="button secondary" href={`${folder}#/new`} aria-label={`${SITE_COPY.startOwn}, ${name}`}>
+            {SITE_COPY.startOwn}
+          </a>
+        </div>
+        <div className="practice-map" dangerouslySetInnerHTML={{ __html: map.markup }} />
+      </article>
     </li>
   );
 }
@@ -57,14 +86,15 @@ function HomePage() {
     <>
       <div className="stack">
         <h1 tabIndex={-1}>{SITE_COPY.siteName}</h1>
+        <p className="job">{SITE_COPY.jobLine}</p>
         <p className="tagline">{SITE_COPY.tagline}</p>
       </div>
       <section className="stack" aria-labelledby="choose">
         <h2 id="choose">{SITE_COPY.chooseHeading}</h2>
         <ul className="choices plain">
-          <Choice tone="church" name={SITE_COPY.churchyardName} line={SITE_COPY.churchyardLine} href="churchyard/" open={SITE_COPY.churchyardOpen} />
-          <Choice tone="garden" name={SITE_COPY.allotmentName} line={SITE_COPY.allotmentLine} href="allotments/" open={SITE_COPY.allotmentOpen} />
-          <Choice tone="desk" name={SITE_COPY.deskName} line={SITE_COPY.deskLine} href="review/" open={SITE_COPY.deskOpen} />
+          <RegisterChoice tone="church" name={SITE_COPY.churchyardName} line={SITE_COPY.churchyardLine} folder="churchyard/" map={{ markup: PRACTICE_MAPS.church }} />
+          <RegisterChoice tone="garden" name={SITE_COPY.allotmentName} line={SITE_COPY.allotmentLine} folder="allotments/" map={{ markup: PRACTICE_MAPS.garden }} />
+          <DeskChoice name={SITE_COPY.deskName} line={SITE_COPY.deskLine} href="review/" open={SITE_COPY.deskOpen} />
         </ul>
       </section>
       <section className="stack" aria-labelledby="visitors">
@@ -82,7 +112,6 @@ function HomePage() {
     </>
   );
 }
-
 function AboutPage() {
   return (
     <div className="stack">

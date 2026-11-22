@@ -8,6 +8,8 @@ import { describe, expect, it } from "vitest";
 import { Home, hubRouteOf, hubTitleOf } from "../../site/src/Home";
 import { VisitorLanding, visitorRouteOf, visitorTitleOf } from "../../site/src/VisitorLanding";
 import { SITE_COPY } from "../../site/src/copy";
+import { PRACTICE_MAPS } from "../../site/src/practiceMaps";
+import { buildPracticeMaps } from "../../tools/site/practiceMaps";
 import { buildVisitorFiles } from "../../tools/site/visitorFiles";
 
 const read = (rel: string): string => readFileSync(new URL(`../../${rel}`, import.meta.url), "utf8");
@@ -123,15 +125,98 @@ describe("the hub", () => {
     expect((textOf(html).match(/keeps plot registers/g) ?? []).length).toBe(1);
   });
 
-  it("offers the two registers and the Desk preview as clear choices, each a link with its own name", () => {
-    const list = links(hub());
-    expect(list.find((l) => l.text === "Open Churchyard Register")?.href).toBe("churchyard/");
-    expect(list.find((l) => l.text === "Open Allotment Register")?.href).toBe("allotments/");
-    expect(list.find((l) => l.text === "Open Review Desk preview")?.href).toBe("review/");
+  it("offers the two registers and the Desk preview as clear choices, each with its own name", () => {
     const html = hub();
+    const list = links(html);
+    expect(list.find((l) => l.text === "Open Review Desk preview")?.href).toBe("review/");
     expect(html).toContain(">Churchyard Register<");
     expect(html).toContain(">Allotment Register<");
     expect(html).toContain(">Plotwarden Review Desk<");
+    // The two registers are no longer one link each. Each has a practice button and a start button.
+    expect(list.find((l) => l.text === "Open Churchyard Register")).toBeUndefined();
+    expect(list.find((l) => l.text === "Open Allotment Register")).toBeUndefined();
+  });
+
+  it("says the job in the first line under the heading, and keeps the line about the device under it", () => {
+    const html = hub();
+    expect(SITE_COPY.jobLine).toBe("Find a burial. Offer a garden plot. Keep the history of both.");
+    expect(html).toMatch(/<\/h1><p[^>]*>Find a burial\. Offer a garden plot\. Keep the history of both\.<\/p>/);
+    const text = textOf(html);
+    expect(text.indexOf(SITE_COPY.jobLine)).toBeGreaterThan(-1);
+    expect(text.indexOf(SITE_COPY.jobLine)).toBeLessThan(text.indexOf(SITE_COPY.tagline));
+    expect(text.indexOf(SITE_COPY.tagline)).toBeLessThan(text.indexOf("Churchyard Register Find a burial, give"));
+  });
+
+  /** The two register cards, each as the markup between its `<article` and `</article>`. */
+  const cards = (): { name: string; html: string }[] =>
+    [...hub().matchAll(/<article\b[^>]*>([\s\S]*?)<\/article>/g)].map((m) => ({ name: textOf(/<h3[^>]*>([\s\S]*?)<\/h3>/.exec(m[1] as string)?.[1] ?? ""), html: m[1] as string }));
+
+  it("gives each register a card with its name, one line, a drawing, and two buttons: one to try and one to start", () => {
+    const found = cards();
+    expect(found.map((c) => c.name)).toEqual(["Churchyard Register", "Allotment Register"]);
+    for (const [card, folder, line] of [
+      [found[0], "churchyard/", SITE_COPY.churchyardLine],
+      [found[1], "allotments/", SITE_COPY.allotmentLine],
+    ] as const) {
+      const here = links(card?.html ?? "");
+      expect(here.map((l) => l.text), card?.name).toEqual(["Try the practice register", "Start your own"]);
+      expect(here[0]?.href).toBe(`${folder}#/practice`);
+      expect(here[1]?.href).toBe(`${folder}#/new`);
+      expect(textOf(card?.html ?? "")).toContain(line);
+      // The button's own name says which register, and keeps the words that show on it.
+      for (const m of (card?.html ?? "").matchAll(/<a\b[^>]*aria-label="([^"]*)"[^>]*>([\s\S]*?)<\/a>/g)) {
+        expect(m[1], card?.name).toContain(textOf(m[2] as string));
+        expect(m[1], card?.name).toContain(card?.name);
+      }
+    }
+  });
+
+  it("draws each practice map with the shared sheet: inline svg, no image file, no address, a name, and the plots of the hand totals", () => {
+    const [church, garden] = cards();
+    for (const card of [church, garden]) {
+      const html = card?.html ?? "";
+      expect((html.match(/<svg\b[^>]*class="sheet"/g) ?? []).length, card?.name).toBe(1);
+      expect(html).not.toMatch(/<img\b|<image\b|url\(|https?:|\.svg|\.png|\.jpg|\.webp|<script/);
+      expect(html).toMatch(/<svg\b[^>]*role="img"[^>]*aria-label="[^"]+"/);
+      expect(html).toMatch(/viewBox="0 0 [\d.]+ [\d.]+"/);
+    }
+    expect(church?.html).toContain(`aria-label="${SITE_COPY.churchyardMapLabel}"`);
+    expect(garden?.html).toContain(`aria-label="${SITE_COPY.allotmentMapLabel}"`);
+    const count = (html: string, pattern: RegExp): number => (html.match(pattern) ?? []).length;
+    // Lantern Fold, hand totals 1: 12 plots. 6 taken, 2 reserved, 1 unusable, 3 free.
+    expect(count(church?.html ?? "", /<path class="plot"/g)).toBe(12);
+    expect(count(church?.html ?? "", /<circle class="mark solid"/g)).toBe(6);
+    expect(count(church?.html ?? "", /<line class="mark"/g)).toBe(2);
+    expect(count(church?.html ?? "", /<g class="mark">/g)).toBe(1);
+    expect(church?.html).toContain("Main gate");
+    // Thimble Beds, hand totals 2.1: 6 beds. 3 taken, 1 unusable, 2 free, none reserved.
+    expect(count(garden?.html ?? "", /<polygon class="plot bed"/g)).toBe(6);
+    expect(count(garden?.html ?? "", /<circle class="mark solid"/g)).toBe(3);
+    expect(count(garden?.html ?? "", /<line class="mark"/g)).toBe(0);
+    expect(count(garden?.html ?? "", /<g class="mark">/g)).toBe(1);
+    expect(garden?.html).toContain("Main gate");
+  });
+
+  it("holds no person name in either drawing", () => {
+    for (const map of [PRACTICE_MAPS.church, PRACTICE_MAPS.garden]) {
+      for (const name of ["Mirel Quillmoss", "Torin Pellwick", "Tavi Bramblequill", "Olin Reedwhorl", "Ada Stonecrop"]) expect(map).not.toContain(name);
+    }
+  });
+
+  it("keeps the committed drawings equal to a fresh build from the practice data (npm run build:maps)", () => {
+    expect(PRACTICE_MAPS).toEqual(buildPracticeMaps());
+  });
+
+  it("says the new words exactly, and no dash", () => {
+    expect(SITE_COPY.tryPractice).toBe("Try the practice register");
+    expect(SITE_COPY.startOwn).toBe("Start your own");
+    expect(SITE_COPY.churchyardMapLabel).toBe("Practice map of Lantern Fold");
+    expect(SITE_COPY.allotmentMapLabel).toBe("Practice map of Thimble Beds");
+    expect(SITE_COPY).not.toHaveProperty("churchyardOpen");
+    expect(SITE_COPY).not.toHaveProperty("allotmentOpen");
+    for (const key of ["jobLine", "tryPractice", "startOwn", "churchyardMapLabel", "allotmentMapLabel"] as const) {
+      expect(SITE_COPY[key], key).not.toMatch(/[\u2012-\u2015\u2212]|\s-{1,2}\s|--/);
+    }
   });
 
   it("links the two sample sheets for visitors, and About", () => {

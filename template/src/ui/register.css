@@ -226,6 +226,21 @@ legend {
   font-weight: 700;
 }
 
+/* Counts as plain text: a line of words, no border, no fill, nothing to press. */
+.tally {
+  margin: 0;
+  font-weight: 600;
+}
+
+/* A named group of links on a desk. The heading names the group, and the links keep the gap of a button row. */
+.link-group {
+  gap: 8px;
+}
+
+.group-heading {
+  font-size: 18px;
+}
+
 .hint {
   margin: 0;
   color: var(--muted);

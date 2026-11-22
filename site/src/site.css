@@ -171,7 +171,20 @@ h1:focus:not(:focus-visible) {
   outline: none;
 }
 
-/* The choices. One column on a phone, three across on a wide page. Each has a bar of its own colour. */
+/* The job line comes first, in a larger type. The line about the device is plain text under it. */
+.job {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.tagline {
+  color: var(--muted);
+}
+
+/* The choices. One column on a phone, the two registers side by side on a wide page, and the Desk under them.
+   Each has a bar of its own colour. */
 .choices {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -202,12 +215,146 @@ h1:focus:not(:focus-visible) {
   border-left-color: var(--muted);
 }
 
-@media (min-width: 900px) {
+.register-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  width: 100%;
+  min-width: 0;
+}
+
+/* The practice map: the shared sheet, drawn when the project is built and kept as text. It stays at its own size,
+   272 px, so its words are never drawn under 12 px. On a page narrower than the drawing, as at 200 percent zoom on a
+   phone, the frame scrolls sideways and the page does not. */
+.practice-map {
+  max-width: 100%;
+  overflow-x: auto;
+  border: 2px solid var(--sheet-ink);
+  background: var(--sheet-paper);
+}
+
+.practice-map svg {
+  display: block;
+  max-width: none;
+  background: var(--sheet-paper);
+  font-family: inherit;
+}
+
+.choice.church .practice-map {
+  --sheet-ink: #22252c;
+  --sheet-paper: #faf5e9;
+  --sheet-stone: #fffef8;
+  --sheet-walk: #d9cdb0;
+}
+
+.choice.garden .practice-map {
+  --sheet-ink: #1b312a;
+  --sheet-paper: #efe6cc;
+  --sheet-stone: #fffef6;
+  --sheet-walk: #cfe0b8;
+}
+
+.practice-map .plot {
+  fill: var(--sheet-stone);
+  stroke: var(--sheet-ink);
+  stroke-width: 1.75;
+}
+
+.practice-map .plot.bed {
+  fill: #e3edcb;
+  stroke-width: 2;
+}
+
+.practice-map .arch-inner {
+  fill: none;
+  stroke: var(--sheet-ink);
+  stroke-width: 1;
+  opacity: 0.55;
+}
+
+.practice-map .hatch {
+  fill: none;
+  stroke: var(--sheet-ink);
+  stroke-width: 1.25;
+  opacity: 0.55;
+}
+
+.practice-map .peg {
+  fill: var(--sheet-stone);
+  stroke: var(--sheet-ink);
+  stroke-width: 1.5;
+}
+
+.practice-map .mark {
+  fill: none;
+  stroke: var(--sheet-ink);
+  stroke-width: 2;
+}
+
+.practice-map .mark.solid {
+  fill: var(--sheet-ink);
+}
+
+.practice-map .label,
+.practice-map .north {
+  fill: var(--sheet-ink);
+}
+
+.practice-map .section-outline {
+  fill: none;
+  stroke: var(--sheet-ink);
+  stroke-width: 1.5;
+  stroke-dasharray: 8 5;
+  opacity: 0.8;
+}
+
+.practice-map .path {
+  fill: none;
+  stroke: var(--sheet-walk);
+  stroke-width: 14;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.practice-map .path-line {
+  fill: none;
+  stroke: var(--sheet-ink);
+  stroke-width: 1.25;
+  stroke-dasharray: 1 6;
+  stroke-linecap: round;
+}
+
+.choice.church .practice-map .gate {
+  fill: var(--sheet-ink);
+}
+
+.choice.garden .practice-map .gate {
+  fill: var(--sheet-stone);
+  stroke: var(--sheet-ink);
+  stroke-width: 2;
+}
+
+@media (min-width: 44rem) {
   .choices {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .choice.wide {
+    grid-column: 1 / -1;
   }
 }
 
+/* Phones: a lower sky strip, so the job and the first button are in the first screen. */
+@media (max-width: 37.4375rem) {
+  .sky::before {
+    height: 44px;
+  }
+
+  main {
+    padding-top: 16px;
+  }
+}
 noscript {
   display: block;
   padding: 16px;

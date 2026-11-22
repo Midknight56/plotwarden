@@ -162,6 +162,21 @@ export function keepSearch(event: MouseEvent<HTMLAnchorElement>, go: () => void)
   go();
 }
 
+/**
+ * A named group of links: a visible heading, and a navigation landmark that the heading names. The caller gives the
+ * heading an `id` that is its own on the page, and the links as list items.
+ */
+export function LinkGroup({ id, title, children }: { id: string; title: string; children: ReactNode }) {
+  return (
+    <nav aria-labelledby={id} className="stack link-group">
+      <h2 id={id} className="group-heading">
+        {title}
+      </h2>
+      <ul className="actions plain">{children}</ul>
+    </nav>
+  );
+}
+
 /** A link that looks like a button. */
 export function ButtonLink({ href, children, primary, ...rest }: { href: string; children: ReactNode; primary?: boolean } & Omit<React.AnchorHTMLAttributes<HTMLAnchorElement>, "href">) {
   return (

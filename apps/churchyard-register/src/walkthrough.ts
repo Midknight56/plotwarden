@@ -42,6 +42,9 @@ const BURIALS: Burial[] = [
   { ref: "LF-H1", name: "Perrin Gladwyn", date: { p: "year", y: 1790 }, dateText: "1790" },
 ];
 
+/** The one search that the practice register offers to try. It finds the burial of Mirel Quillmoss in plot Y07. */
+export const LANTERN_EXAMPLE = "Quillmoss";
+
 export const lanternFold: Walkthrough = {
   siteTitle: "Lantern Fold",
   zone: "Europe/London",

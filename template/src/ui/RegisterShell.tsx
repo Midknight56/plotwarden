@@ -19,7 +19,7 @@ import { Exchange } from "./Exchange";
 import { FastEntry } from "./FastEntry";
 import { Help } from "./Help";
 import { ImportWizard } from "./ImportWizard";
-import { Library, NewSite } from "./Library";
+import { Library, NewSite, PracticeEntry } from "./Library";
 import { MapEditor } from "./MapEditor";
 import { PlotDetails } from "./PlotDetails";
 import { PlotList } from "./PlotList";
@@ -347,13 +347,16 @@ function RegisterRoutes({ route }: { route: Route }) {
 }
 
 function Screens() {
-  const { route } = useShell();
+  const { app, route } = useShell();
   const [first, second] = route.path;
   switch (first) {
     case undefined:
       return <Library />;
     case "new":
       return <NewSite />;
+    case "practice":
+      // One press from the hub. An app with no practice register has no such page.
+      return second === undefined && app.walkthrough !== undefined ? <PracticeEntry /> : <NotFound />;
     case "restore":
       return <BackupRestore mode="library" />;
     case "settings":

@@ -15,32 +15,75 @@ interface Card {
   changed: string | undefined;
 }
 
-export function Library() {
-  const { app, db, t, register, route, sitesVersion, navigate, newId, bumpSites } = useShell();
-  const [cards, setCards] = useState<Card[] | null>(null);
-  const [started, setStarted] = useState(false);
-  const [practice, setPractice] = useState<"idle" | "busy" | "failed">("idle");
+/**
+ * Open or restart the practice register of the app. A second press while one is running does nothing. The library
+ * button and the `#/practice` route share it, so there is one way to open a practice register.
+ */
+export function usePracticeRegister(): { state: "idle" | "busy" | "failed"; open(restart: boolean, options?: { replace?: boolean }): Promise<void> } {
+  const { app, db, register, navigate, newId, bumpSites } = useShell();
+  const [state, setState] = useState<"idle" | "busy" | "failed">("idle");
   const guard = useRef(false);
 
-  /** Open or restart the practice register. A second press while one is running does nothing. */
-  const openPractice = async (restart: boolean) => {
+  const open = async (restart: boolean, options?: { replace?: boolean }): Promise<void> => {
     const walkthrough = app.walkthrough;
     if (walkthrough === undefined || guard.current) return;
     guard.current = true;
-    setPractice("busy");
+    setState("busy");
     const made = restart
       ? await restartWalkthrough(db, register as never, walkthrough, { newId })
       : await seedWalkthrough(db, register as never, walkthrough, { newId });
     guard.current = false;
     if (!made.ok) {
-      setPractice("failed");
+      setState("failed");
       return;
     }
-    setPractice("idle");
+    setState("idle");
     bumpSites();
-    navigate(`/r/${made.value.id}${restart ? "?restarted=1" : ""}`);
+    navigate(`/r/${made.value.id}${restart ? "?restarted=1" : ""}`, options?.replace === true ? { replace: true } : undefined);
   };
+  return { state, open };
+}
 
+/**
+ * The route `#/practice`: one press from the hub opens the practice register. It replaces its own history entry, so
+ * Back returns to where the keeper came from and does not open the register a second time. The caller shows this
+ * only for an app that has a practice register.
+ */
+export function PracticeEntry() {
+  const { app, t } = useShell();
+  const practice = usePracticeRegister();
+  const started = useRef(false);
+  const { open } = practice;
+  useEffect(() => {
+    if (started.current) return;
+    started.current = true;
+    void open(false, { replace: true });
+  }, [open]);
+  return (
+    <section className="stack">
+      <h1>{app.title}</h1>
+      {practice.state === "failed" ? (
+        <>
+          <Notice tone="error">{t("storageUnavailable")}</Notice>
+          <div className="actions">
+            <ButtonLink href="#/" primary>
+              {t("openRegisters")}
+            </ButtonLink>
+          </div>
+        </>
+      ) : (
+        <p role="status">{t("openingRegister")}</p>
+      )}
+    </section>
+  );
+}
+
+export function Library() {
+  const { app, db, t, register, route, sitesVersion } = useShell();
+  const [cards, setCards] = useState<Card[] | null>(null);
+  const [started, setStarted] = useState(false);
+  const practice = usePracticeRegister();
+  const openPractice = practice.open;
   useEffect(() => {
     let cancelled = false;
     void (async () => {
@@ -75,7 +118,7 @@ export function Library() {
       <p>{app.adapter.labels["libraryPrompt"] ?? t("libraryPrompt")}</p>
       <p>{t("libraryWho")}</p>
       {route.query.get("removed") === "1" ? <Notice tone="good">{t("registerRemoved")}</Notice> : null}
-      {practice === "failed" ? <Notice tone="error">{t("storageUnavailable")}</Notice> : null}
+      {practice.state === "failed" ? <Notice tone="error">{t("storageUnavailable")}</Notice> : null}
       <div className="actions">
         <ButtonLink href="#/new" primary={cards !== null && cards.length === 0}>
           {t("startRegister")}
@@ -86,11 +129,11 @@ export function Library() {
         <div className="stack">
           <p>{t("walkthroughNote")}</p>
           <div className="actions">
-            <Button className="button quiet" onClick={() => void openPractice(false)} disabled={practice === "busy"}>
+            <Button className="button quiet" onClick={() => void openPractice(false)} disabled={practice.state === "busy"}>
               {t("openWalkthrough")}
             </Button>
             {started ? (
-              <Button onClick={() => void openPractice(true)} disabled={practice === "busy"}>
+              <Button onClick={() => void openPractice(true)} disabled={practice.state === "busy"}>
                 {t("restartWalkthrough")}
               </Button>
             ) : null}

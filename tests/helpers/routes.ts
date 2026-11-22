@@ -154,7 +154,7 @@ export async function proof(page: Page, folder: string, name: string): Promise<v
   await page.screenshot({ path: `${folder}/${name}-${sizeOf(page)}.jpg`, type: "jpeg", quality: 50, fullPage: true });
 }
 
-const DESKTOP_PROOF = /^(library-home|route-(home|map|plot|add-one|exchange|settings)|dialog-|error-|long-name-words-home|zoom200-(home|map))/;
+const DESKTOP_PROOF = /^(library-home|desk-|route-(home|map|plot|add-one|exchange|settings)|dialog-|error-|long-name-words-home|zoom200-(home|map))/;
 
 /** A name for a route that is safe in a file name: no slash, no ID. */
 export function routeName(route: string): string {

@@ -210,6 +210,66 @@ test.describe("the desk", () => {
   });
 });
 
+test.describe("the first search and the groups of links", () => {
+  test("a practice register offers one example button, and pressing it searches and shows Mirel Quillmoss · Y07 · Yew Walk", async ({ page }) => {
+    const requests = trackRequests(page, APP);
+    await openFold(page);
+    const example = page.getByRole("button", { name: "Try Quillmoss", exact: true });
+    await expect(example).toHaveCount(1);
+    await expect(example).toBeVisible();
+    // The one example button, and no other button that starts with Try.
+    await expect(page.getByRole("button", { name: /^Try / })).toHaveCount(1);
+    // It sits beside the search button, under the box that it fills.
+    const [field, button] = [await page.getByLabel("Name or plot code", { exact: true }).boundingBox(), await example.boundingBox()];
+    expect((button?.y ?? 0) > (field?.y ?? 0)).toBe(true);
+    await check(page, "desk-example");
+
+    await example.click();
+    await expect(page.getByLabel("Name or plot code", { exact: true })).toHaveValue("Quillmoss");
+    const card = page.getByRole("listitem").filter({ hasText: "Mirel Quillmoss · Y07 · Yew Walk" });
+    await expect(card).toHaveCount(1);
+    await expect(page.locator(".summary-line")).toContainText("Y07 · Yew Walk · Taken");
+    // The name stays in the history entry and out of the address, as for a typed search.
+    await expectSearchOutOfAddress(page, "Quillmoss");
+    await check(page);
+    expect(requests.external).toEqual([]);
+  });
+
+  test("a register the keeper started never shows the example button", async ({ page }) => {
+    await page.goto("/");
+    await page.getByRole("link", { name: "Start a register" }).click();
+    await page.getByLabel("Site name").fill("St Edda");
+    await page.getByLabel("Local time zone").selectOption("Europe/London");
+    await page.getByRole("button", { name: "Create register" }).click();
+    await expect(page.getByRole("heading", { level: 1, name: "St Edda" })).toBeVisible();
+    await expect(page.getByLabel("Name or plot code", { exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: /^Try / })).toHaveCount(0);
+    await expect(page.getByText("Quillmoss")).toHaveCount(0);
+    await check(page, "desk-own");
+  });
+
+  test("puts the links of the desk in three named groups, Records, Share and Site, and every landmark has its own name", async ({ page }) => {
+    await openFold(page);
+    const groups = [
+      { name: "Records", links: ["Record a burial", "Reserve a space", "Unplaced burials · 1", "Add records"] },
+      { name: "Share", links: ["Make a family map", "Reports", "Committee review"] },
+      { name: "Site", links: ["Map", "Plot list", "Back up"] },
+    ];
+    const main = page.locator("main");
+    for (const group of groups) {
+      const nav = main.getByRole("navigation", { name: group.name, exact: true });
+      await expect(nav, group.name).toHaveCount(1);
+      await expect(nav.getByRole("heading", { level: 2, name: group.name, exact: true })).toBeVisible();
+      expect(await nav.getByRole("link").allInnerTexts(), group.name).toEqual(group.links);
+    }
+    // Nothing else on the desk is a link in a landmark of its own, and no two landmarks share a name.
+    const names = await page.evaluate(() => [...document.querySelectorAll("nav")].map((n) => n.getAttribute("aria-label") ?? document.getElementById(n.getAttribute("aria-labelledby") ?? "")?.textContent ?? ""));
+    expect(new Set(names).size).toBe(names.length);
+    expect(names).toEqual(expect.arrayContaining(["Records", "Share", "Site"]));
+    await check(page, "desk-groups");
+  });
+});
+
 test.describe("a burial and its stone", () => {
   test("shows the record at its precision, the inscription with its line breaks, and the history", async ({ page }) => {
     await openFold(page);
