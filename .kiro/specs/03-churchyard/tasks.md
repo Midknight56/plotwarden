@@ -20,7 +20,7 @@ Each task writes its test first, sees it fail on the missing behaviour (a stub t
 
 ## Not settled in spec 03
 
-- The plan lists "Use neutral outline" among the public map fields. It is not built: the family file already carries only the outlines of approved plots, so there is nothing more neutral to switch to.
+- The plan lists "Use neutral outline" among the public map fields. Task 10 builds it as "Show other plots as plain outlines" (C5.10): footprints of the other plots with no code, state, ID or count.
 - "Open source" opens the burial record, which shows its source ref and page text. A paper page photo is not linked to a burial. Photos are added with the shared controls on the plot screen.
 - Stone photo linking is covered by unit tests. The browser spec does not add a photo.
 - Print is checked by reading the document handed to a hidden frame. No page was printed and no print dialog was driven. A4 and Letter on paper, and the grayscale look on paper, are not observed.
@@ -34,3 +34,18 @@ Each task writes its test first, sees it fail on the missing behaviour (a stub t
 ## Repair 07 (findings of an independent review)
 
 - [x] 3.16 A burial dated by a year or a month is checked for overlap from the earliest day that date could mean (R8.9). A family file checks the public name of each burial and any word of a living name (R15.10, R15.11). Files: `template/src/commands.ts` (`overlapFrom`), `apps/churchyard-register/src/{rules,projection}.ts`, `apps/allotment-register/src/projection.ts`, `template/src/output/privacy.ts`, `tests/unit/{burial,visitor}.test.ts`. T IDs: T13, T22.
+
+## Task 10: the family map shows the way
+
+- [x] 3.17 Plain outlines, two direction fields and a map with no label on a walk. Spec first (`requirements.md` C5.10 to C5.12, `design.md` K2, K5, K5a, K10). Files: `template/src/output/{privacy,familyMap,visitorHtml,print}.ts`, `apps/churchyard-register/src/{types,rules,projection,walkthrough,copy,FamilySheet}.ts(x)`, `tools/inspector/*` (no change expected), `tests/unit/{visitor,inspect,churchCopy}.test.ts`, `tests/properties/privacy.test.ts`. T IDs: T22. C5.10, C5.11, C5.12.
+- [x] 3.18 Print proof: the A4 page of a family location, of the plot seeker sheet and of the private season report, saved as PDF and as a picture of page 1. Files: `tests/browser/share-print.spec.ts`, `docs/acceptance/print/*`. T IDs: browser `share-print.spec.ts`. C5.9, C5.12.
+- [x] 3.19 Docs and log: `docs/privacy.md`, `docs/judge-guide.md` if a word changed, proof pictures, `docs/kiro-log.md`. T IDs: none.
+
+## Not settled in task 10
+
+- The one way in for the whole site travels in urials[].directions, as before, because task 10 allows exactly two new key paths. A file with no approved burial therefore carries no way in. A top level key for it needs a change to the contract.
+- The gate and path names of Lantern Fold have no clear place on a drawing 320 px wide, so they are written under the map beside a sample of their mark. A wider drawing would be shrunk below 12 px text on a phone.
+- A line to a burial has the limit of a note (4,000 characters), like the way in. No shorter limit was chosen.
+- The A4 pictures of page 1 are the print document drawn in print media with the page margin, not pictures of the PDF. No PDF rasteriser is installed. No page was printed.
+- 
+pm run assemble:site refused on this machine: the sibling Desk checkout is at another commit than elease/desk-preview.lock.json names, though its three file hashes match. dist/site was assembled by the same steps with the Desk files already in dist/site/review, after their hashes were compared with the lock. The lock was not touched.

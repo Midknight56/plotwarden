@@ -1,7 +1,7 @@
 // Print documents. Each one is a separate document built from its own object, never from the screen:
 // the family print from the visitor object alone, the private report from a plain table model.
 // Black, white and grays only, so a page stays legible in grayscale. No script.
-import { escapeHtml, familyMapSvg, fillWords, plotsOfSection } from "./familyMap";
+import { WALK_BAND, escapeHtml, familyMapSvg, fillWords, plotsOfSection } from "./familyMap";
 import { availabilityMapSvg, freePlotsOfSection } from "./availabilityMap";
 import { checkAvailabilityWords } from "./availabilityHtml";
 import type { AvailabilityWords } from "./availabilityHtml";
@@ -44,9 +44,11 @@ tr{break-inside:avoid;page-break-inside:avoid}
 .arch{fill:#fff;stroke:#000;stroke-width:2}
 .arch-inner{fill:none;stroke:#444;stroke-width:1}
 .section{fill:none;stroke:#888;stroke-width:1.5;stroke-dasharray:8 4}
-.walk{fill:none;stroke:#bbb;stroke-width:12;stroke-linecap:round}
-.walk-line{fill:none;stroke:#000;stroke-width:1.5;stroke-dasharray:1 6;stroke-linecap:round}
-.gate{fill:#000;stroke:#000}
+.outline{fill:none;stroke:#666;stroke-width:1}
+.walk,.walk-sample{fill:none;stroke:#bbb;stroke-width:${WALK_BAND};stroke-linecap:round}
+.walk-line,.walk-line-sample{fill:none;stroke:#000;stroke-width:1.5;stroke-dasharray:1 6;stroke-linecap:round}
+.section-sample{stroke:#888;stroke-width:1.5;stroke-dasharray:8 4}
+.gate,.gate-sample{fill:#000;stroke:#000}
 .north{fill:#000}
 .sel-outer{fill:none;stroke:#fff;stroke-width:7}
 .sel-inner{fill:none;stroke:#000;stroke-width:3}
@@ -90,24 +92,24 @@ export function buildFamilyPrint(file: FamilyFile, words: FamilyWords, options: 
     file.burials.length === 0
       ? `<section><p>${escapeHtml(words.noNames)}</p></section>`
       : `<section><h2>${escapeHtml(words.burials)}</h2><table><thead><tr><th>${escapeHtml(words.findBurial)}</th><th>${escapeHtml(words.plot)}</th><th>${escapeHtml(words.section)}</th></tr></thead><tbody>${file.burials
-          .map((b) => `<tr><td>${escapeHtml(b.name)}${b.year === undefined ? "" : ` · ${b.year}`}</td><td>${escapeHtml(codeOf(b.plotId))}</td><td>${escapeHtml(sectionLabel(b.plotId))}</td></tr>`)
+          .map((b) => `<tr><td>${escapeHtml(b.name)}${b.year === undefined ? "" : ` · ${b.year}`}${b.line === undefined ? "" : `<br><span class="note">${escapeHtml(b.line)}</span>`}</td><td>${escapeHtml(codeOf(b.plotId))}</td><td>${escapeHtml(sectionLabel(b.plotId))}</td></tr>`)
           .join("")}</tbody></table></section>`;
 
   const dense = file.plots.length > DENSE_PLOT_LIMIT;
   let maps: string;
   if (!dense) {
-    maps = `<section class="sheet" data-sheet="overview"><h2>${escapeHtml(words.mapLabel)}</h2>${familyMapSvg(file, { width: 640, label: words.mapLabel })}</section>`;
+    maps = `<section class="sheet" data-sheet="overview"><h2>${escapeHtml(words.mapLabel)}</h2>${familyMapSvg(file, { width: 640, label: words.mapLabel, allTabs: true })}</section>`;
   } else {
     const sections = file.sections.filter((s) => plotsOfSection(file, s.id).length > 0);
     const total = sections.length;
-    const overview = `<section class="sheet" data-sheet="overview" style="break-after:page"><h2>${escapeHtml(words.mapLabel)}</h2>${familyMapSvg(file, { width: 640, label: words.mapLabel, labels: false, sectionBoxes: true })}<h3>${escapeHtml(words.sections)}</h3><ol class="plain">${sections
+    const overview = `<section class="sheet" data-sheet="overview" style="break-after:page"><h2>${escapeHtml(words.mapLabel)}</h2>${familyMapSvg(file, { width: 640, label: words.mapLabel, sectionBoxes: true })}<h3>${escapeHtml(words.sections)}</h3><ol class="plain">${sections
       .map((s, i) => `<li>${escapeHtml(s.label)} · ${escapeHtml(fillWords(words.sheet, { n: i + 1, total }))}</li>`)
       .join("")}</ol></section>`;
     const sheets = sections
       .map((s, i) => {
         const ids = new Set(plotsOfSection(file, s.id).map((p) => p.id));
         const last = i === sections.length - 1;
-        return `<section class="sheet" data-sheet="section" style="${last ? "" : "break-after:page"}"><h2>${escapeHtml(s.label)}</h2><p>${escapeHtml(fillWords(words.sheet, { n: i + 1, total }))}</p>${familyMapSvg(file, { width: 640, label: s.label, plotIds: ids, context: false })}</section>`;
+        return `<section class="sheet" data-sheet="section" style="${last ? "" : "break-after:page"}"><h2>${escapeHtml(s.label)}</h2><p>${escapeHtml(fillWords(words.sheet, { n: i + 1, total }))}</p>${familyMapSvg(file, { width: 640, label: s.label, plotIds: ids, context: false, allTabs: true })}</section>`;
       })
       .join("");
     maps = overview + sheets;

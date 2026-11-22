@@ -37,7 +37,10 @@ export interface PublicBurial {
   name: string;
   year?: number;
   plotId: string;
+  /** The one way in for the whole site. The same text on every burial of a file. */
   directions?: string;
+  /** One optional line for this burial alone. */
+  line?: string;
 }
 
 /** `plot.family.v1`. Design D9. */
@@ -51,6 +54,8 @@ export interface FamilyFile {
   sections: PublicSection[];
   plots: PublicPlot[];
   burials: PublicBurial[];
+  /** Plain footprints of the other plots, as bare point lists. Only when the keeper chose them. No code, state, ID or count. */
+  outlines?: Point[][];
 }
 
 /** `plot.availability.v1`. Design D9. It has no person field. */
@@ -92,6 +97,7 @@ const burial = z.strictObject({
   year: z.number().int().min(1000).max(9999).optional(),
   plotId: publicId,
   directions: text(LIMITS.noteChars).optional(),
+  line: text(LIMITS.noteChars).optional(),
 });
 
 const asOf = z.string().refine(isValidLocalDate, { message: "not a date" });
@@ -107,6 +113,7 @@ const familySchema: z.ZodType<FamilyFile> = z.strictObject({
   sections: z.array(section).max(LIMITS.sectionsPerSite),
   plots: z.array(plot).max(LIMITS.plotsPerSite),
   burials: z.array(burial).max(LIMITS.domainRecordsPerSite),
+  outlines: z.array(outline).max(LIMITS.plotsPerSite).optional(),
 });
 
 const availabilitySchema: z.ZodType<AvailabilityFile> = z.strictObject({

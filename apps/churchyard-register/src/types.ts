@@ -73,6 +73,8 @@ export interface Approval {
   /** The name shown to visitors. */
   name: string;
   includeYear: boolean;
+  /** One optional line of directions for this burial alone. Public text. */
+  line?: string;
   /** What the keeper saw. A change to any of it returns the approval to review. */
   basis: { recordedName: string; nameUnknown: boolean; year?: number; plotId?: Uuid };
   withdrawn?: boolean;
@@ -82,6 +84,8 @@ export interface PublicSettings {
   siteName?: string;
   gateName?: string;
   directions?: string;
+  /** Draw the other plots of the map as plain outlines in the family file. Off when absent. */
+  outlines?: boolean;
   sectionNames: Record<Uuid, string>;
   pathNames: Record<Uuid, string>;
   plotCodes: Record<Uuid, string>;
@@ -173,13 +177,14 @@ export type ChurchCommand =
     }
   | { type: "settle_reading"; memorialId: Uuid }
   | { type: "link_stone_photo"; memorialId: Uuid; photoId: Uuid }
-  | { type: "approve_burial"; burialId: Uuid; name?: string; includeYear: boolean }
+  | { type: "approve_burial"; burialId: Uuid; name?: string; includeYear: boolean; line?: string }
   | { type: "withdraw_approval"; burialId: Uuid }
   | {
       type: "set_public";
       siteName?: string;
       gateName?: string;
       directions?: string;
+      outlines?: boolean;
       sectionNames?: Record<Uuid, string>;
       pathNames?: Record<Uuid, string>;
       plotCodes?: Record<Uuid, string>;

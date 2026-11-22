@@ -28,7 +28,7 @@ The hub says what Plotwarden is and offers three choices: **Open Churchyard Regi
 3. The result reads "Mirel Quillmoss · Y07 · Yew Walk". Choose **Show on map**. The map marks Y07 in Yew Walk.
 4. Choose **Make a family map**, then **Preview as a visitor**. The preview shows only the name the warden approved.
 5. Choose **Download family copy**. The file is `family-map-2026-04-20.html`. Open it from your downloads folder. It is one file and it needs no connection.
-6. In the file, type `Quillmoss` in **Name or plot code**, choose **Find**, then **Show location**. The map marks Y07. **Print this location** prints that one plot.
+6. In the file, type `Quillmoss` in **Name or plot code**, choose **Find**, then **Show location**. The map marks Y07 as an arch with its code on a tab. The other eleven plots are plain outlines with no code. The list shows the line for this burial, and **Entrance** shows the way in for the whole site. **Print this location** prints the gate, the walk, the outlines and that one plot with its tab.
 7. Back in the register, choose **Back to register**, **Committee review**, **Preview review file**, then **Download review file**. The file is `committee-review-2026-04-20.json`. It holds no name, amount or note.
 
 ## 2. Allotment Register

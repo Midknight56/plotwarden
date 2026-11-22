@@ -161,7 +161,7 @@ describe("explain_plot refuses with a typed error", () => {
 const D9_FAMILY = new Set([
   "format", "asOf", "siteTitle", "north", "gate", "gate.name", "gate.x", "gate.y", "paths", "paths[].name", "paths[].points",
   "sections", "sections[].id", "sections[].label", "sections[].outline", "plots", "plots[].id", "plots[].code", "plots[].sectionId", "plots[].outline",
-  "burials", "burials[].id", "burials[].name", "burials[].year", "burials[].plotId", "burials[].directions",
+  "burials", "burials[].id", "burials[].name", "burials[].year", "burials[].plotId", "burials[].directions", "burials[].line", "outlines",
 ]);
 const D9_AVAILABILITY = new Set([
   "format", "asOf", "siteTitle", "north", "gate", "gate.name", "gate.x", "gate.y", "paths", "paths[].name", "paths[].points",
@@ -182,6 +182,18 @@ describe("audit_projection of the visitor files", () => {
     expect([...keys].sort()).toEqual(keys);
     expect(out["canaryViolations"]).toEqual([]);
     expect(out["privateEditChangesOutput"]).toBe(false);
+  });
+
+  it("Lantern Fold: the family file gains exactly the outline points and the line of each burial", () => {
+    const before = new Set([
+      "format", "asOf", "siteTitle", "north", "gate", "gate.name", "gate.x", "gate.y", "paths", "paths[].name", "paths[].points",
+      "sections", "sections[].id", "sections[].label", "sections[].outline", "plots", "plots[].id", "plots[].code", "plots[].sectionId", "plots[].outline",
+      "burials", "burials[].id", "burials[].name", "burials[].year", "burials[].plotId", "burials[].directions",
+    ]);
+    const keys = audit("lantern-fold", "visitor")["allowedKeys"] as string[];
+    expect(keys.filter((k) => !before.has(k))).toEqual(["burials[].line", "outlines"]);
+    // The list of outlines is a leaf: points only, with no key of its own below it.
+    expect(keys.filter((k) => k.startsWith("outlines"))).toEqual(["outlines"]);
   });
 
   it("Thimble Beds: an availability file with the two free plots B03 and B05, no person key, and only keys of design D9", () => {

@@ -148,6 +148,7 @@ export function validateChurch(command: ChurchCommand, state: ChurchState): Fiel
       break;
     case "approve_burial":
       if (c.name !== undefined && c.name.trim() !== "" && !checkText("nameChars", c.name.trim()).ok) fields.push({ field: "shownName", code: "over_limit" });
+      if (c.line !== undefined && !checkText("noteChars", c.line.trim()).ok) fields.push({ field: "line", code: "over_limit" });
       break;
     case "set_public": {
       const words: [string, string | undefined, "nameChars" | "noteChars"][] = [
@@ -372,6 +373,7 @@ function approveBurial(state: ChurchState, c: Cmd<"approve_burial">, on: LocalDa
   if (year !== undefined) basis.year = year;
   if (burial.plotId !== undefined) basis.plotId = burial.plotId;
   const approval: Approval = { burialId: c.burialId, name: blank(c.name) ? recordedName : (c.name as string).trim(), includeYear: c.includeYear, basis };
+  if (!blank(c.line)) approval.line = (c.line as string).trim();
   return ok([draft({ type: "burial_approved", approval }, [c.burialId], on)]);
 }
 
@@ -385,6 +387,7 @@ function setPublic(state: ChurchState, c: Cmd<"set_public">, on: LocalDate): Res
   if (c.siteName !== undefined) pub.siteName = c.siteName.trim();
   if (c.gateName !== undefined) pub.gateName = c.gateName.trim();
   if (c.directions !== undefined) pub.directions = c.directions.trim();
+  if (c.outlines !== undefined) pub.outlines = c.outlines;
   if (c.sectionNames !== undefined) {
     for (const id of Object.keys(c.sectionNames)) if (state.map.sections[id] === undefined) return err("no_such_section", { sectionId: id });
     pub.sectionNames = cleanWords(c.sectionNames);

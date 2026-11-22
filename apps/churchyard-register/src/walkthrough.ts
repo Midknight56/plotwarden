@@ -144,10 +144,11 @@ export const lanternFold: Walkthrough = {
         siteName: "Lantern Fold",
         gateName: "Lantern Gate",
         directions: "Enter at Lantern Gate. Follow Yew Walk to row Y. Look for Y07.",
+        outlines: true,
         sectionNames: { [section]: "Yew Walk" },
         pathNames: { [id("path:yew")]: "Yew Walk" },
       },
-      { type: "approve_burial", burialId: id("burial:LF-07A"), includeYear: false },
+      { type: "approve_burial", burialId: id("burial:LF-07A"), includeYear: false, line: "Seventh stone along the walk, on the north side." },
     ];
 
     // One revision for the map, one for the checks, then one each for the burials, the holds, the stone and the family file.

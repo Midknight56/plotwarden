@@ -60,11 +60,15 @@ const familyArb: fc.Arbitrary<FamilyFile> = fc.record({
   plots: fc.array(plotRow, { maxLength: 6 }),
   burials: fc.array(
     fc.record({ id, name: text(40), plotId: id }).chain((base) =>
-      fc.option(fc.integer({ min: 1000, max: 9999 }), { nil: undefined }).map((y) => (y === undefined ? base : { ...base, year: y })),
+      fc.tuple(fc.option(fc.integer({ min: 1000, max: 9999 }), { nil: undefined }), fc.option(text(60), { nil: undefined })).map(([y, line]) => ({
+        ...base,
+        ...(y === undefined ? {} : { year: y }),
+        ...(line === undefined ? {} : { line }),
+      })),
     ),
     { maxLength: 6 },
   ),
-});
+}).chain((base) => fc.option(fc.array(outline, { maxLength: 6 }), { nil: undefined }).map((o) => (o === undefined ? base : { ...base, outlines: o })));
 
 /** Paths to every plain object inside a value, the root included. */
 function objectPaths(value: unknown, at: (string | number)[] = []): (string | number)[][] {
@@ -317,5 +321,79 @@ describe("the properties catch a deliberate defect", () => {
       return { ...file, siteTitle: holders.length > 0 && holders.join("").length % 2 === 0 ? "Stall Row" : "Stall Rows" };
     };
     expect(() => run(dependent)).toThrow(/Property failed/);
+  });
+});
+
+// ---------- C. the churchyard family file with plain outlines (task 10, C5.10) ----------
+
+import { fixture } from "../../tools/inspector/fixtures";
+import type { ChurchState } from "../../apps/churchyard-register/src/types";
+
+const LIVING = ["Odalys Fennimore", "Wren Ashgrove", "Pim Cartwhistle", "Saffi Underhay", "Lorcan Dewbright", "Maud Treacleton"];
+const NOTE_WORDS = ["Bring the key", "Ask about the rent", "Photo of page nine", "Hollowmere family", "Call back in May"];
+const uuidOf = (n: number): string => `00000000-0000-4000-8000-${(0xa0000 + n).toString(16).padStart(12, "0")}`;
+
+type Edit =
+  | { kind: "note"; code: string; text: string }
+  | { kind: "request"; name: string; contact: boolean; note: string }
+  | { kind: "reserve"; code: string; name: string; start: string }
+  | { kind: "reading"; text: string; unclear: boolean };
+
+const editArb: fc.Arbitrary<Edit> = fc.oneof(
+  fc.record({ kind: fc.constant("note" as const), code: fc.constantFrom("Y01", "Y03", "Y05", "Y08", "Y10", "Y12"), text: fc.constantFrom(...NOTE_WORDS) }),
+  fc.record({ kind: fc.constant("request" as const), name: fc.constantFrom(...LIVING), contact: fc.boolean(), note: fc.constantFrom(...NOTE_WORDS) }),
+  fc.record({ kind: fc.constant("reserve" as const), code: fc.constantFrom("Y03", "Y08", "Y10"), name: fc.constantFrom(...LIVING), start: fc.constantFrom("2026-01-01", "2026-03-01", "2026-04-01") }),
+  fc.record({ kind: fc.constant("reading" as const), text: fc.constantFrom(...NOTE_WORDS), unclear: fc.boolean() }),
+);
+
+describe("C. a private only edit leaves the churchyard family file as it was", () => {
+  const fx = fixture("lantern-fold");
+  const start = fx.state as unknown as ChurchState;
+  const plotOf = (code: string) => Object.values(start.core.plots).find((p) => p.code === code);
+  const project = (state: unknown): string => JSON.stringify(fx.adapter.project(state as never, "visitor", fx.asOf));
+  const base = project(fx.state);
+  const seen = { cases: 0, edits: 0, outlines: 0 };
+
+  it("starts from a file with 11 plain outlines and 1 coded plot", () => {
+    const file = JSON.parse(base) as FamilyFile;
+    expect(file.outlines).toHaveLength(11);
+    expect(file.plots).toHaveLength(1);
+  });
+
+  it(`holds for random notes, requests, reservations and readings (${RUNS} cases, seed ${SEEDS.INV_PUBLIC_CLOSED + 2000})`, () => {
+    const outcome = runProperty(
+      "INV_PUBLIC_CLOSED",
+      fc.array(editArb, { minLength: 1, maxLength: 8 }),
+      (edits) => {
+        let state = fx.state;
+        edits.forEach((edit, i) => {
+          const n = i * 4;
+          let command: { type: string; [k: string]: unknown } | undefined;
+          if (edit.kind === "note") command = { type: "add_note", noteId: uuidOf(n), plotId: plotOf(edit.code)?.plotId, text: edit.text };
+          else if (edit.kind === "request") command = { type: "add_request", requestId: uuidOf(n), holderId: uuidOf(n + 1), holderName: edit.name, note: edit.note, ...(edit.contact ? { contact: `${edit.name.split(" ")[0]?.toLowerCase()}@example.invalid` } : {}) };
+          else if (edit.kind === "reserve") command = { type: "record_reservation", reservationId: uuidOf(n), holderId: uuidOf(n + 1), holderName: edit.name, spaceId: plotOf(edit.code)?.spaces[0]?.spaceId, claimId: uuidOf(n + 2), start: edit.start };
+          else {
+            const burial = Object.values((state as unknown as ChurchState).burials).find((b) => b.sourceRef === "LF-01");
+            command = { type: "save_reading", memorialId: uuidOf(n), burialId: burial?.burialId, reading: edit.text, unclear: edit.unclear };
+          }
+          const decided = fx.register.run(state, command, fx.asOf);
+          if (!decided.ok) return;
+          for (const draft of decided.value) state = fx.adapter.apply(state, draft.event);
+          seen.edits += 1;
+        });
+        seen.cases += 1;
+        const after = project(state);
+        if (after !== base) throw new Error(`INV_PUBLIC_CLOSED: a private only edit changed the family file: ${after}`);
+        seen.outlines += (JSON.parse(after) as FamilyFile).outlines?.length ?? 0;
+      },
+      { seed: SEEDS.INV_PUBLIC_CLOSED + 2000 },
+    );
+    expect(outcome.cases).toBeGreaterThanOrEqual(RUNS);
+  });
+
+  it("really applied edits, and every file had its outlines", () => {
+    const note = JSON.stringify(seen);
+    expect(seen.edits, note).toBeGreaterThan(1000);
+    expect(seen.outlines, note).toBeGreaterThanOrEqual(seen.cases * 11);
   });
 });

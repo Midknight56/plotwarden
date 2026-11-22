@@ -838,3 +838,331 @@ describe("T22 the availability print is its own document (A6.8)", () => {
     expect(small).not.toContain('data-sheet="section"');
   });
 });
+
+// ---------------------------------------------------------------------------------------------------------
+// Task 10, the family map shows the way (spec 03, C5.10 to C5.12). Expected values are worked by hand from the
+// Yew Walk layout: Y01 to Y06 south of the walk, Y07 to Y12 north of it, each 900 wide and 1100 tall, 1100 apart.
+// ---------------------------------------------------------------------------------------------------------
+import { familyMapSvg, WALK_BAND } from "../../template/src/output/familyMap";
+import { buildFamilyPrint } from "../../template/src/output/print";
+import { boxOf, distanceToLine } from "../../template/src/map/labels";
+import type { Box } from "../../template/src/map/labels";
+
+const footprintOf = (index: number): [number, number][] => {
+  const x = 1000 + (index % 6) * 1100;
+  const y = index >= 6 ? 2900 : 1200;
+  return [[x, y], [x + 900, y], [x + 900, y + 1100], [x, y + 1100]];
+};
+/** The footprints of Y01 to Y12 except the listed codes, south row first, west to east in each row. */
+const handOutlines = (...except: string[]): [number, number][][] =>
+  Array.from({ length: 12 }, (_, i) => ({ code: `Y${String(i + 1).padStart(2, "0")}`, shape: footprintOf(i) }))
+    .filter((p) => !except.includes(p.code))
+    .map((p) => p.shape);
+
+const MIREL_LINE = "Seventh stone along the walk, on the north side.";
+const CORWIN_LINE = "Past the yew, the ninth stone from the gate.";
+const withLine = (ref: string, line?: string): ChurchCommand => ({ type: "approve_burial", burialId: id(`burial:${ref}`), includeYear: false, ...(line === undefined ? {} : { line }) });
+
+describe("T22 plain outlines of the other plots (C5.10)", () => {
+  it("holds 11 plain outlines and 1 coded plot in Lantern Fold, with the option on", async () => {
+    await env.must([settings({ outlines: true })]);
+    const { file } = built();
+    expect(file.plots).toHaveLength(1);
+    expect(file.plots[0]?.code).toBe("Y07");
+    expect(file.outlines).toHaveLength(11);
+    expect(file.outlines).toEqual(handOutlines("Y07"));
+    expect(parseFamily(file).ok).toBe(true);
+  });
+
+  it("holds none when the option is off, and a new register has it off", async () => {
+    expect(env.state.pub.outlines).toBeUndefined();
+    expect("outlines" in built().file).toBe(false);
+    await env.must([settings({ outlines: true })]);
+    expect(built().file.outlines).toHaveLength(11);
+    await env.must([settings({ outlines: false })]);
+    expect("outlines" in built().file).toBe(false);
+  });
+
+  it("gives a footprint and nothing else: no code, no state, no id, no count of burials, no private canary", async () => {
+    await env.must([settings({ outlines: true })]);
+    const { file } = built();
+    for (const outline of file.outlines ?? []) {
+      expect(Array.isArray(outline)).toBe(true);
+      for (const point of outline) expect(point.every((n) => typeof n === "number")).toBe(true);
+    }
+    const text = JSON.stringify(file.outlines);
+    expect(text).toMatch(/^[\d,[\]]+$/);
+    for (const code of ["Y01", "Y02", "Y09", "Y12"]) expect(JSON.stringify(file)).not.toContain(code);
+    expect(scanForCanaries(file, VISITOR_CANARIES)).toEqual([]);
+    expect(JSON.stringify(file)).not.toContain("Hollowmere");
+  });
+
+  it("does not change with a burial in another plot, a reservation or an unusable plot, so it shows no count", async () => {
+    await env.must([settings({ outlines: true })]);
+    const before = JSON.stringify(built().file.outlines);
+    await env.must([
+      { type: "record_burial", burialId: id("burial:LF-NEW"), sourceRef: "LF-NEW", recordedName: "Test Person", date: { p: "year", y: 1900 }, dateText: "1900", plotId: plotId("Y10"), spaceId: spaceId("Y10"), claimId: id("claim:LF-NEW") },
+    ]);
+    expect(JSON.stringify(built().file.outlines)).toBe(before);
+  });
+
+  it("leaves a plot out of the list when it is in the file as a coded plot", async () => {
+    await env.must([settings({ outlines: true }), approve("LF-09")]);
+    const { file } = built();
+    expect(file.plots.map((p) => p.code)).toEqual(["Y07", "Y09"]);
+    expect(file.outlines).toEqual(handOutlines("Y07", "Y09"));
+  });
+
+  it("is in the same order whatever the plot codes are", async () => {
+    await env.must([settings({ outlines: true, plotCodes: { [plotId("Y07")]: "Seven" } })]);
+    expect(built().file.outlines).toEqual(handOutlines("Y07"));
+  });
+
+  it("is carried in the page and in the print, drawn as plain outlines with no word", async () => {
+    await env.must([settings({ outlines: true })]);
+    const { file } = built();
+    const html = buildFamilyHtml(file, FAMILY_WORDS);
+    expect(html.match(/<polygon class="outline"/g)).toHaveLength(11);
+    const print = buildFamilyPrint(file, FAMILY_WORDS, { paper: "A4", orientation: "portrait" });
+    expect(print.match(/<polygon class="outline"/g)).toHaveLength(11);
+    expect(JSON.parse(/<script type="application\/json" id="plot-family">([\s\S]*?)<\/script>/.exec(html)?.[1] ?? "").outlines).toEqual(file.outlines);
+  });
+
+  it("prints in grays: the outline stroke is a gray in the page print rules", async () => {
+    await env.must([settings({ outlines: true })]);
+    const rules = printRules(buildFamilyHtml(built().file, FAMILY_WORDS));
+    expect(rules).toMatch(new RegExp(`\\.outline\\{stroke:${GRAY}`, "i"));
+  });
+
+  it("refuses an outline list that is not a list of points, and any extra key inside", () => {
+    const file = built().file;
+    expect(parseFamily({ ...file, outlines: [[[1, 2], [3, 4], [5, 6]]] }).ok).toBe(true);
+    expect(parseFamily({ ...file, outlines: [[[1, 2], [3, 4]]] }).ok).toBe(false);
+    expect(parseFamily({ ...file, outlines: [{ code: "Y01", points: [[1, 2], [3, 4], [5, 6]] }] }).ok).toBe(false);
+    expect(parseFamily({ ...file, outlines: [[[1, 2], [3, 4], [5, "6"]]] }).ok).toBe(false);
+  });
+});
+
+describe("T22 directions are two fields: one way in, and one line for each burial (C5.11)", () => {
+  it("gives each approved burial its own line and the one way in", async () => {
+    await env.must([withLine("LF-07A", MIREL_LINE), withLine("LF-09", CORWIN_LINE)]);
+    const { file } = built();
+    const mirel = file.burials.find((b) => b.name === APPROVED_NAME);
+    const corwin = file.burials.find((b) => b.name === "Corwin Aldersey");
+    expect(mirel?.line).toBe(MIREL_LINE);
+    expect(corwin?.line).toBe(CORWIN_LINE);
+    expect(mirel?.directions).toBe(DIRECTIONS);
+    expect(corwin?.directions).toBe(DIRECTIONS);
+    expect(Object.keys(mirel ?? {}).sort()).toEqual(["directions", "id", "line", "name", "plotId"]);
+    expect(file.plots).toHaveLength(2);
+    expect(mirel?.plotId).not.toBe(corwin?.plotId);
+    expect(parseFamily(file).ok).toBe(true);
+  });
+
+  it("leaves the line out of a burial that has none, and out of the whole file by default", () => {
+    expect(Object.keys(built().file.burials[0] ?? {}).sort()).toEqual(["directions", "id", "name", "plotId"]);
+  });
+
+  it("shows a burial its own line and never another burial's line, in the page and in the print", async () => {
+    await env.must([withLine("LF-07A", MIREL_LINE), withLine("LF-09", CORWIN_LINE)]);
+    const { file } = built();
+    const html = buildFamilyHtml(file, FAMILY_WORDS);
+    const items = [...html.matchAll(/<li data-plot="[^"]*"[\s\S]*?<\/li>/g)].map((m) => m[0]);
+    expect(items).toHaveLength(2);
+    const mirel = items.find((i) => i.includes(APPROVED_NAME)) ?? "";
+    const corwin = items.find((i) => i.includes("Corwin Aldersey")) ?? "";
+    expect(mirel).toContain(MIREL_LINE);
+    expect(mirel).not.toContain(CORWIN_LINE);
+    expect(corwin).toContain(CORWIN_LINE);
+    expect(corwin).not.toContain(MIREL_LINE);
+    // The way in stands once, in the entrance, and holds neither line.
+    const entrance = /<section aria-labelledby="entrance-heading">([\s\S]*?)<\/section>/.exec(html)?.[1] ?? "";
+    expect(entrance).toContain(DIRECTIONS);
+    expect(entrance).not.toContain(MIREL_LINE);
+    expect(entrance).not.toContain(CORWIN_LINE);
+
+    const print = buildFamilyPrint(file, FAMILY_WORDS, { paper: "A4", orientation: "portrait" });
+    const rows = [...print.matchAll(/<tr><td>[\s\S]*?<\/tr>/g)].map((m) => m[0]);
+    expect(rows).toHaveLength(2);
+    expect(rows.find((r) => r.includes(APPROVED_NAME))).toContain(MIREL_LINE);
+    expect(rows.find((r) => r.includes(APPROVED_NAME))).not.toContain(CORWIN_LINE);
+    expect(rows.find((r) => r.includes("Corwin"))).toContain(CORWIN_LINE);
+    expect(rows.find((r) => r.includes("Corwin"))).not.toContain(MIREL_LINE);
+  });
+
+  it("keeps the approval when only the line changes, and drops the line with the approval", async () => {
+    await env.must([withLine("LF-07A", MIREL_LINE)]);
+    expect(built().file.burials[0]?.line).toBe(MIREL_LINE);
+    await env.must([withLine("LF-07A", "Look for the old yew.")]);
+    expect(built().file.burials[0]?.line).toBe("Look for the old yew.");
+    await env.must([withLine("LF-07A")]);
+    expect("line" in (built().file.burials[0] ?? {})).toBe(false);
+    await env.must([{ type: "withdraw_approval", burialId: MIREL }]);
+    expect(built().file.burials).toEqual([]);
+  });
+
+  it("flags a line that holds a living name or a contact, and builds no file", async () => {
+    for (const line of [`Ask ${LIVING_HOLDERS[0]} at the gate`, `Ring ${CONTACT}`, `Look for the stone of ${OTHER_OCCUPANT}`]) {
+      await env.must([withLine("LF-07A", line)]);
+      const out = build();
+      expect(out.ok, line).toBe(false);
+      if (!out.ok) expect(out.flagged.map((f) => f.field), line).toEqual(["lines"]);
+    }
+  });
+
+  it("refuses a line that is too long, and names the field", async () => {
+    const out = await env.dispatch([withLine("LF-07A", "x".repeat(4001))]);
+    expect(out.ok).toBe(false);
+    if (!out.ok) expect(JSON.stringify(out.error)).toContain("line");
+  });
+
+  it("refuses a line key that is not text, or an empty line", () => {
+    const file = built().file;
+    const burial = file.burials[0] as FamilyFile["burials"][number];
+    expect(parseFamily({ ...file, burials: [{ ...burial, line: "" }] }).ok).toBe(false);
+    expect(parseFamily({ ...file, burials: [{ ...burial, line: 7 }] }).ok).toBe(false);
+    expect(parseFamily({ ...file, burials: [{ ...burial, line: "A line." }] }).ok).toBe(true);
+  });
+});
+
+// ---- The drawn map (C5.12) ------------------------------------------------------------------------------
+
+interface DrawnText {
+  text: string;
+  tab: boolean;
+  box: Box;
+}
+
+/** The drawing of a page or a print, read back as plain data. Independent of the code that drew it. */
+function readDrawing(html: string, which = 0): { texts: DrawnText[]; walks: [number, number][][]; plotBoxes: Box[]; size: { width: number; height: number } } {
+  const svg = [...html.matchAll(/<svg class="map"[\s\S]*?<\/svg>/g)][which]?.[0] ?? "";
+  expect(svg, "the page holds a drawing").not.toBe("");
+  const view = /viewBox="0 0 ([\d.]+) ([\d.]+)"/.exec(svg);
+  const attr = (tag: string, name: string): string => new RegExp(`\\s${name}="([^"]*)"`).exec(tag)?.[1] ?? "";
+  const texts = [...svg.matchAll(/<text\b([^>]*)>([^<]*)<\/text>/g)].map((m) => {
+    const tag = m[1] ?? "";
+    const anchor = attr(tag, "text-anchor") === "" ? "start" : (attr(tag, "text-anchor") as "start" | "middle" | "end");
+    const size = Number(attr(tag, "font-size") || 12);
+    const content = (m[2] ?? "").replace(/&amp;/g, "&");
+    return { text: content, tab: /class="tab-text"/.test(tag), box: boxOf(content, size, { x: Number(attr(tag, "x")), y: Number(attr(tag, "y")), anchor }) };
+  });
+  const points = (value: string): [number, number][] => value.trim().split(/\s+/).map((pair) => pair.split(",").map(Number) as [number, number]);
+  const walks = [...svg.matchAll(/<polyline class="walk" points="([^"]*)"/g)].map((m) => points(m[1] ?? ""));
+  const plotBoxes: Box[] = [];
+  const boxOfPoints = (list: [number, number][]): Box => ({ x0: Math.min(...list.map((p) => p[0])), y0: Math.min(...list.map((p) => p[1])), x1: Math.max(...list.map((p) => p[0])), y1: Math.max(...list.map((p) => p[1])) });
+  for (const m of svg.matchAll(/<polygon class="outline" points="([^"]*)"/g)) plotBoxes.push(boxOfPoints(points(m[1] ?? "")));
+  for (const m of svg.matchAll(/<path class="arch" d="M([\d.-]+) ([\d.-]+)L([\d.-]+) ([\d.-]+)A([\d.-]+) [\d.-]+ 0 0 1 ([\d.-]+) [\d.-]+L/g)) {
+    const [x0, y1, , yArc, r, x1] = m.slice(1).map(Number) as [number, number, number, number, number, number];
+    plotBoxes.push({ x0, y0: (yArc as number) - r, x1, y1 });
+  }
+  return { texts, walks, plotBoxes, size: { width: Number(view?.[1]), height: Number(view?.[2]) } };
+}
+
+const overlap = (a: Box, b: Box): boolean => a.x0 < b.x1 && b.x0 < a.x1 && a.y0 < b.y1 && b.y0 < a.y1;
+
+/** Every way a text of the drawing can lie on something it should keep off. Empty when the drawing is clear. */
+function labelFaults(html: string, which = 0): string[] {
+  const { texts, walks, plotBoxes, size } = readDrawing(html, which);
+  const faults: string[] = [];
+  for (const t of texts) {
+    for (const walk of walks) if (distanceToLine(t.box, walk) < WALK_BAND / 2) faults.push(`"${t.text}" lies on a walk`);
+    for (const plot of plotBoxes) if (overlap(t.box, plot)) faults.push(`"${t.text}" lies on a plot`);
+    if (t.box.x0 < 0 || t.box.y0 < 0 || t.box.x1 > size.width || t.box.y1 > size.height) faults.push(`"${t.text}" leaves the drawing`);
+  }
+  for (let i = 0; i < texts.length; i++) {
+    for (let j = i + 1; j < texts.length; j++) {
+      if (overlap((texts[i] as DrawnText).box, (texts[j] as DrawnText).box)) faults.push(`"${(texts[i] as DrawnText).text}" lies on "${(texts[j] as DrawnText).text}"`);
+    }
+  }
+  return faults;
+}
+
+describe("T22 the drawn map keeps every code and name off the walk, the plots and each other (C5.12)", () => {
+  const SOUTH_AND_NORTH = ["LF-01", "LF-04", "LF-06", "LF-09"];
+
+  it("the checker sees a name lying on a walk, a plot and another name", () => {
+    expect(WALK_BAND).toBe(12);
+    const svg = (...parts: string[]) => `<svg class="map" viewBox="0 0 200 100">${parts.join("")}</svg>`;
+    const walk = `<polyline class="walk" points="10,50 190,50"/>`;
+    expect(labelFaults(svg(walk, `<text x="100" y="54" font-size="12" text-anchor="middle">Yew Walk</text>`))).toEqual([`"Yew Walk" lies on a walk`]);
+    expect(labelFaults(svg(`<polygon class="outline" points="60,10 140,10 140,40 60,40"/>`, `<text x="100" y="30" font-size="12" text-anchor="middle">Y07</text>`))).toEqual([`"Y07" lies on a plot`]);
+    expect(labelFaults(svg(`<text x="20" y="20" font-size="12">Gate</text>`, `<text x="30" y="22" font-size="12">Walk</text>`))).toEqual([`"Gate" lies on "Walk"`]);
+    expect(labelFaults(svg(walk, `<text x="100" y="20" font-size="12" text-anchor="middle">Clear</text>`))).toEqual([]);
+  });
+
+  it("holds for the page of Lantern Fold, with outlines, and no text box lies over the walk band", async () => {
+    await env.must([settings({ outlines: true })]);
+    const html = buildFamilyHtml(built().file, FAMILY_WORDS);
+    const { texts, walks } = readDrawing(html);
+    expect(walks).toHaveLength(1);
+    expect(texts.length).toBeGreaterThan(0);
+    for (const t of texts) expect(distanceToLine(t.box, walks[0] as [number, number][]), t.text).toBeGreaterThanOrEqual(WALK_BAND / 2);
+    expect(labelFaults(html)).toEqual([]);
+  });
+
+  it("holds with plots north and south of the walk, with outlines on and off", async () => {
+    for (const outlines of [true, false]) {
+      await env.must([settings({ outlines }), ...SOUTH_AND_NORTH.map((ref) => withLine(ref))]);
+      const file = built().file;
+      expect(file.plots.length).toBe(5);
+      expect(labelFaults(buildFamilyHtml(file, FAMILY_WORDS)), `page, outlines ${outlines}`).toEqual([]);
+      expect(labelFaults(buildFamilyPrint(file, FAMILY_WORDS, { paper: "A4", orientation: "portrait" })), `print, outlines ${outlines}`).toEqual([]);
+    }
+  });
+
+  it("holds with the gate and path names that are longer, and with a site with no outline", async () => {
+    await env.must([settings({ outlines: true, gateName: "The old lych gate by the yew", pathNames: { [WALK_PATH_ID]: "The long gravel walk to the east" } })]);
+    expect(labelFaults(buildFamilyHtml(built().file, FAMILY_WORDS))).toEqual([]);
+  });
+
+  it("writes a plot code on its tab only, never beside the plot", async () => {
+    await env.must([settings({ outlines: true }), ...SOUTH_AND_NORTH.map((ref) => withLine(ref))]);
+    const html = buildFamilyHtml(built().file, FAMILY_WORDS);
+    const { texts } = readDrawing(html);
+    const codes = new Set(built().file.plots.map((p) => p.code));
+    const written = texts.filter((t) => codes.has(t.text));
+    expect(written.length).toBe(codes.size);
+    for (const t of written) expect(t.tab, `${t.text} is on a tab`).toBe(true);
+    expect(texts.filter((t) => !t.tab).map((t) => t.text).sort()).toEqual(["Lantern Gate", "N", "Yew Walk"]);
+  });
+
+  it("draws the tab of the selected plot alone, and of every plot for a print of the whole map", async () => {
+    await env.must([settings({ outlines: true }), withLine("LF-09")]);
+    const file = built().file;
+    const tabsIn = (svg: string): string[] => [...svg.matchAll(/<text class="tab-text"[^>]*>([^<]*)<\/text>/g)].map((m) => m[1] as string);
+    const one = familyMapSvg(file, { width: 320, label: "Map", selectedPlotId: file.plots[0]?.id });
+    expect(tabsIn(one)).toEqual(["Y07"]);
+    expect(tabsIn(familyMapSvg(file, { width: 320, label: "Map" }))).toEqual([]);
+    expect(tabsIn(familyMapSvg(file, { width: 320, label: "Map", allTabs: true })).sort()).toEqual(["Y07", "Y09"]);
+  });
+
+  it("writes a name with no clear place under the drawing, beside a sample of its mark", async () => {
+    await env.must([settings({ outlines: true })]);
+    const svg = familyMapSvg(built().file, { width: 320, label: "Map" });
+    expect(svg).toContain(`<rect class="gate-sample"`);
+    expect(svg).toContain(`<polyline class="walk-sample"`);
+    const { texts, size } = readDrawing(svg.startsWith("<svg") ? svg : "");
+    const gate = texts.find((t) => t.text === "Lantern Gate");
+    expect(gate).toBeDefined();
+    expect(gate?.box.y1 ?? 0).toBeLessThanOrEqual(size.height);
+  });
+
+  it("is in grays in the print and shows one location with its gate, walk, outlines, selected plot and tab", async () => {
+    await env.must([settings({ outlines: true })]);
+    const html = buildFamilyHtml(built().file, FAMILY_WORDS);
+    const rules = printRules(html);
+    expect(rules).toContain("body.only-selected");
+    expect(rules).toMatch(/\.plotg:not\(\.on\)/);
+    expect(rules).toMatch(new RegExp(`\\.tab\\{fill:${GRAY}`, "i"));
+    expect(rules).toMatch(new RegExp(`\\.walk\\{stroke:${GRAY}`, "i"));
+    expect(html).toContain("only-selected");
+    expect(html).toContain("all-tabs");
+  });
+
+  it("shows every tab with script off, and none until a plot is chosen with script on", () => {
+    const css = /<style>([\s\S]*?)<\/style>/.exec(buildFamilyHtml(built().file, FAMILY_WORDS))?.[1] ?? "";
+    expect(css).toMatch(/html\.has-script \.selbits\{display:none\}/);
+    expect(css).toMatch(/html\.has-script \.plotg\.on \.selbits\{display:inline\}/);
+    expect(css).not.toMatch(/(^|\})\.selbits\{display:none\}/);
+  });
+});

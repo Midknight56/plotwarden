@@ -188,7 +188,8 @@ For each checked, non retired space at date `t`: Taken if a burial or tenancy co
   paths: [{ name, points: [[x,y]...] }],
   sections: [{ id, label, outline?: [[x,y]...] }],
   plots: [{ id, code, sectionId, outline?: [[x,y]...] }],
-  burials: [{ id, name, year?: number, plotId, directions? }] }
+  burials: [{ id, name, year?: number, plotId, directions?, line? }],
+  outlines?: [[[x,y]...]...] }     // only when the keeper ticked "Show other plots as plain outlines"
 ```
 
 `plot.availability.v1`:
@@ -204,6 +205,7 @@ For each checked, non retired space at date `t`: Taken if a burial or tenancy co
 ```
 
 - Every `id` is a random public ID minted for that file. Two files from the same site share no IDs.
+- `directions` is the one way in for the whole site. `line` is one optional line for one approved burial. A burial carries no other burial's line. `outlines` is a list of bare footprints with no code, state, ID or count.
 - Every string comes from a keeper approved public field. `name` is the approved deceased display name. `year` appears only if approved for that burial.
 - No other key exists. There is no person field in `plot.availability.v1`.
 - Text is escaped. Embedded JSON escapes `<`, `>`, `&`, U+2028 and U+2029. The HTML carries a Content Security Policy that allows only its inline sealed script and style, no network, no forms.

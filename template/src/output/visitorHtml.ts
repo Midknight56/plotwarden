@@ -2,7 +2,7 @@
 // alone: it holds the object as closed JSON, lists each burial as plain text so browser Find works
 // with script off, and has one small script that filters the list and marks a plot.
 // A policy seals it: no network, no form, no remote font, no image but a data address.
-import { escapeHtml, familyMapSvg, fillWords, jsonForScript } from "./familyMap";
+import { WALK_BAND, escapeHtml, familyMapSvg, fillWords, jsonForScript } from "./familyMap";
 import type { FamilyFile, PublicBurial } from "./privacy";
 
 export const FAMILY_WORD_KEYS = [
@@ -90,17 +90,21 @@ html.has-script .js-only{display:inline-flex;align-items:center;justify-content:
 .arch{fill:${paper};stroke:${ink};stroke-width:2}
 .arch-inner{fill:none;stroke:${ink};stroke-width:1}
 .section{fill:none;stroke:${ink};stroke-width:1.5;stroke-dasharray:8 4}
-.walk{fill:none;stroke:#D9CDB0;stroke-width:12;stroke-linecap:round}
-.walk-line{fill:none;stroke:${ink};stroke-width:1.5;stroke-dasharray:1 6;stroke-linecap:round}
-.gate{fill:${paper};stroke:${ink};stroke-width:2}
+.outline{fill:none;stroke:${ink};stroke-width:1}
+.walk,.walk-sample{fill:none;stroke:#D9CDB0;stroke-width:${WALK_BAND};stroke-linecap:round}
+.walk-line,.walk-line-sample{fill:none;stroke:${ink};stroke-width:1.5;stroke-dasharray:1 6;stroke-linecap:round}
+.section-sample{stroke:${ink};stroke-width:1.5;stroke-dasharray:8 4}
+.gate,.gate-sample{fill:${paper};stroke:${ink};stroke-width:2}
 .north{fill:${ink}}
-.selbits{display:none}
-.plotg.on .selbits{display:inline}
+.selring{display:none}
+.plotg.on .selring{display:inline}
+html.has-script .selbits{display:none}
+html.has-script .plotg.on .selbits{display:inline}
 .sel-outer{fill:none;stroke:${paper};stroke-width:7}
 .sel-inner{fill:none;stroke:${ink};stroke-width:3}
 .tab{fill:#E4D9BE;stroke:${ink};stroke-width:2}
 .tab-text{font-weight:700}
-@media print{.sky{background:#FFF;color:#000;border-bottom:2px solid #000}.sky p{color:#000}.js-only,.search{display:none!important}ul.list li{border-color:#000;background:#FFF}.walk{stroke:#BBB}.tab{fill:#DDD}body.only-selected ul.list li:not(.on){display:none}}
+@media print{.sky{background:#FFF;color:#000;border-bottom:2px solid #000}.sky p{color:#000}.js-only,.search{display:none!important}ul.list li{border-color:#000;background:#FFF}.walk{stroke:#BBB}.walk-sample{stroke:#BBB}.outline{stroke:#666}.tab{fill:#DDD}body.only-selected ul.list li:not(.on){display:none}body.only-selected .plotg:not(.on) .arch-inner{display:none}body.only-selected .plotg:not(.on) .arch{stroke:#666;stroke-width:1}html.has-script body.all-tabs .selbits{display:inline}}
 `.trim();
 }
 
@@ -133,7 +137,7 @@ d.getElementById('go').addEventListener('click',run);
 d.getElementById('clr').addEventListener('click',function(){q.value='';run();mark('');q.focus();});
 Array.prototype.forEach.call(d.querySelectorAll('button[data-plot]'),function(b){b.addEventListener('click',function(){mark(b.getAttribute('data-plot'));var m=d.querySelector('.map');if(m&&m.scrollIntoView){m.scrollIntoView({block:'nearest'});}});});
 d.getElementById('printloc').addEventListener('click',function(){d.body.className='only-selected';window.print();d.body.className='';});
-d.getElementById('printmap').addEventListener('click',function(){d.body.className='';window.print();});
+d.getElementById('printmap').addEventListener('click',function(){d.body.className='all-tabs';window.print();d.body.className='';});
 })();`;
 
 export function buildFamilyHtml(file: FamilyFile, words: FamilyWords, theme: PageTheme = DEFAULT_THEME): string {
@@ -150,7 +154,7 @@ export function buildFamilyHtml(file: FamilyFile, words: FamilyWords, theme: Pag
 <ul class="list" id="list">${rows
           .map(
             ({ burial, code, section, q }) =>
-              `<li data-plot="${escapeHtml(burial.plotId)}" data-q="${escapeHtml(q)}"><strong>${escapeHtml(burial.name)}${burial.year === undefined ? "" : ` · ${burial.year}`}</strong><span>${escapeHtml(words.plot)} ${escapeHtml(code)} · ${escapeHtml(words.section)} ${escapeHtml(section)}</span><span><button type="button" class="js-only" data-plot="${escapeHtml(burial.plotId)}">${escapeHtml(words.showLocation)}</button></span></li>`,
+              `<li data-plot="${escapeHtml(burial.plotId)}" data-q="${escapeHtml(q)}"><strong>${escapeHtml(burial.name)}${burial.year === undefined ? "" : ` · ${burial.year}`}</strong><span>${escapeHtml(words.plot)} ${escapeHtml(code)} · ${escapeHtml(words.section)} ${escapeHtml(section)}</span>${burial.line === undefined ? "" : `<span class="line">${escapeHtml(burial.line)}</span>`}<span><button type="button" class="js-only" data-plot="${escapeHtml(burial.plotId)}">${escapeHtml(words.showLocation)}</button></span></li>`,
           )
           .join("")}</ul>`;
 

@@ -50,6 +50,25 @@ function toPoints(points: readonly (readonly [number, number])[]): Point[] {
   return points.map((p) => [p[0], p[1]]);
 }
 
+/**
+ * The footprints of every plot on the map that is not in the file, as bare point lists. Nothing about the plot goes
+ * with a footprint: no code, no state, no ID. They are sorted by their lowest point (south to north, then west to
+ * east), so the order says nothing about a plot code or the order burials were recorded.
+ */
+function otherOutlines(state: ChurchState, shown: ReadonlySet<Uuid>): Point[][] {
+  const list: Point[][] = [];
+  for (const [plotId, shape] of Object.entries(state.map.shapes)) {
+    if (shown.has(plotId) || state.core.plots[plotId] === undefined || shape.length < 3) continue;
+    list.push(toPoints(shape));
+  }
+  const low = (shape: Point[]): [number, number] => [Math.min(...shape.map((p) => p[1])), Math.min(...shape.map((p) => p[0]))];
+  return list.sort((a, b) => {
+    const [ay, ax] = low(a);
+    const [by, bx] = low(b);
+    return ay - by || ax - bx || JSON.stringify(a).localeCompare(JSON.stringify(b));
+  });
+}
+
 export function buildFamilyFile(
   state: ChurchState,
   input: { asOf: LocalDate; revision: number; newPublicId: () => string },
@@ -130,6 +149,8 @@ export function buildFamilyFile(
     const year = approval.includeYear ? approval.basis.year : undefined;
     if (year !== undefined) row.year = year;
     if (!blank(pub.directions)) row.directions = (pub.directions as string).trim();
+    // The line is this burial's own. It is read from this burial's approval and never from another's.
+    if (!blank(approval.line)) row.line = (approval.line as string).trim();
     burials.push(row);
     const line: FamilyPreview["included"][number] = { burialId: burial.burialId, name: approval.name, plotCode: pub.plotCodes[plotId] ?? plotCodeOf(state, plotId), sectionLabel: section.label };
     if (year !== undefined) line.year = year;
@@ -154,6 +175,14 @@ export function buildFamilyFile(
   for (const [id, text] of Object.entries(pub.sectionNames)) if (sectionIds.has(id)) check("sectionNames", text);
   for (const p of paths) check("pathNames", p.name);
   for (const plot of plots) check("plotCodes", plot.code);
+  // Each line is public text for one burial. It may not hold a living name, an unapproved name or a contact.
+  const lineMatches = new Set<string>();
+  for (const row of burials) {
+    if (row.line === undefined) continue;
+    for (const m of flagPrivateStrings(row.line, [...known], [...guarded])) lineMatches.add(m);
+    if (looksLikeContact(row.line)) lineMatches.add(row.line);
+  }
+  if (lineMatches.size > 0) flagged.push({ field: "lines", matches: [...lineMatches] });
 
   // The public name of a burial is typed text. Unless it is the recorded name itself, it must hold no other
   // person's name and no contact. The burial's own recorded name is left out of the check.
@@ -181,6 +210,9 @@ export function buildFamilyFile(
     plots,
     burials,
   };
+  // Plain outlines come from the map shapes alone, so no note, reading, holder or burial can change them.
+  const outlines = pub.outlines === true ? otherOutlines(state, new Set(plotIds.keys())) : undefined;
+  if (outlines !== undefined) file.outlines = outlines;
   if (!parseFamily(file).ok) return { ok: false, missing: ["file"], flagged: [] };
 
   const includedIds = new Set(included.map((b) => b.burialId));
@@ -198,6 +230,8 @@ export function buildFamilyFile(
   if (!blank(pub.directions)) fields.push("directions");
   if (burials.length > 0) fields.push("names");
   if (burials.some((b) => b.year !== undefined)) fields.push("years");
+  if (outlines !== undefined && outlines.length > 0) fields.push("outlines");
+  if (burials.some((b) => b.line !== undefined)) fields.push("lines");
 
   const photos = Object.keys(state.notes).reduce((sum, plotId) => sum + livePhotos(state.notes, plotId).length, 0);
   const notes = Object.values(state.notes).reduce((sum, n) => sum + n.notes.length, 0);

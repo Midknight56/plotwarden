@@ -21,12 +21,14 @@ interface Row {
   include: boolean;
   shown: string;
   year: boolean;
+  line: string;
 }
 
 interface FormState {
   siteName: string;
   gateName: string;
   directions: string;
+  outlines: boolean;
   sectionNames: Record<string, string>;
   pathNames: Record<string, string>;
   includePath: Record<string, boolean>;
@@ -41,7 +43,7 @@ function fromState(state: ChurchState): FormState {
     if (b.voided === true || b.nameUnknown || b.recordedName === undefined) continue;
     const approval = state.approvals[b.burialId];
     const status = approvalStatus(state, b.burialId);
-    rows[b.burialId] = { include: status !== "none", shown: approval?.name ?? b.recordedName, year: approval?.includeYear === true };
+    rows[b.burialId] = { include: status !== "none", shown: approval?.name ?? b.recordedName, year: approval?.includeYear === true, line: approval?.line ?? "" };
   }
   const pathNames: Record<string, string> = {};
   const includePath: Record<string, boolean> = {};
@@ -57,6 +59,7 @@ function fromState(state: ChurchState): FormState {
     siteName: state.pub.siteName ?? "",
     gateName: state.pub.gateName ?? "",
     directions: state.pub.directions ?? "",
+    outlines: state.pub.outlines === true,
     sectionNames,
     pathNames,
     includePath,
@@ -110,6 +113,7 @@ export function FamilySheet() {
       siteName: edit.siteName,
       gateName: edit.gateName,
       directions: edit.directions,
+      outlines: edit.outlines,
       sectionNames: Object.fromEntries(Object.entries(edit.sectionNames).filter(([, v]) => v.trim() !== "")),
       pathNames: Object.fromEntries(Object.entries(edit.pathNames).filter(([id, v]) => edit.includePath[id] === true && v.trim() !== "")),
       plotCodes,
@@ -120,8 +124,8 @@ export function FamilySheet() {
       const hasYear = open.state.burials[burialId]?.date.p !== "unknown";
       if (row.include) {
         const wantYear = row.year && hasYear;
-        if (status !== "approved" || approval?.name !== row.shown.trim() || approval?.includeYear !== wantYear) {
-          commands.push({ type: "approve_burial", burialId, ...(row.shown.trim() === "" ? {} : { name: row.shown.trim() }), includeYear: wantYear });
+        if (status !== "approved" || approval?.name !== row.shown.trim() || approval?.includeYear !== wantYear || (approval?.line ?? "") !== row.line.trim()) {
+          commands.push({ type: "approve_burial", burialId, ...(row.shown.trim() === "" ? {} : { name: row.shown.trim() }), includeYear: wantYear, ...(row.line.trim() === "" ? {} : { line: row.line.trim() }) });
         }
       } else if (approval !== undefined && approval.withdrawn !== true) {
         commands.push({ type: "withdraw_approval", burialId });
@@ -131,7 +135,7 @@ export function FamilySheet() {
   };
 
   const clearPublic = async () => {
-    const outcome = await intent.send([{ type: "set_public", siteName: "", gateName: "", directions: "", sectionNames: {}, pathNames: {}, plotCodes: {} }], { done: t("familySettingsSaved") });
+    const outcome = await intent.send([{ type: "set_public", siteName: "", gateName: "", directions: "", outlines: false, sectionNames: {}, pathNames: {}, plotCodes: {} }], { done: t("familySettingsSaved") });
     if (outcome.ok) setPreview(undefined);
   };
 
@@ -179,6 +183,8 @@ export function FamilySheet() {
     sectionNames: "fieldSectionNames",
     plotCodes: "fieldPlotCodes",
     directions: "fieldDirections",
+    outlines: "fieldOutlines",
+    lines: "fieldLines",
     names: "fieldNames",
     years: "fieldYears",
   };
@@ -208,7 +214,9 @@ export function FamilySheet() {
           )}
         </section>
 
-        <TextArea label={t("publicDirections")} value={edit.directions} onChange={(v) => setEdit((e) => ({ ...e, directions: v }))} rows={3} />
+        <TextArea label={t("publicDirections")} hint={t("publicDirectionsHint")} value={edit.directions} onChange={(v) => setEdit((e) => ({ ...e, directions: v }))} rows={3} />
+
+        <CheckField label={t("showOutlines")} checked={edit.outlines} onChange={(v) => setEdit((e) => ({ ...e, outlines: v }))} />
 
         {Object.values(open.state.map.paths).length === 0 ? null : (
           <section className="card stack" aria-labelledby="paths-heading">
@@ -239,7 +247,7 @@ export function FamilySheet() {
           {unnamed === 0 ? null : <p className="hint">{t("nameUnknown")}: {unnamed}</p>}
           <ul className="cards plain">
             {burials.map((b) => {
-              const row = edit.rows[b.burialId] ?? { include: false, shown: b.recordedName ?? "", year: false };
+              const row = edit.rows[b.burialId] ?? { include: false, shown: b.recordedName ?? "", year: false, line: "" };
               const choice = plotOf(b.plotId);
               const status = approvalStatus(open.state, b.burialId);
               const label = `${t("includeBurial")}: ${b.recordedName ?? ""} · ${choice?.code ?? t("locationToConfirm")}`;
@@ -251,6 +259,7 @@ export function FamilySheet() {
                   {row.include ? (
                     <>
                       <TextField label={`${t("nameShownToVisitors")}: ${b.recordedName ?? ""}`} value={row.shown} onChange={(v) => setRow(b.burialId, { shown: v })} error={intent.fieldErrors["shownName"]} autoComplete="off" />
+                      <TextField label={`${t("burialLine")}: ${b.recordedName ?? ""}`} value={row.line} onChange={(v) => setRow(b.burialId, { line: v })} error={intent.fieldErrors["line"]} autoComplete="off" />
                       {b.date.p === "unknown" ? null : <CheckField label={`${t("includeYear")}: ${b.recordedName ?? ""}`} checked={row.year} onChange={(v) => setRow(b.burialId, { year: v })} />}
                       {choice === undefined ? null : (
                         <TextField label={`${t("publicPlotCode")}: ${choice.code}`} value={edit.plotCodes[choice.plotId] ?? choice.code} onChange={(v) => setEdit((e) => ({ ...e, plotCodes: { ...e.plotCodes, [choice.plotId]: v } }))} autoComplete="off" />

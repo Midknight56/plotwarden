@@ -7,9 +7,14 @@
 // overflow, black and grays only, no script, and the private words. The two visitor files are downloaded from the
 // registers, opened cold from disk with the network off, searched, and printed to A4 and to Letter.
 //
+// A4 proof (task 10): the family location, the plot seeker sheet and the private season report are saved to
+// docs/acceptance/print/ as the browser's own PDF and as a picture of page 1. The picture is the same document drawn
+// in print media at the width of A4 with the 12 mm page margin, cut at the height of A4. It is not a picture of the PDF.
+//
 // What this does not show: a printed page. The browser makes a PDF from the document. No print dialog was driven
 // and no paper was used.
-import { readFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { chromium, expect, test } from "@playwright/test";
 import type { Browser, BrowserContext, Page } from "@playwright/test";
@@ -34,6 +39,20 @@ test.beforeAll(async () => {
 test.afterAll(async () => {
   await plainTextBrowser.close();
 });
+
+const PROOF_DIR = "docs/acceptance/print";
+/** The height of an A4 page in CSS pixels at 96 per inch. */
+const A4_HEIGHT = 1123;
+
+/** Save a PDF and a picture of page 1 of the same document. The picture is drawn with the page margin of the document. */
+async function saveProof(name: string, pdf: Buffer, doc: Page): Promise<void> {
+  mkdirSync(PROOF_DIR, { recursive: true });
+  await doc.setViewportSize({ width: PAPERS[0].cssWidth, height: A4_HEIGHT });
+  await doc.addStyleTag({ content: "body{padding:12mm}" });
+  const picture = await doc.screenshot({ clip: { x: 0, y: 0, width: PAPERS[0].cssWidth, height: A4_HEIGHT }, fullPage: true });
+  writeFileSync(join(PROOF_DIR, `${name}.pdf`), pdf);
+  writeFileSync(join(PROOF_DIR, `${name}-page-1.png`), picture);
+}
 
 const CHURCH_APP = { ...CHURCH, origin: `${SITE}churchyard/` };
 const GARDEN_APP = { ...GARDEN, origin: `${SITE}allotments/` };
@@ -116,7 +135,7 @@ async function drawPrint(context: BrowserContext, html: string, paper: Paper): P
 }
 
 /** What a print document must be, on one paper. Words are checked by the caller. */
-async function expectPrintPage(parent: BrowserContext, html: string, paper: Paper, label: string): Promise<{ text: string; facts: PdfFacts }> {
+async function expectPrintPage(parent: BrowserContext, html: string, paper: Paper, label: string, proof?: string): Promise<{ text: string; facts: PdfFacts }> {
   // Drawn in a browser that has its coloured text smoothing off. With it on, the edges of every letter carry red and
   // blue fringes that the document did not paint, and a picture of the page could never be all gray.
   void parent;
@@ -137,6 +156,7 @@ async function expectPrintPage(parent: BrowserContext, html: string, paper: Pape
     expect(colour.pixels).toBeGreaterThan(1000);
     expect(colour.coloured / colour.pixels, `${label}: ${colour.coloured} of ${colour.pixels} pixels are not gray ${colour.debug}`).toBeLessThan(0.0005);
     const text = await doc.evaluate(() => document.body.innerText);
+    if (proof !== undefined && paper.name === "A4") await saveProof(proof, facts.bytes, doc);
     return { text, facts };
   } finally {
     await context.close();
@@ -206,7 +226,7 @@ for (const paper of PAPERS) {
       await expect(page.getByRole("heading", { level: 1, name: /report/i })).toBeVisible();
       const html = await printed(page, "Print private report");
       expect(html).toMatch(new RegExp(`size:\\s*${paper.name}`, "i"));
-      const { text } = await expectPrintPage(context, html, paper, `garden report ${paper.name}`);
+      const { text } = await expectPrintPage(context, html, paper, `garden report ${paper.name}`, "season-report-a4");
       expect(text).toContain("Season report");
       expect(text).toContain("Ada Stonecrop");
       expect(text).toContain("Tavi Bramblequill");
@@ -224,7 +244,7 @@ for (const paper of PAPERS) {
       await previewPublic(page, /^List this plot:/);
       const html = await printed(page, "Print availability map");
       expect(html).toMatch(new RegExp(`size:\\s*${paper.name}`, "i"));
-      const { text, facts } = await expectPrintPage(context, html, paper, `seeker print ${paper.name}`);
+      const { text, facts } = await expectPrintPage(context, html, paper, `seeker print ${paper.name}`, "seeker-sheet-a4");
       expect(text).toContain("Thimble Gate");
       expect(text).toContain("B03");
       for (const secret of AVAILABILITY_CANARIES) {
@@ -274,12 +294,70 @@ test.describe("the two visitor files, shared and opened cold", () => {
     await expect(cold.page.locator("#selcode")).toHaveText("Y07");
     expect(cold.requests.filter((u) => !u.startsWith("file:") && !u.startsWith("data:") && !u.startsWith("about:"))).toEqual([]);
 
+    // One location. The button marks the page and asks the browser to print. The print call is a stub here, so the
+    // state of the page at that moment is read and no dialog opens.
+    await cold.page.evaluate(() => {
+      const mark = window as unknown as { __printed: string[] };
+      mark.__printed = [];
+      window.print = () => {
+        mark.__printed.push(document.body.className);
+      };
+    });
+    await cold.page.getByRole("button", { name: "Print this location", exact: true }).click();
+    expect(await cold.page.evaluate(() => (window as unknown as { __printed: string[] }).__printed)).toEqual(["only-selected"]);
+    await cold.page.evaluate(() => {
+      document.body.className = "only-selected";
+    });
     await cold.page.emulateMedia({ media: "print" });
+    const location = await cold.page.evaluate(() => {
+      const svg = document.querySelector("svg.map") as SVGSVGElement;
+      const shown = (el: Element | null): boolean => el !== null && getComputedStyle(el).display !== "none";
+      const rectOf = (el: Element) => el.getBoundingClientRect();
+      const scale = rectOf(svg).width / svg.viewBox.baseVal.width;
+      // A walk is drawn 12 px wide. The box of its line is widened by half of that, in the scale of the drawing.
+      const bands = [...svg.querySelectorAll("polyline.walk")].map((w) => {
+        const r = rectOf(w);
+        return { name: "the walk", x0: r.left - 6 * scale, x1: r.right + 6 * scale, y0: r.top - 6 * scale, y1: r.bottom + 6 * scale };
+      });
+      const shapes = [...svg.querySelectorAll("polygon.outline, path.arch")].filter(shown).map((s) => {
+        const r = rectOf(s);
+        return { name: "a plot", x0: r.left, x1: r.right, y0: r.top, y1: r.bottom };
+      });
+      const texts = [...svg.querySelectorAll("text")]
+        .filter((t) => shown(t) && (t.textContent ?? "").trim() !== "" && rectOf(t).width > 0)
+        .map((t) => ({ name: (t.textContent ?? "").trim(), r: rectOf(t) }));
+      const faults: string[] = [];
+      const over = (a: { left: number; right: number; top: number; bottom: number }, b: { x0: number; x1: number; y0: number; y1: number }) => a.left < b.x1 && b.x0 < a.right && a.top < b.y1 && b.y0 < a.bottom;
+      for (const t of texts) {
+        for (const other of [...bands, ...shapes]) if (over(t.r, other)) faults.push(`${t.name} lies on ${other.name}`);
+      }
+      for (let i = 0; i < texts.length; i++) {
+        for (let j = i + 1; j < texts.length; j++) {
+          const a = texts[i];
+          const b = texts[j];
+          if (a !== undefined && b !== undefined && over(a.r, { x0: b.r.left, x1: b.r.right, y0: b.r.top, y1: b.r.bottom })) faults.push(`${a.name} lies on ${b.name}`);
+        }
+      }
+      return {
+        outlines: [...svg.querySelectorAll("polygon.outline")].filter(shown).length,
+        selectedPlots: svg.querySelectorAll(".plotg.on").length,
+        tabs: [...svg.querySelectorAll(".plotg.on .tab")].filter((tab) => rectOf(tab).width > 0).length,
+        gate: shown(svg.querySelector("rect.gate")),
+        walks: bands.length,
+        listItems: [...document.querySelectorAll("#list li")].filter(shown).length,
+        faults,
+      };
+    });
+    expect(location).toEqual({ outlines: 11, selectedPlots: 1, tabs: 1, gate: true, walks: 1, listItems: 1, faults: [] });
+    const locationPdf = await cold.page.pdf({ format: "A4", printBackground: true });
+    for (const secret of VISITOR_CANARIES) expect(locationPdf.toString("latin1"), secret).not.toContain(secret);
+
     for (const paper of PAPERS) {
       const facts = pdfFacts(await cold.page.pdf({ format: paper.name }));
       expectPaper(facts, paper, `family file ${paper.name}`);
       for (const secret of VISITOR_CANARIES) expect(facts.bytes.toString("latin1"), secret).not.toContain(secret);
     }
+    await saveProof("family-location-a4", locationPdf, cold.page);
     await cold.context.close();
     void context;
   });

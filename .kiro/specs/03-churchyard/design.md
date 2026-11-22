@@ -50,8 +50,8 @@ Reservation { reservationId; plotId; spaceId; claimId; holderId; start; sourceRe
               released?: { on; reason }; convertedTo?: Uuid }
 Request { requestId; holderId; note?; on; reservationId? }
 Memorial { memorialId; burialId; reading; unclear; pageRef?; photoIds: Uuid[] }
-Approval { burialId; name; includeYear; basis: { recordedName; year?; plotId; nameUnknown } ; withdrawn? }
-PublicSettings { siteName?; gateName?; directions?; sectionNames: Record<Uuid,string>; pathNames: Record<Uuid,string>; plotCodes: Record<Uuid,string> }
+Approval { burialId; name; includeYear; line?; basis: { recordedName; year?; plotId; nameUnknown } ; withdrawn? }
+PublicSettings { siteName?; gateName?; directions?; outlines?: boolean; sectionNames: Record<Uuid,string>; pathNames: Record<Uuid,string>; plotCodes: Record<Uuid,string> }
 ```
 
 A burial writes one `taken` claim with `endable: false`, `ref` set to the burial ID and `sourceRef` set. A reservation writes one `held` claim with `endable: true`. A request writes no claim.
@@ -94,7 +94,8 @@ Error codes added by this spec: `space_taken` (core), `space_reserved` (detail `
 - `paths`: each map path whose ID is in `pub.pathNames`, with that public name.
 - `sections`: each section holding an approved burial's plot, labelled `pub.sectionNames[id]` or, if unset, a neutral "Section n".
 - `plots`: the plot of each approved burial, with its footprint outline and the code `pub.plotCodes[plotId]` or the plot's code.
-- `burials`: the approved name, `year` only when `includeYear`, the plot's public ID and `pub.directions`.
+- `burials`: the approved name, `year` only when `includeYear`, the plot's public ID, `directions` (the one way in for the whole site, from `pub.directions`) and `line` (the approval's own optional line for this burial, never another burial's).
+- `outlines` (only when `pub.outlines` is true): the footprint of every plot that has one on the map and is not in `plots`, as bare point lists, sorted by their points (south to north, then west to east) so the order says nothing about a plot code. It holds no code, state, ID or count. It is built from the map shapes alone, so an edit to a note, a reading, a request, a holder or a burial in a plot not shown cannot change it.
 - `north` from the map.
 
 Each public ID is `newPublicId()`, a random 16 character token, never a private UUID. `previewFamily` lists the included burials, the withheld ones (count and "withheld" only, with no name) and the fields. Flagging uses `flagPrivateStrings` with every person name, contact, request note and holder name in the state. The built file is checked with `parseFamily` before it is returned.
@@ -104,6 +105,16 @@ Each public ID is `newPublicId()`, a random 16 character token, never a private 
 `buildFamilyPrint(file, { paper, orientation })` builds a second document from the same object: title, "As at", entrance, directions, the map sheet and an index of burials with plot codes. A4 or Letter by `@page size`. Grayscale: every mark has a word or a shape and no colour carries a meaning.
 
 A dense public map (more than 60 plots in the file) splits: the print document draws an overview with a section index and then one numbered sheet per section.
+
+### K5a The drawn map
+
+`familyMapSvg` places every name with the rules of `template/src/map/labels.ts` (pure, no private type). It draws, in order: other plots as plain outlines, section outlines, walks (a band `WALK_BAND` px wide with a dotted line), the plots of the file as arches, the gate, the north arrow, then the tabs.
+
+- A plot code is never written beside its plot. It is written on a tab (`rect.tab` and `text.tab-text`). `selectedPlotId` draws that tab. `selectable` draws a tab for every plot in the file inside a group, which the page hides by script until a plot is chosen and shows when script is off. `allTabs` draws every tab, for a print.
+- Names (gate, section, path) are placed first, each in the first clear spot: inside the sheet, `WALK_BAND / 2 + 4` px from every walk, away from every plot and outline, the north arrow, the gate mark and every earlier name. A name with no clear spot is written under the drawing, one to a line, after a small sample of its mark (the gate square or a short walk). A path named like a drawn section is not written twice.
+- Tabs are placed after the names, each in the first clear spot above, below or beside its own plot, against the same things and against every other tab.
+- The page prints one location with the selected plot and its tab. Other plots of the file draw as thin outlines in that print. The print of the whole map shows every tab.
+- Print colours: outlines, walks and tabs are gray. Nothing carries meaning by colour.
 
 ## K6 Private report
 
@@ -160,7 +171,7 @@ Routes under `#/r/<siteId>`: home (the app `home`), `burial/new`, `burial/<id>`,
 | Reservation | `Reservation.tsx` | "Reservation holder", "Contact details", "Start date", "Available spaces", "Record reservation", "Reserve for next applicant", "Release reservation", "Record burial in this space" |
 | Unplaced | `Unplaced.tsx` | "Burials with no plot", "Open source", "Choose location", "Confirm placement", "Possible name match", "Keep separate", "Link to existing person" |
 | Report | `BurialReport.tsx` | "Burial and reservation report", "From", "Through", "Burials", "Reservations made", "Reservations released", "Date incomplete", "Open spaces", "Location to confirm", "Print private report", "Download private CSV" |
-| Family | `FamilySheet.tsx` | "Family map", "Public site name", "Public section name", "Public plot code", "Public directions", "Include this burial", "Name shown to visitors", "Include year", "Preview as a visitor", "Download family copy", "Print family map" |
+| Family | `FamilySheet.tsx` | "Family map", "Public site name", "Public section name", "Public plot code", "Public directions" (the way in for the whole site), "Line to this burial", "Show other plots as plain outlines", "Include this burial", "Name shown to visitors", "Include year", "Preview as a visitor", "Download family copy", "Print family map" |
 | Family file | `visitorHtml.ts` | "Find a burial", "Name or plot code", "Find", "Clear", "Show location", "Entrance", "Section", "Plot", "Directions", "Print this location", "Print site map", "As at {date}" |
 
 Every screen uses `useRegister().run` so a repeat press returns the same promise, with one operation ID per intent held in a ref and cleared on success.
