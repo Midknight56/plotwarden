@@ -11,6 +11,9 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 4173 --strictPort",
     "preview": "vite preview --host 127.0.0.1 --port 4174 --strictPort",
+    "host:build": "vite build --config tests/host/vite.config.ts",
+    "host:preview": "vite preview --config tests/host/vite.config.ts",
+    "fixtures": "node scripts/generate-fixtures.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "lint": "eslint .",
     "test:unit": "vitest run tests/unit",
@@ -22,12 +25,17 @@
     "check:changed": "npm run typecheck && node scripts/check-imports.mjs && node scripts/changed-tests.mjs --git"
   },
   "dependencies": {
+    "fflate": "0.8.3",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
     "zod": "4.6.7"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
     "@playwright/test": "1.65.1",
     "@types/node": "26.6.6",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
     "eslint": "10.15.0",
     "fake-indexeddb": "6.2.8",
     "fast-check": "4.11.0",

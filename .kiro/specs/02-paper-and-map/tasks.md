@@ -1,0 +1,57 @@
+# 02 Paper and map: tasks
+
+Each task writes its test first, runs it and sees it fail on the missing behaviour, then writes the smallest complete code. A stub that compiles and throws "not implemented" counts as the skeleton. A missing module or a failed install does not count as red. Tick a task only when its tests pass and the adjacent tests still pass.
+
+Run one test file with `npx vitest run <file>`. Run one browser spec with `npx playwright test tests/browser/<file>`. Check at least 8 GB of free memory before Playwright.
+
+Exit gate: `npm run typecheck`, `npm run test:unit`, `npm run test:properties`, `npm run test:conformance`, `npm run test:oracle`, `node scripts/check-imports.mjs`, and `tests/browser/paper-map.spec.ts` and `tests/browser/paper-entry.spec.ts` all exit 0.
+
+## Tasks
+
+- [x] 2.1 Tooling for the screens. Files: `package.json`, `package-lock.json`, `tsconfig.json`, `playwright.config.ts`, `tests/host/vite.config.ts`, `tests/host/index.html`. Requirements: P15, P16. T IDs: none. No red: tooling has no behaviour. Proved by tasks 2.19 to 2.21 running.
+- [x] 2.2 Coordinates. Files: `template/src/map/coordinates.ts`. Requirements: P1. T IDs: T04 (point and coordinate parity). Red command: `npx vitest run tests/unit/coordinates.test.ts`. First red: site (0, 0) is not the bottom left corner and a north flip is applied twice or not at all.
+- [x] 2.3 Grid and renumber. Files: `template/src/map/generate.ts`. Requirements: P2. T IDs: T03, T16 (old codes), T32 (grid size). Red command: `npx vitest run tests/unit/grid.test.ts`. First red: 10 by 20 with prefix C does not give C001 to C200, a skipped place renumbers the others and regeneration makes new plots.
+- [x] 2.4 Geometry. Files: `template/src/map/geometry.ts`. Requirements: P3. T IDs: T04, T32 (vertices). Red command: `npx vitest run tests/unit/geometry.test.ts`. First red: a bow tie is accepted, two footprints that overlap in area are accepted and two that only touch are refused.
+- [x] 2.5 Layout events, commands and drafts. Files: `template/src/map/edit.ts`. Requirements: P4. T IDs: T04, T16 (renumber). Red commands: `npx vitest run tests/unit/layout.test.ts tests/unit/edit.test.ts`. First red: a layout apply returns no events, a section outline change drops a linked plot and undo changes nothing.
+- [x] 2.6 Layout file and backdrop. Files: `template/src/map/layoutFile.ts`. Requirements: P5. T IDs: T05. Red command: `npx vitest run tests/unit/trace.test.ts`. First red: the file holds a backdrop key, a conflicting import is applied and a repeat import adds plots.
+- [x] 2.7 Sheet. Files: `template/src/map/sheet.ts`. Requirements: P6. T IDs: T05 (safe drawing). Red command: `npx vitest run tests/unit/sheet.test.ts`. First red: the sheet has no plots, north is not flipped and a code under 12 px is drawn.
+- [x] 2.8 CSV reading. Files: `template/src/data/csv.ts`. Requirements: P7. T IDs: T06, T32 (CSV bounds). Red command: `npx vitest run tests/unit/csv.test.ts`. First red: a quoted newline splits a row, `001` loses its zeros and a stray quote is accepted.
+- [x] 2.9 Mapping. Files: `template/src/data/mapping.ts`. Requirements: P8. T IDs: T06. Red command: `npx vitest run tests/unit/mapping.test.ts`. First red: `03/04/26` is accepted, a blank money cell becomes 0 and two columns map to one field.
+- [x] 2.10 CSV export. Files: `template/src/data/csvExport.ts`. Requirements: P10. T IDs: T06 (support), T23 (escaping, owned by 03 and 04 for reports). Red command: `npx vitest run tests/unit/csvExport.test.ts`. First red: `=1+1` is written as it came.
+- [x] 2.11 Notes and base state. Files: `template/src/notes.ts`, `template/src/base.ts`. Requirements: P14.1 to P14.3. T IDs: support. Red commands: `npx vitest run tests/unit/notes.test.ts tests/unit/base.test.ts`. First red: a ninth photo is accepted and an app event is swallowed by `applyBase`.
+- [x] 2.12 Staged import. Files: `template/src/data/importBatch.ts`, `tests/helpers/paperAdapter.ts`. Requirements: P9. T IDs: T07, T24 (unique source keys), T32 (rows). Red command: `npx vitest run tests/unit/importBatch.test.ts`. First red: a bad row lets 199 rows through, a repeated file adds records and two equal names merge.
+- [x] 2.13 Fast entry. Files: `template/src/data/fastEntry.ts`. Requirements: P11. T IDs: T08. Red command: `npx vitest run tests/unit/fastEntry.test.ts`. First red: "Repeat section" copies a name and a failed row loses the page and the position.
+- [x] 2.14 Photos. Files: `template/src/data/images.ts`. Requirements: P12. T IDs: T11, T32 (photo bounds). Red command: `npx vitest run tests/unit/images.test.ts`. First red: a PNG named `.jpg` is taken as a JPEG, a 25 megapixel image is decoded and camera metadata survives.
+- [x] 2.15 Site admin. Files: `template/src/data/siteAdmin.ts`. Requirements: P14.4, P14.5. T IDs: T02 (confirmed removal). Red command: `npx vitest run tests/unit/siteAdmin.test.ts`. First red: removing one site removes another.
+- [x] 2.16 Backup and restore. Files: `template/src/data/backup.ts`, `tests/helpers/paperFiles.ts`. Requirements: P13. T IDs: T10, T32 (archive bounds). Red command: `npx vitest run tests/unit/backup.test.ts`. First red: a truncated archive replaces the active site and an image is missing after the round trip.
+- [x] 2.17 Fixtures and the 200 record proof. Files: `scripts/generate-fixtures.mjs`, `tests/fixtures/paper-200.csv`, `tests/fixtures/paper-200-bad.csv`, `tests/fixtures/comma-quotes.csv`, `tests/fixtures/tiny-page.png`, `tests/unit/paperBook.test.ts`. Requirements: P17. T IDs: T07, T24 (hand totals). Red command: `npx vitest run tests/unit/paperBook.test.ts`. First red: the bad file writes records and the counts differ from `hand-totals.md` section 3.
+- [x] 2.18 Copy catalog. Files: `template/src/ui/copy.ts`, `tests/unit/paperCopy.test.ts`. Requirements: P15.2. T IDs: T35 (support). Red command: `npx vitest run tests/unit/paperCopy.test.ts`. First red: the words of section 5 are missing.
+- [x] 2.19 Screens, styles and host. Files: `template/src/ui/{RegisterShell,Library,RegisterHome,PlotList,PlotDetails,SiteMap,MapEditor,TraceEditor,RecordForm,FastEntry,ReferencePage,ImportWizard,ImportReview,BackupRestore,Settings,Help,Status,Dialog}.tsx`, `template/src/ui/{copyScreens,shellContext,messages,controls,plotView,blobUrl,download}.ts*`, `tests/unit/screenWords.test.ts`, `template/src/ui/register.css`, `template/src/ui/print.css`, `tests/host/main.tsx`, `tests/helpers/measureLayout.ts`. Requirements: P15, P16. T IDs: browser. Red: the first browser assertion in 2.20 against a shell that renders only its title.
+- [x] 2.20 Browser: paper and map. Files: `tests/browser/paper-map.spec.ts`. Requirements: P2 to P6, P15, P16. T IDs: T03, T04, T05. Red command: `npx playwright test tests/browser/paper-map.spec.ts`.
+- [x] 2.21 Browser: paper entry. Files: `tests/browser/paper-entry.spec.ts`. Requirements: P7 to P12, P15 to P17. T IDs: T06, T07, T08, T11. Red command: `npx playwright test tests/browser/paper-entry.spec.ts`.
+- [x] 2.22 Properties and conformance. Files: `tests/properties/geometry.test.ts`, `tests/properties/seeds.ts`, `tests/conformance/suite.ts`, `tests/conformance/adapter.test.ts`, `tests/conformance/paper.test.ts`. Requirements: P18, H18. T IDs: T01, T03, T04, T10. Red commands: `npx vitest run tests/properties/geometry.test.ts tests/conformance/adapter.test.ts`. First red: the suite has no import or restore check, so a broken import passes.
+- [x] 2.23 Log and exit gate. Files: `docs/kiro-log.md`, `.kiro/specs/02-paper-and-map/{design,tasks}.md`. One row for each task above. T IDs: none.
+
+## T ID coverage
+
+| T ID | File | Task |
+|---|---|---|
+| T03 | `tests/unit/grid.test.ts`, browser `paper-map.spec.ts` | 2.3, 2.20 |
+| T04 | `tests/unit/{coordinates,geometry,layout,edit}.test.ts`, browser `paper-map.spec.ts` | 2.2, 2.4, 2.5, 2.20 |
+| T05 | `tests/unit/{trace,sheet}.test.ts`, browser `paper-map.spec.ts` | 2.6, 2.7, 2.20 |
+| T06 | `tests/unit/{csv,mapping,csvExport}.test.ts`, browser `paper-entry.spec.ts` | 2.8, 2.9, 2.10, 2.21 |
+| T07 | `tests/unit/{importBatch,paperBook}.test.ts`, browser `paper-entry.spec.ts` | 2.12, 2.17, 2.21 |
+| T08 | `tests/unit/fastEntry.test.ts`, browser `paper-entry.spec.ts` | 2.13, 2.21 |
+| T10 | `tests/unit/backup.test.ts`, conformance restore check | 2.16, 2.22 |
+| T11 | `tests/unit/images.test.ts`, browser `paper-entry.spec.ts` | 2.14, 2.21 |
+| T16 (renumber, old codes) | `tests/unit/grid.test.ts`, `tests/unit/layout.test.ts` | 2.3, 2.5 |
+| T32 (map, import, restore parts) | `grid`, `geometry`, `csv`, `images`, `backup` tests | 2.3, 2.4, 2.8, 2.14, 2.16 |
+| Support | `notes`, `base`, `siteAdmin`, `paperCopy` tests | 2.11, 2.15, 2.18 |
+
+T35 stays open in 06 for the full copy gate. T23 stays open in 03 and 04 for report CSV, which reuse `csvExport.ts`.
+
+## Left for later specs
+
+- The churchyard adapter replaces `tests/helpers/paperAdapter.ts` with its own burial rules and sheets (spec 03). The allotment adapter does the same for waiting list, tenancies and fees (spec 04).
+- Dense map print as an overview with numbered section sheets, the visitor HTML and the family and availability previews are specs 03 and 04. This spec ships one sheet and its print page.
+- Explicit linking of a layout plot to an existing plot of a different code is not built. A layout import matches by section and code only (R26.5).

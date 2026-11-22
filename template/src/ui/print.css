@@ -1,0 +1,55 @@
+/* Print: the sheet, its key and the index of codes. Controls and the page frame stay on the screen.
+   The words never say that anything was printed. */
+
+@media print {
+  html,
+  body {
+    background: #ffffff;
+    color: #000000;
+  }
+
+  header.app,
+  nav,
+  .no-print,
+  .actions,
+  form,
+  dialog,
+  .mist {
+    display: none !important;
+  }
+
+  .print-only {
+    display: flex !important;
+    flex-direction: column;
+    gap: 8px;
+    break-before: page;
+  }
+
+  main {
+    max-width: none;
+    padding: 0;
+  }
+
+  .sheet-scroll {
+    overflow: visible;
+    border: 0;
+  }
+
+  svg.sheet {
+    max-width: 100%;
+    height: auto;
+  }
+
+  .map-key {
+    break-inside: avoid;
+  }
+
+  .print-index {
+    columns: 3;
+    font-size: 12px;
+  }
+
+  .print-index li {
+    break-inside: avoid;
+  }
+}

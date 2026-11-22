@@ -4,9 +4,10 @@
 import { MONTH_NAMES } from "../calendar";
 import type { PartialDate } from "../calendar";
 import type { PlotSummary } from "../status";
+import { SCREEN_COPY } from "./copyScreens";
 import type { PhysicalState } from "../types";
 
-export const COPY: Readonly<Record<string, string>> = {
+export const FOUNDATION_COPY: Readonly<Record<string, string>> = {
   saved: "Saved on this device.",
   saving: "Saving changes…",
   staleRevision: "This register changed in another tab.",
@@ -35,6 +36,9 @@ export const COPY: Readonly<Record<string, string>> = {
   actionDownloadBackup: "Download backup",
   actionContinueInTab: "Continue in this tab",
 };
+
+/** The whole catalog: the foundation words and the words of the shared screens. */
+export const COPY: Readonly<Record<string, string>> = { ...FOUNDATION_COPY, ...SCREEN_COPY };
 
 /** Error code to catalog key. Codes without an entry here get their words with their own feature. */
 const ERROR_KEYS: Readonly<Record<string, string>> = {
@@ -115,4 +119,9 @@ export function plotSummaryText(summary: PlotSummary): string {
       ? fill(COPY["plotUsed"] as string, { state, used: summary.counts.taken, total: summary.spaceCount })
       : state;
   return summary.needsChecking ? `${head} · ${checking}` : head;
+}
+
+/** The reason on a row that needs attention, from the error code. A code with no entry gets a plain line. */
+export function reasonText(code: string, catalog: Readonly<Record<string, string>> = COPY): string {
+  return catalog[`reason_${code}`] ?? (catalog["reason_unknown"] as string);
 }

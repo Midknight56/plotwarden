@@ -57,6 +57,8 @@ const EXPECTED_CHECKS = [
   "builds a visitor file with a closed schema and no private string",
   "writes a repeated operation once",
   "refuses a stale commit and writes nothing",
+  "backs up and restores as a new register that replays to the same state",
+  "refuses a backup of another kind or a broken file, and writes nothing",
 ];
 
 describe("the suite has every check it promises", () => {

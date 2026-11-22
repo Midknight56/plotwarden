@@ -18,6 +18,8 @@ export interface FieldDef {
   required?: boolean;
   maxChars?: number;
   choices?: readonly string[];
+  /** Fast entry may repeat this value from the row above, as a section or as a page. */
+  repeat?: "section" | "page";
 }
 
 export interface SheetDef {
@@ -51,6 +53,8 @@ export interface ThemeTokens {
 export interface RegisterAdapter<S, C extends { type: string }, E extends { type: string }> {
   kind: string;
   version: number;
+  /** The new register form asks for a currency, as a garden does. */
+  usesCurrency?: boolean;
   spacesPerPlot: { min: number; max: number };
   fields: FieldDef[];
   sheets: SheetDef[];

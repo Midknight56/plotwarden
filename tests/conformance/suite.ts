@@ -1,11 +1,14 @@
 // The conformance suite. It runs unchanged against every adapter: the two apps
-// and the tiny market adapter. Spec 02 adds import and restore checks.
+// and the tiny market adapter. Spec 02 adds the restore checks to every adapter, and the import checks to an\n// adapter that names a sheet to import.
 // Test helper. The template never imports it.
 import { IDBFactory } from "fake-indexeddb";
 import { describe, expect, it } from "vitest";
-import { defineRegister, type Register, type RegisterAdapter } from "../../template/src/adapter";
+import { defineRegister, type FieldDef, type Register, type RegisterAdapter, type SheetDef } from "../../template/src/adapter";
 import type { LocalDate } from "../../template/src/calendar";
+import { exportBackup, restoreBackup, verifyBackup } from "../../template/src/data/backup";
 import { openRegisterDb } from "../../template/src/data/db";
+import { commitImport, stageImport, type SheetImporter } from "../../template/src/data/importBatch";
+import { checkCells, fieldsForSheet, type MappedRow } from "../../template/src/data/mapping";
 import { commit, listSites, readEvents, readSite, saveNewSite } from "../../template/src/data/transaction";
 import type { DraftEvent } from "../../template/src/events";
 import { scanForCanaries } from "../../template/src/output/privacy";
@@ -27,6 +30,15 @@ export interface ConformanceCase<S, C extends { type: string }, E extends { type
   parseVisitor(value: unknown): { ok: boolean };
   /** Another kind name, to test isolation. */
   otherKind: string;
+  /** A sheet the adapter imports. When given, the import checks run. */
+  entry?: EntryCase<S, C>;
+}
+
+export interface EntryCase<S, C extends { type: string }> {
+  sheet: SheetDef;
+  importer: SheetImporter<S, C>;
+  /** Rows by field key. Each one must stage without an error on the state the script builds. */
+  rows: Record<string, string>[];
 }
 
 export interface Check {
@@ -116,7 +128,7 @@ function stateOnly<S, C extends { type: string }, E extends { type: string }>(
 export function conformanceChecks<S, C extends { type: string }, E extends { type: string }>(
   c: ConformanceCase<S, C, E>,
 ): Check[] {
-  return [
+  const base: Check[] = [
     {
       name: "replays from the database to the state in memory",
       async run() {
@@ -283,10 +295,143 @@ export function conformanceChecks<S, C extends { type: string }, E extends { typ
         expect((await readEvents(db, site.id)).length).toBe(decided.value.length);
         db.close();
       },
+    },    {
+      name: "backs up and restores as a new register that replays to the same state",
+      async run() {
+        const register = registerOf(c);
+        const db = await openDb();
+        const site = newSite(c.adapter.kind, "Conformance");
+        await saveNewSite(db, site);
+        const { state, revision } = await playScript(c, register, db, site);
+        const written = await exportBackup(db, site.id, FIXED_NOW);
+        if (!written.ok) throw new Error(`The backup was refused: ${JSON.stringify(written.error)}`);
+        const verified = await verifyBackup(written.value.bytes, { kind: c.adapter.kind });
+        if (!verified.ok) throw new Error(`The backup did not verify: ${JSON.stringify(verified.error)}`);
+
+        const restored = await restoreBackup(db, verified.value, { mode: "new" });
+        if (!restored.ok) throw new Error(`The restore was refused: ${JSON.stringify(restored.error)}`);
+        expect(restored.value.siteId).not.toBe(site.id);
+        const copy = await readSite(db, restored.value.siteId);
+        expect(copy?.kind).toBe(c.adapter.kind);
+        expect(copy?.title).toBe(site.title);
+        expect(copy?.siteKey).not.toBe(site.siteKey);
+        expect(copy?.revision).toBe(revision);
+        const copied = await readEvents(db, restored.value.siteId);
+        expect(copied.length).toBe((await readEvents(db, site.id)).length);
+        if (copy === undefined) throw new Error("The copy is missing");
+        const replayed = register.replay(copy, copied);
+        if (!replayed.ok) throw new Error(`The copy did not replay: ${JSON.stringify(replayed.error)}`);
+        // The same state, with only the register's own ID changed.
+        expect(replayed.value).toEqual(JSON.parse(JSON.stringify(state).split(site.id).join(copy.id)));
+        // The register it came from is as it was.
+        expect((await readSite(db, site.id))?.revision).toBe(revision);
+        db.close();
+      },
+    },
+    {
+      name: "refuses a backup of another kind or a broken file, and writes nothing",
+      async run() {
+        const register = registerOf(c);
+        const db = await openDb();
+        const site = newSite(c.adapter.kind, "Conformance");
+        await saveNewSite(db, site);
+        await playScript(c, register, db, site);
+        const written = await exportBackup(db, site.id, FIXED_NOW);
+        if (!written.ok) throw new Error(`The backup was refused: ${JSON.stringify(written.error)}`);
+        const bytes = written.value.bytes;
+        const before = (await listSites(db)).length;
+
+        const other = await verifyBackup(bytes, { kind: c.otherKind });
+        expect(other).toMatchObject({ ok: false, error: { code: "wrong_kind" } });
+        const cut = await verifyBackup(bytes.slice(0, Math.floor(bytes.length / 2)), { kind: c.adapter.kind });
+        expect(cut.ok).toBe(false);
+        const text = await verifyBackup(new TextEncoder().encode('{"format":"plot.review.v1"}'), { kind: c.adapter.kind });
+        expect(text).toMatchObject({ ok: false, error: { code: "wrong_file" } });
+
+        expect((await listSites(db)).length).toBe(before);
+        db.close();
+      },
+    },
+  ];
+  return c.entry === undefined ? base : [...base, ...importChecks(c, c.entry)];
+}
+
+/** The two checks that an adapter with a sheet to import adds. */
+function importChecks<S, C extends { type: string }, E extends { type: string }>(c: ConformanceCase<S, C, E>, entry: EntryCase<S, C>): Check[] {
+  const rowsOf = (fields: readonly FieldDef[]): MappedRow[] => {
+    const headings: Record<string, string> = {};
+    for (const f of fieldsForSheet(entry.sheet, fields)) headings[f.key] = f.label;
+    return entry.rows.map((cells, i) => ({ rowNumber: i + 1, cells, errors: checkCells(i + 1, cells, headings, entry.sheet, fields) }));
+  };
+  const stage = (register: Register<S, C, E>, site: Site, state: S, revision: number) =>
+    stageImport({
+      register,
+      importer: entry.importer,
+      rows: rowsOf(c.adapter.fields),
+      columns: fieldsForSheet(entry.sheet, c.adapter.fields).map((f, index) => ({ index, heading: f.label, fieldKey: f.key })),
+      sheet: entry.sheet,
+      fields: c.adapter.fields,
+      state,
+      siteId: site.id,
+      baseRevision: revision,
+      effectiveOn: c.asOf,
+      options: { newId: mintId },
+    });
+  return [
+    {
+      name: "staging an import writes nothing, and the import is one revision",
+      async run() {
+        const register = registerOf(c);
+        const db = await openDb();
+        const site = newSite(c.adapter.kind, "Conformance");
+        await saveNewSite(db, site);
+        const { state, revision } = await playScript(c, register, db, site);
+        const eventsBefore = (await readEvents(db, site.id)).length;
+
+        const staged = stage(register, site, state, revision);
+        expect(staged.counts.errors).toBe(0);
+        expect(staged.counts.conflicts).toBe(0);
+        expect(staged.writes).toBe(entry.rows.length);
+        // Looking at the import changed nothing.
+        expect((await readEvents(db, site.id)).length).toBe(eventsBefore);
+        expect((await readSite(db, site.id))?.revision).toBe(revision);
+
+        const done = await commitImport(db, staged, { opId: mintId(), now: fixedClock(FIXED_NOW) });
+        if (!done.ok) throw new Error(`The import was refused: ${JSON.stringify(done)}`);
+        expect(done.written).toBe(entry.rows.length);
+        expect((await readSite(db, site.id))?.revision).toBe(revision + 1);
+        expect((await readEvents(db, site.id)).length).toBeGreaterThan(eventsBefore);
+        db.close();
+      },
+    },
+    {
+      name: "an import repeated adds nothing",
+      async run() {
+        const register = registerOf(c);
+        const db = await openDb();
+        const site = newSite(c.adapter.kind, "Conformance");
+        await saveNewSite(db, site);
+        const { state, revision } = await playScript(c, register, db, site);
+        const first = await commitImport(db, stage(register, site, state, revision), { opId: mintId(), now: fixedClock(FIXED_NOW) });
+        expect(first.ok).toBe(true);
+
+        const stored = await readEvents(db, site.id);
+        const row = await readSite(db, site.id);
+        if (row === undefined) throw new Error("The register is missing");
+        const replayed = register.replay(row, stored);
+        if (!replayed.ok) throw new Error(`replay refused: ${JSON.stringify(replayed.error)}`);
+        const again = stage(register, site, replayed.value, row.revision);
+        expect(again.counts.unchanged).toBe(entry.rows.length);
+        expect(again.writes).toBe(0);
+        const second = await commitImport(db, again, { opId: mintId(), now: fixedClock(FIXED_NOW) });
+        expect(second).toMatchObject({ ok: false, code: "nothing_to_import" });
+        expect((await readEvents(db, site.id)).length).toBe(stored.length);
+        expect((await readSite(db, site.id))?.revision).toBe(row.revision);
+        db.close();
+      },
     },
   ];
 }
-
 /** Register one test for each check, under the adapter's name. */
 export function runConformance<S, C extends { type: string }, E extends { type: string }>(
   c: ConformanceCase<S, C, E>,
