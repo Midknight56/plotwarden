@@ -2,6 +2,7 @@
 import { describe, expect, it } from "vitest";
 import type { FieldDef, SheetDef } from "../../template/src/adapter";
 import type { CsvTable } from "../../template/src/data/csv";
+import { BURIALS_SHEET, BURIAL_FIELDS } from "../../apps/churchyard-register/src/fields";
 import { applyMapping, checkCells, checkMapping, fieldsForSheet, normaliseHeading, suggestMapping } from "../../template/src/data/mapping";
 import type { Mapping } from "../../template/src/data/mapping";
 
@@ -63,6 +64,50 @@ describe("matching headings", () => {
     const m = suggestMapping(["Source ref", "NAME", "burial  date", "Mystery", "Reference"], fieldsForSheet(SHEET, FIELDS));
     expect(m.columns.map((c) => c.fieldKey)).toEqual(["sourceRef", "name", "burialDate", undefined, "sourceRef"]);
     expect(m.columns.map((c) => c.heading)).toEqual(["Source ref", "NAME", "burial  date", "Mystery", "Reference"]);
+  });
+
+  // P8.8: an app may list other headings for a field. An exact heading always wins, and no field is filled twice.
+  describe("aliases of a field", () => {
+    const WITH_ALIAS: FieldDef[] = FIELDS.map((f) => (f.key === "name" ? { ...f, key: "recordedName", label: "Recorded name", aliases: ["Name", "Full name"] } : f));
+    const keys = (headings: string[]) => suggestMapping(headings, fieldsForSheet({ ...SHEET, required: ["Source ref", "Recorded name"] }, WITH_ALIAS)).columns.map((c) => c.fieldKey);
+
+    it("matches an alias to its field when no heading says the field's own name", () => {
+      expect(keys(["Source ref", "Name", "Plot"])).toEqual(["sourceRef", "recordedName", "plot"]);
+      expect(keys(["Source ref", "  FULL  name ", "Plot"])).toEqual(["sourceRef", "recordedName", "plot"]);
+    });
+
+    it("lets the exact heading keep the field, so the alias column stays unmatched", () => {
+      expect(keys(["Source ref", "Name", "Recorded name"])).toEqual(["sourceRef", undefined, "recordedName"]);
+      expect(keys(["Source ref", "Recorded name", "Name"])).toEqual(["sourceRef", "recordedName", undefined]);
+    });
+
+    it("uses an alias once: the first heading that matches", () => {
+      expect(keys(["Source ref", "Name", "Full name"])).toEqual(["sourceRef", "recordedName", undefined]);
+    });
+
+    it("gives a mapping that checks clean", () => {
+      const fields = fieldsForSheet({ ...SHEET, required: ["Source ref", "Recorded name"] }, WITH_ALIAS);
+      const headings = ["Source ref", "Name"];
+      expect(checkMapping(suggestMapping(headings, fields), { ...SHEET, required: ["Source ref", "Recorded name"] }, WITH_ALIAS).ok).toBe(true);
+    });
+  });
+
+  // C11.3: the Churchyard Register's own sheet. The paper book heads its names column "Name".
+  it("matches the heading Name to the recorded name of the Burials sheet, with no choice by the keeper", () => {
+    const fields = fieldsForSheet(BURIALS_SHEET, BURIAL_FIELDS);
+    const m = suggestMapping(["Source ref", "Name", "Section", "Plot", "Burial date", "Page"], fields);
+    expect(m.columns.map((c) => c.fieldKey)).toEqual(["sourceRef", "recordedName", "section", "plot", "burialDate", "page"]);
+    const table = { headings: m.columns.map((c) => c.heading), rows: [["R117", "Quill Fernhollow", "Paper", "C117", "1866-09", "P12"]], separator: "comma" as const };
+    expect(checkMapping(m, BURIALS_SHEET, BURIAL_FIELDS, table).ok).toBe(true);
+    const applied = applyMapping(table, m, BURIALS_SHEET, BURIAL_FIELDS);
+    expect(applied.ok && applied.value[0]?.cells["recordedName"]).toBe("Quill Fernhollow");
+    expect(applied.ok && applied.value[0]?.errors).toEqual([]);
+  });
+
+  it("keeps a file that heads its column Recorded name as it was, and leaves Name for the keeper", () => {
+    const fields = fieldsForSheet(BURIALS_SHEET, BURIAL_FIELDS);
+    expect(suggestMapping(["Source ref", "Recorded name"], fields).columns.map((c) => c.fieldKey)).toEqual(["sourceRef", "recordedName"]);
+    expect(suggestMapping(["Source ref", "Name", "Recorded name"], fields).columns.map((c) => c.fieldKey)).toEqual(["sourceRef", undefined, "recordedName"]);
   });
 });
 

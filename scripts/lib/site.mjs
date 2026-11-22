@@ -68,7 +68,7 @@ export function checkInputs(root) {
   const need = (rel) => {
     if (!existsSync(join(apps, rel))) missing.push(`dist/apps/${rel}`);
   };
-  for (const rel of ["hub/index.html", "hub/404.html", "hub/_headers", "hub/sw.js", "hub/sw-register.js", "churchyard/index.html", "allotments/index.html", "hub/visitor/family/index.html", "hub/visitor/seeker/index.html"]) need(rel);
+  for (const rel of ["hub/index.html", "hub/404.html", "hub/_headers", "hub/sw.js", "hub/sw-register.js", "churchyard/index.html", "churchyard/practice-book.csv", "allotments/index.html", "hub/visitor/family/index.html", "hub/visitor/seeker/index.html"]) need(rel);
   for (const [kind, pattern] of Object.entries(VISITOR_FILES)) {
     const dir = join(apps, "hub", "visitor", kind);
     if (!listFiles(dir).some((f) => pattern.test(f))) missing.push(`a visitor file in dist/apps/hub/visitor/${kind}/`);

@@ -33,6 +33,11 @@ export interface RegisterApp<S extends BaseState, C extends { type: string }, E 
   plotExtras?: ComponentType<{ plotId: string }>;
   /** A practice register that opens in its own workspace. */
   walkthrough?: Walkthrough;
+  /**
+   * A file of invented records that the Import screen offers beside the column guide. `href` is relative to the page
+   * of the app, so it works from any folder the app is served from and from the offline shell.
+   */
+  practiceBook?: { href: string; fileName: string };
 }
 
 export type AnyApp = RegisterApp<BaseState, { type: string }, { type: string }>;

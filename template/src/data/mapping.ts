@@ -73,11 +73,26 @@ export function suggestMapping(headings: readonly string[], fields: readonly Fie
     byLabel.set(normaliseHeading(f.label), f);
     byLabel.set(normaliseHeading(f.key), f);
   }
+  const byAlias = new Map<string, FieldDef>();
+  for (const f of fields) for (const alias of f.aliases ?? []) if (!byAlias.has(normaliseHeading(alias))) byAlias.set(normaliseHeading(alias), f);
+
+  // First the exact headings. An alias comes after, and only for a field that no exact heading took (P8.8).
+  const exact = headings.map((heading) => {
+    const normal = normaliseHeading(heading);
+    const field = byLabel.get(normal);
+    return field === undefined && SOURCE_REF_ALIASES.has(normal) ? fields.find((f) => f.key === "sourceRef") : field;
+  });
+  const taken = new Set(exact.flatMap((f) => (f === undefined ? [] : [f.key])));
   return {
     columns: headings.map((heading, index) => {
-      const normal = normaliseHeading(heading);
-      let field = byLabel.get(normal);
-      if (field === undefined && SOURCE_REF_ALIASES.has(normal)) field = fields.find((f) => f.key === "sourceRef");
+      let field = exact[index];
+      if (field === undefined) {
+        const byName = byAlias.get(normaliseHeading(heading));
+        if (byName !== undefined && !taken.has(byName.key)) {
+          field = byName;
+          taken.add(byName.key);
+        }
+      }
       return field === undefined ? { index, heading } : { index, heading, fieldKey: field.key };
     }),
   };

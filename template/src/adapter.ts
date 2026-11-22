@@ -20,6 +20,8 @@ export interface FieldDef {
   choices?: readonly string[];
   /** Fast entry may repeat this value from the row above, as a section or as a page. */
   repeat?: "section" | "page";
+  /** Other column headings that fill this field, for a file whose headings are not the register's own. */
+  aliases?: readonly string[];
 }
 
 export interface SheetDef {

@@ -15,6 +15,7 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { compileBanned, loadBannedWords, scanText } from "../../scripts/lib/publicText.mjs";
+import { paperBookCsv } from "../../scripts/lib/paperBook.mjs";
 import { buildVisitorFiles } from "../../tools/site/visitorFiles";
 
 const repo = fileURLToPath(new URL("../..", import.meta.url));
@@ -353,6 +354,8 @@ function makeMain(): string {
   put(root, "dist/apps/churchyard/index.html", PAGE("Churchyard Register", "./assets/c.js"));
   put(root, "dist/apps/churchyard/assets/c.js", "console.log('church');\n");
   put(root, "dist/apps/churchyard/assets/a.css", "body{margin:1px}\n");
+  // The practice book that `npm run church:build` writes, so a build with no book is told apart from one with it.
+  put(root, "dist/apps/churchyard/practice-book.csv", readFileSync(join(repo, "tests", "fixtures", "paper-200-bad.csv")));
   put(root, "dist/apps/allotments/index.html", PAGE("Allotment Register", "./assets/g.js"));
   put(root, "dist/apps/allotments/assets/g.js", "console.log('garden');\n");
   put(root, "dist/apps/allotments/assets/a.css", "body{margin:2px}\n");
@@ -452,6 +455,7 @@ describe("T36 assemble:site", () => {
         "churchyard/assets/a.css",
         "churchyard/assets/c.js",
         "churchyard/index.html",
+        "churchyard/practice-book.csv",
         "index.html",
         "review/asset-manifest.json",
         "review/assets/index-abc.js",
@@ -569,6 +573,15 @@ describe("T36 assemble:site", () => {
     expect(existsSync(out)).toBe(false);
   });
 
+  it("stops with code 2 when the churchyard build has no practice book, and writes nothing", () => {
+    const { root, desk, out } = ready();
+    rmSync(join(root, "dist", "apps", "churchyard", "practice-book.csv"));
+    const result = run("assemble-site.mjs", ["--desk", desk.preview, "--root", root]);
+    expect(result.code).toBe(2);
+    expect(result.err).toContain("churchyard/practice-book.csv");
+    expect(existsSync(out)).toBe(false);
+  });
+
   it("stops with code 2 when the hub has no visitor file, and writes nothing", () => {
     const { root, desk, out } = ready();
     rmSync(join(root, "dist", "apps", "hub", "visitor", "family", "family-map-2026-04-20.html"));
@@ -586,6 +599,65 @@ describe("T36 assemble:site", () => {
     });
     expect(result.status).toBe(0);
     expect(existsSync(join(out, "review", "index.html"))).toBe(true);
+  });
+});
+
+// ---- the practice book -----------------------------------------------------------------------------------------
+
+describe("T36 the practice book of the Churchyard Register", () => {
+  const fixture = (name: string): string => readFileSync(join(repo, "tests", "fixtures", name), "utf8");
+  // Worked by hand from the plan: R001 is the first row, R117 has no source ref, R199 and R200 have no place.
+  const FIRST_ROW = "R001,Alder Ashgrove,Paper,C001,1850,P1";
+  const ROW_117_BLANK = ",Quill Fernhollow,Paper,C117,1866-09,P12";
+  const ROW_199 = "R199,Sorrel Larkspur,,,unknown,P20";
+
+  it("is one source for the fixture files and the practice book", () => {
+    expect(paperBookCsv(true)).toBe(fixture("paper-200-bad.csv"));
+    expect(paperBookCsv(false)).toBe(fixture("paper-200.csv"));
+  });
+
+  it("has 200 rows under six headings, invented names, and no source ref in row 117 only", () => {
+    const lines = paperBookCsv(true).split("\n");
+    expect(lines.pop()).toBe("");
+    expect(lines).toHaveLength(201);
+    expect(lines[0]).toBe("Source ref,Name,Section,Plot,Burial date,Page");
+    expect(lines[1]).toBe(FIRST_ROW);
+    expect(lines[117]).toBe(ROW_117_BLANK);
+    expect(lines[199]).toBe(ROW_199);
+    expect(lines.slice(1).filter((l) => l.startsWith(",")).length).toBe(1);
+    expect(paperBookCsv(false).split("\n")[117]).toBe(`R117${ROW_117_BLANK}`);
+  });
+
+  it("is plain UTF-8 with LF line ends and no byte order mark", () => {
+    const text = paperBookCsv(true);
+    expect(text.includes("\r")).toBe(false);
+    expect(text.charCodeAt(0)).not.toBe(0xfeff);
+    expect(text.endsWith("\n")).toBe(true);
+  });
+
+  it("is written into a folder by generate-fixtures, as practice-book.csv and nothing else, and the fixtures stay as they were", () => {
+    const folder = fresh("practice");
+    const before = treeHash(join(repo, "tests", "fixtures"));
+    const result = run("generate-fixtures.mjs", ["--practice-book", folder]);
+    expect(result.err).toBe("");
+    expect(result.code).toBe(0);
+    expect(files(folder)).toEqual(["practice-book.csv"]);
+    expect(readFileSync(join(folder, "practice-book.csv"), "utf8")).toBe(fixture("paper-200-bad.csv"));
+    expect(treeHash(join(repo, "tests", "fixtures"))).toBe(before);
+  });
+
+  it("is written into a folder that does not exist yet, and again with the same bytes", () => {
+    const folder = join(fresh("practice"), "made", "here");
+    expect(run("generate-fixtures.mjs", ["--practice-book", folder]).code).toBe(0);
+    const once = readFileSync(join(folder, "practice-book.csv"));
+    expect(run("generate-fixtures.mjs", ["--practice-book", folder]).code).toBe(0);
+    expect(readFileSync(join(folder, "practice-book.csv"))).toEqual(once);
+  });
+
+  it("refuses --practice-book with no folder", () => {
+    const result = run("generate-fixtures.mjs", ["--practice-book"]);
+    expect(result.code).toBe(2);
+    expect(result.err).toContain("--practice-book");
   });
 });
 
@@ -694,6 +766,18 @@ describe("T36 check:release", () => {
     const result = check(root);
     expect(result.code).toBe(1);
     expect(result.err).toContain("churchyard/index.html");
+    expect(result.err).toContain("missing-file");
+  });
+
+  it("fails a site that has lost the practice book of the Churchyard Register, and passes with it", () => {
+    const { root, out } = assembled();
+    expect(existsSync(join(out, "churchyard", "practice-book.csv"))).toBe(true);
+    expect(check(root).code).toBe(0);
+    rmSync(join(out, "churchyard", "practice-book.csv"));
+    restamp(out);
+    const result = check(root);
+    expect(result.code).toBe(1);
+    expect(result.err).toContain("churchyard/practice-book.csv");
     expect(result.err).toContain("missing-file");
   });
 

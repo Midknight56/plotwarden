@@ -112,6 +112,7 @@ Tests: T06 (`mapping.test.ts`). Implements R5.5, R7.2, R31.4. Owner: 02-paper-an
 5. When a date cell is read, the register shall use the date parser of spec 01 with the order chosen for the whole import. `03/04/26` shall never be guessed. A year first date, a month and year, a year or `unknown` is accepted at its own precision.
 6. When a money cell is blank, the register shall treat it as unknown and never zero.
 7. When a column is set to "Ignore column", the register shall drop it from the mapped row.
+8. When an app lists other headings for a field (an alias), the register shall use an alias only for a field that no exact heading took, and only for the first heading that matches. A heading is never matched to two fields and a field is never filled by two columns because of an alias. The keeper may still change any match.
 
 ## P9 Staged import
 
@@ -238,6 +239,7 @@ Tests: T07 (`paperBook.test.ts`) and the browser `paper-entry.spec.ts`. Implemen
 3. When the same file is staged again, in file order or reversed, the register shall report 0 new, 200 unchanged, 0 conflicts and 0 writes.
 4. When R117 is changed, the register shall report 199 unchanged and 1 conflict, with 0 writes until the keeper chooses.
 5. When R199 is placed on C199, the register shall report 199 placed, 1 unplaced and 1 unchecked plot.
+6. When the Churchyard Register runs the same path (spec 03, C11), it shall give the same counts. The test app of `tests/host` and the real register share the import screen.
 
 ## P18 Conformance additions
 

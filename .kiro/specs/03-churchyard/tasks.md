@@ -48,4 +48,19 @@ Each task writes its test first, sees it fail on the missing behaviour (a stub t
 - A line to a burial has the limit of a note (4,000 characters), like the way in. No shorter limit was chosen.
 - The A4 pictures of page 1 are the print document drawn in print media with the page margin, not pictures of the PDF. No PDF rasteriser is installed. No page was printed.
 - 
-pm run assemble:site refused on this machine: the sibling Desk checkout is at another commit than elease/desk-preview.lock.json names, though its three file hashes match. dist/site was assembled by the same steps with the Desk files already in dist/site/review, after their hashes were compared with the lock. The lock was not touched.
+pm run assemble:site refused on this machine: the sibling Desk checkout is at another commit than release/desk-preview.lock.json names, though its three file hashes match. dist/site was assembled by the same steps with the Desk files already in dist/site/review, after their hashes were compared with the lock. The lock was not touched.
+
+## Task 15: the 200 record book on the real register
+
+- [x] 3.20 Spec first (`requirements.md` C11, `design.md` K13, spec 02 P8.8 and P17.6). Files: `.kiro/specs/03-churchyard/*`, `.kiro/specs/02-paper-and-map/requirements.md`. T IDs: none.
+- [x] 3.21 "Name" matches "Recorded name" with no choice by the keeper, through a field alias. Files: `template/src/adapter.ts` (`FieldDef.aliases`), `template/src/data/mapping.ts`, `apps/churchyard-register/src/fields.ts`, `tests/unit/mapping.test.ts`. T IDs: T06. C11.3. Red command: `npx vitest run tests/unit/mapping.test.ts`. First red: the Burials sheet leaves the heading "Name" unmatched.
+- [x] 3.22 The practice book: one source for the fixture and the build, the link on the Import screen, the build step and the site inventory. Files: `scripts/lib/paperBook.mjs`, `scripts/generate-fixtures.mjs`, `scripts/lib/site.mjs`, `scripts/lib/siteScan.mjs`, `package.json` (`church:build`), `template/src/ui/{shellContext.ts,ImportWizard.tsx,copyScreens.ts}`, `apps/churchyard-register/src/main.tsx`, `tests/unit/{release,paperCopy}.test.ts`. T IDs: T36 (inventory). C11.1, C11.2. Red command: `npx vitest run tests/unit/release.test.ts`. First red: the assembled site has no `churchyard/practice-book.csv`.
+- [x] 3.23 Browser: the 200 record book on the real register. Files: `tests/browser/warden-paper-book.spec.ts`, `docs/acceptance/layout/churchyard/paper-book-import-{phone,desktop}.png`. T IDs: browser. C11.4, C11.5. Red command: `npx playwright test tests/browser/warden-paper-book.spec.ts`.
+- [x] 3.24 Guide, log and exit gate. Files: `docs/judge-guide.md`, `tests/browser/judge-guide.spec.ts`, `docs/kiro-log.md`, this file. T IDs: browser `judge-guide.spec.ts`.
+
+## Not settled in task 15
+
+- On the dense map of the 200 record book (200 plots side by side) the code tab of a plot in the middle of the grid has no free place, and the shared layout measure reports `label_on_plot` for it ("the text of the code tab lies over a plot shape"). Spec 02 H19 lets the cheapest place win when none is clear, so this is the existing design and not a new fault, but it breaks P19 on a real dense book. `warden-paper-book.spec.ts` filters that one rule, by name, at the end of its search step, and measures every other rule there. A tab outside the grid with a leader line would remove the exception. It is a change to `template/src/map/{sheet,labels}.ts`, to P19 and to the family map, and is not built.
+- The practice book is written by `npm run church:build`. `npm run church:dev` serves the app without it, so the link on the Import screen finds no file there.
+- Only the Churchyard Register offers a practice book. The Allotment Register has no invented waiting list file yet.
+- Headless Chromium only. No real person tried the practice book, so the words of the guide steps and their order are untried by a person.

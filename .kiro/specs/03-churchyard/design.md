@@ -1,6 +1,6 @@
 # 03 Churchyard: design
 
-This design says how spec 03 builds C1 to C10. Names in `code` are files or exports. Where it adds detail to a contract, it says so.
+This design says how spec 03 builds C1 to C11. Names in `code` are files or exports. Where it adds detail to a contract, it says so.
 
 ## K1 Files and what each owns
 
@@ -186,6 +186,16 @@ Every screen uses `useRegister().run` so a repeat press returns the same promise
 - Key: `MapKey` stays directly below the sheet.
 - The desk screen is a two column grid from 60 rem: the verb and search on the left, the selected plot and the map on the right. On a phone it is one column: the job, the search and the main action first.
 
+## K13 The practice book
+
+`scripts/lib/paperBook.mjs` is the one source of the 200 rows: `paperBookCsv(blankRef117)` returns the text. `scripts/generate-fixtures.mjs` writes `tests/fixtures/paper-200.csv` and `paper-200-bad.csv` from it. With `--practice-book <folder>` it writes the bad file, under the name `practice-book.csv`, into that folder and nothing else. `npm run church:build` runs it after the Vite build with `dist/apps/churchyard`, so `assemble-site.mjs` copies it to `churchyard/practice-book.csv`. `assemble-site.mjs` stops when the file is missing from `dist/apps/churchyard`, and `check-release.mjs` reports it when it is missing from `dist/site`.
+
+`RegisterApp.practiceBook` is `{ href, fileName }`. The Import screen draws a link to `href` with the `download` attribute beside "Download column guide" only when the app gives one. The Churchyard Register gives `{ href: "./practice-book.csv", fileName: "practice-book.csv" }`.
+
+`FieldDef.aliases` lists other headings that fill a field. `suggestMapping` looks at an exact heading first and uses an alias only for a field that no exact heading took, and only once. The Recorded name field of the Burials sheet lists "Name". The template names no kind: the alias is the app's.
+
 ## K12 Test plan
 
 Unit tests follow `tasks.md`. The expected values come from `tests/fixtures/expected/hand-totals.md` sections 1 and 4, read by hand into `tests/helpers/lanternFold.ts`. Browser spec `tests/browser/warden-family.spec.ts` runs the real app on `127.0.0.1:4176` at 360 by 640 and 1920 by 1080. `playwright.config.ts` starts the app build beside the shared host and stops both. Every browser test logs every request and expects none outside the app origin. The downloaded family file is opened in a fresh page context with the network blocked, and is scanned for every canary in `tests/helpers/privacyCanaries.ts`.
+
+Browser spec `tests/browser/warden-paper-book.spec.ts` runs the 200 record path of C11 on the same app, with the expected counts from hand totals section 3 and a proof picture of the import review at each size.

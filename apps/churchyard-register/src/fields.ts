@@ -4,7 +4,7 @@ import { BURIALS } from "./types";
 
 export const BURIAL_FIELDS: FieldDef[] = [
   { key: "sourceRef", label: "Source ref", type: "text", required: true, maxChars: 100 },
-  { key: "recordedName", label: "Recorded name", type: "text", maxChars: 100 },
+  { key: "recordedName", label: "Recorded name", type: "text", maxChars: 100, aliases: ["Name"] },
   { key: "nameUnknown", label: "Name unknown", type: "text", maxChars: 10 },
   { key: "section", label: "Section", type: "text", maxChars: 100, repeat: "section" },
   { key: "plot", label: "Plot", type: "text", maxChars: 24 },

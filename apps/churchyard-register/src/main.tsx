@@ -28,6 +28,7 @@ export const churchApp: RegisterApp<ChurchState, ChurchCommand, ChurchEvent> = {
   },
   plotExtras: ChurchPlotExtras,
   walkthrough: lanternFold,
+  practiceBook: { href: "./practice-book.csv", fileName: "practice-book.csv" },
 };
 
 const root = document.getElementById("root");

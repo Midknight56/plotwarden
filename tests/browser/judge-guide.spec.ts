@@ -12,6 +12,7 @@ import type { Page, TestInfo } from "@playwright/test";
 import { readExchangeFile } from "../../template/src/exchange/schema";
 import type { ReviewPacket } from "../../template/src/exchange/schema";
 import { measureLayout, trackRequests } from "../helpers/measureLayout";
+import { fillGrid } from "../helpers/screens";
 import { SITE, expectLayout, saveProof, trackFaults } from "../helpers/siteOrigin";
 
 test.use({ baseURL: SITE });
@@ -330,6 +331,122 @@ test.describe("the path in the guide", () => {
     await expect(page.locator('li.card[aria-current="true"]')).toContainText("Season 2025 · B02 · Ada Stonecrop");
     await expect(page.locator('li.card[aria-current="true"]')).toBeInViewport();
     await expectLayout(page);
+
+    expect(requests.external).toEqual([]);
+    expect(faults.faults).toEqual([]);
+  });
+
+  test("Churchyard Register: the 200 record book, from the practice book to a name on the map", async ({ page }) => {
+    test.setTimeout(240_000);
+    const say = guidePart("### The 200 record book");
+    /** A label and the value typed into it, both looked up in the guide, in order. */
+    const typed = (label: string, value: string): string => {
+      say(label);
+      return say(`\`${value}\``).slice(1, -1);
+    };
+    const requests = trackRequests(page, SITE);
+    const faults = trackFaults(page);
+    const counts = page.getByRole("list", { name: "Review import" });
+    const goTo = async (...names: string[]): Promise<void> => {
+      for (const name of names) await page.getByRole("link", { name: say(name), exact: true }).first().click();
+    };
+
+    // 1. Start a register.
+    await page.goto("/");
+    await page.getByRole("link", { name: say("Open Churchyard Register") }).click();
+    await page.getByRole("link", { name: say("Start a register") }).click();
+    await page.getByLabel("Site name").fill(typed("Site name", "Paper Book"));
+    await page.getByLabel("Local time zone").selectOption(typed("Local time zone", "Europe/London"));
+    await page.getByRole("button", { name: say("Create register") }).click();
+    await expect(page.getByRole("heading", { level: 1, name: "Paper Book" })).toBeVisible();
+
+    // 2. The map: 200 plots.
+    await page.getByRole("link", { name: say("Add your map") }).click();
+    await fillGrid(page, {
+      section: typed("Section name", "Paper"),
+      prefix: typed("Prefix", "C"),
+      first: typed("First number", "1"),
+      digits: typed("Digits", "3"),
+      rows: typed("Rows", "10"),
+      columns: typed("Columns", "20"),
+      width: typed("Plot width", "40"),
+      height: typed("Plot height", "30"),
+      east: typed("Start east", "100"),
+      north: typed("Start north", "100"),
+    });
+    await page.getByRole("button", { name: say("Preview plots") }).click();
+    await page.getByRole("button", { name: say("Apply layout") }).click();
+    await expect(page.getByText(say("Map saved."))).toBeVisible();
+    await page.getByRole("link", { name: "Back to register" }).first().click();
+    await page.getByRole("link", { name: "Plot list" }).click();
+    await expect(page.getByText("200 plots", { exact: true })).toBeVisible();
+
+    // 3. The practice book.
+    await goTo("Back to register", "Add records", "Import spreadsheet");
+    const [practice] = await Promise.all([page.waitForEvent("download"), page.getByRole("link", { name: say("Download a practice book") }).click()]);
+    expect(practice.suggestedFilename()).toBe(say("practice-book.csv"));
+    const book = await practice.path();
+    expect(readFileSync(book, "utf8")).toBe(readFileSync("tests/fixtures/paper-200-bad.csv", "utf8"));
+    expect(readFileSync(book, "utf8").split("\n")[117]).toMatch(/^,/);
+    say("Download column guide");
+    await expect(page.getByRole("button", { name: "Download column guide" })).toBeVisible();
+
+    // 4. Choose the file, see the match, review. Nothing is written.
+    await page.getByLabel(say("Choose CSV")).setInputFiles(book);
+    say("Match columns");
+    await expect(page.getByRole("group", { name: /Column 2/ }).getByLabel("Register field").locator("option:checked")).toHaveText(say("Recorded name"));
+    await page.getByRole("button", { name: say("Review import") }).click();
+    await expect(counts).toContainText(say("Errors 1"));
+    await expect(counts).toContainText(say("Ready 197"));
+    await expect(counts).toContainText(say("Location to confirm 2"));
+    await expect(page.getByRole("button", { name: say("Import 199 records") })).toBeDisabled();
+    await expect(page.getByRole("listitem").filter({ hasText: say("Row 117") })).toContainText(say("Check Source ref in row 117. Enter a value."));
+    await expectLayout(page);
+    await saveProof(page, "guide-paper-book-review");
+
+    // 5. Fix row 117 and import 200.
+    const fix = async (): Promise<void> => {
+      await page.getByRole("listitem").filter({ hasText: "Row 117" }).getByRole("button", { name: "Fix row" }).click();
+      await page.getByRole("dialog", { name: "Fix row 117" }).getByLabel("Source ref").fill("R117");
+      await page.getByRole("dialog", { name: "Fix row 117" }).getByRole("button", { name: "Save row" }).click();
+      await expect(page.getByRole("dialog", { name: "Fix row 117" })).toBeHidden();
+    };
+    say("Fix row");
+    await page.getByRole("listitem").filter({ hasText: "Row 117" }).getByRole("button", { name: "Fix row" }).click();
+    await page.getByRole("dialog", { name: "Fix row 117" }).getByLabel(say("Source ref")).fill(say("`R117`").slice(1, -1));
+    await page.getByRole("dialog", { name: "Fix row 117" }).getByRole("button", { name: say("Save row") }).click();
+    await expect(page.getByRole("dialog", { name: "Fix row 117" })).toBeHidden();
+    await page.getByRole("button", { name: say("Import 200 records") }).click();
+    await expect(page.getByText(say("200 saved · 2 still need a plot."))).toBeVisible();
+
+    // 6. The same file again adds nothing.
+    await goTo("Back to register", "Add records", "Import spreadsheet");
+    await page.getByLabel("Choose CSV").setInputFiles(book);
+    await page.getByRole("button", { name: "Review import" }).click();
+    // Row 117 has no source ref in this file either, so it is the one row that is not already there.
+    await expect(counts).toContainText("Already in register 199");
+    await expect(counts).toContainText("Errors 1");
+    await fix();
+    await expect(counts).toContainText(say("Already in register 200"));
+    await expect(page.getByText(say("There is nothing new to import."))).toBeVisible();
+
+    // 7. Place R199 from the list of burials with no plot.
+    await page.getByRole("button", { name: say("Cancel import") }).click();
+    await goTo("Back to register", "Unplaced burials · 2");
+    const card = page.getByRole("listitem").filter({ hasText: "Sorrel Larkspur" });
+    await card.getByLabel("Section", { exact: true }).selectOption({ label: typed("Section", "Paper") });
+    await card.getByLabel("Plot", { exact: true }).selectOption({ label: typed("Plot", "C199 · Paper") });
+    await card.getByRole("button", { name: say("Confirm placement") }).click();
+    await expect(page.getByText(say("Sorrel Larkspur placed at C199."))).toBeVisible();
+
+    // 8. The link counts one now, and a name from the book shows its plot on the map.
+    await goTo("Back to register");
+    await expect(page.getByRole("link", { name: say("Unplaced burials · 1") })).toBeVisible();
+    await page.getByLabel("Name or plot code", { exact: true }).fill(typed("Name or plot code", "Quill Fernhollow"));
+    await page.getByRole("button", { name: say("Search") }).click();
+    await expect(page.getByRole("listitem").filter({ hasText: say("Quill Fernhollow · C117 · Paper") })).toBeVisible();
+    await expect(page.locator(".summary-line")).toContainText(say("C117 · Paper · Taken"));
+    await expect(page.getByRole("region", { name: "Site map" })).toContainText("C117");
 
     expect(requests.external).toEqual([]);
     expect(faults.faults).toEqual([]);

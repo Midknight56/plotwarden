@@ -119,3 +119,13 @@ Tests: `tests/unit/churchAssets.test.ts`, browser measurements and screenshots. 
 2. Headstones shall be small engraved arches in rows, with open gravel walks between rows, named paths, the gate, a north arrow, the four state key directly below the sheet, and the selected plot with a dark double outline and its code on a paper tab.
 3. The art shall be original SVG in the root `assets/` folder (`gate-lantern.svg`, `churchyard-margin.svg`, `plot-symbols.svg`) with `assets/origins.md` saying it was drawn for this project, and no external reference.
 4. When motion is reduced by the system or the app, the mist shall not move. High contrast shall remove the mist.
+
+## C11 The 200 record book on the Churchyard Register
+
+Tests: browser `warden-paper-book.spec.ts`, `tests/unit/mapping.test.ts`, `tests/unit/release.test.ts`. Implements P8, P17, R24. Hand totals section 3.
+
+1. When the Import screen opens, the register shall offer "Download a practice book" beside "Download column guide". The practice book is one CSV file of 200 rows with the headings Source ref, Name, Section, Plot, Burial date and Page. Its names are invented and the Source ref of row 117 is blank, so a keeper can try the whole path with no paper in hand.
+2. When the practice book is built, `scripts/generate-fixtures.mjs` shall write it into the churchyard build from the one source that also writes `tests/fixtures/paper-200-bad.csv`. The two files shall have the same bytes. The assembled site shall hold it at `churchyard/practice-book.csv`, so it is in the offline shell. The Allotment Register shall offer no practice book.
+3. When the heading "Name" is read for the Burials sheet, the register shall match it to "Recorded name" with no choice by the keeper, and the column list shall show the match. When the file also has a column headed "Recorded name", that exact heading keeps the field and "Name" stays unmatched, so no field is filled twice.
+4. When the warden makes the section Paper, 10 by 20, prefix C, 3 digits, imports the practice book, fixes row 117, imports 200, imports the same file again and places R199, the register shall give the counts of hand totals section 3: 200 plots, nothing written by the file with the error, "Import 200 records", "200 saved · 2 still need a plot.", nothing added by the same file again or with its rows reversed, and 1 burial still unplaced once R199 sits at C199.
+5. When a name from the book is searched, the register shall show its plot on the map.

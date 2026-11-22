@@ -36,7 +36,7 @@
     "check:links": "node scripts/check-links.mjs",
     "check:release": "node scripts/check-release.mjs",
     "check:changed": "npm run typecheck && node scripts/check-imports.mjs && node scripts/changed-tests.mjs --git",
-    "church:build": "vite build --config apps/churchyard-register/vite.config.ts",
+    "church:build": "vite build --config apps/churchyard-register/vite.config.ts && node scripts/generate-fixtures.mjs --practice-book dist/apps/churchyard",
     "church:preview": "vite preview --config apps/churchyard-register/vite.config.ts",
     "church:dev": "vite --config apps/churchyard-register/vite.config.ts",
     "allot:build": "vite build --config apps/allotment-register/vite.config.ts",

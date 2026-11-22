@@ -311,6 +311,7 @@ export const SCREEN_COPY: Readonly<Record<string, string>> = {
   // Import
   chooseSheet: "Choose sheet",
   downloadColumnGuide: "Download column guide",
+  downloadPracticeBook: "Download a practice book",
   chooseCsv: "Choose CSV",
   pasteSpreadsheet: "Paste spreadsheet",
   separator: "Separator",

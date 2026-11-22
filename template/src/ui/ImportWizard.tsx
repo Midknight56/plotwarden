@@ -350,6 +350,11 @@ export function ImportWizard() {
 
       <div className="actions">
         <Button onClick={downloadGuide}>{t("downloadColumnGuide")}</Button>
+        {app.practiceBook === undefined ? null : (
+          <ButtonLink href={app.practiceBook.href} download={app.practiceBook.fileName}>
+            {t("downloadPracticeBook")}
+          </ButtonLink>
+        )}
       </div>
 
       <section className="stack" aria-label={t("importFileHeading")}>

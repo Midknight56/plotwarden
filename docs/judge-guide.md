@@ -70,6 +70,19 @@ This does the same for the garden. It follows section 2, so Thimble Beds holds w
 - Turn off your network after the first load. The hub, both registers, the Desk preview and both sample sheets open again. A register you start offline is saved on your device.
 - Open **About** on the hub. It says which places are invented.
 
+### The 200 record book
+
+This is the paper book of the Churchyard Register. It takes about two minutes and needs no paper. The records are invented. The browser test runs these steps on the built site.
+
+1. Open the hub again. Choose **Open Churchyard Register**, then **Start a register**. Fill in **Site name** `Paper Book`, choose **Local time zone** `Europe/London`, then choose **Create register**.
+2. Choose **Add your map**. Fill in **Section name** `Paper`, **Prefix** `C`, **First number** `1`, **Digits** `3`, **Rows** `10`, **Columns** `20`, **Plot width** `40`, **Plot height** `30`, **Start east** `100` and **Start north** `100`. Choose **Preview plots**, then **Apply layout**. The register says "Map saved." and makes 200 plots, C001 to C200.
+3. Choose **Back to register**, **Add records**, **Import spreadsheet**, then **Download a practice book**. The file is `practice-book.csv`. It holds 200 invented records, and row 117 has no source ref. **Download column guide** beside it lists the columns.
+4. Choose **Choose CSV** and pick `practice-book.csv`. Under **Match columns**, the column headed Name is already matched to **Recorded name**. Choose **Review import**. The review says "Errors 1", "Ready 197" and "Location to confirm 2". **Import 199 records** is off. The card "Row 117" says "Check Source ref in row 117. Enter a value." Nothing has been written.
+5. On the card "Row 117" choose **Fix row**. Fill in **Source ref** `R117` and choose **Save row**. The button now reads **Import 200 records**. Choose it. The register says "200 saved · 2 still need a plot."
+6. Choose **Back to register**, **Add records**, **Import spreadsheet**, pick `practice-book.csv` again and choose **Review import**. Fix row 117 as in step 5. The review says "Already in register 200" and "There is nothing new to import." Nothing is added a second time.
+7. Choose **Cancel import**, then **Back to register**. Choose **Unplaced burials · 2**. On the card "Sorrel Larkspur" choose **Section** `Paper` and **Plot** `C199 · Paper`, then choose **Confirm placement**. The register says "Sorrel Larkspur placed at C199."
+8. Choose **Back to register**. The link now reads **Unplaced burials · 1**. In **Name or plot code** type `Quill Fernhollow` and choose **Search**. The result reads "Quill Fernhollow · C117 · Paper". The summary reads "C117 · Paper · Taken" and the map shows C117 on its tab.
+
 ## What this guide does not show
 
 No real warden, secretary, family member or committee used these screens. The steps were run in headless Chromium on one Windows machine. See `docs/verification.md` for what was tested and what was not.

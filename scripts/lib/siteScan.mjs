@@ -12,6 +12,8 @@ export const MAX_FILES = 500;
 export const MAX_BYTES = 5 * 1024 * 1024;
 
 const ENTRY_PAGES = ["index.html", "churchyard/index.html", "allotments/index.html", "review/index.html", "visitor/family/index.html", "visitor/seeker/index.html", "404.html"];
+/** Files that are not pages and that a page links to. The practice book is the Churchyard Register's, on its Import screen. */
+const LINKED_FILES = ["churchyard/practice-book.csv"];
 const TEXT_FILE = /\.(?:html?|m?js|css|json|svg|webmanifest|txt|xml)$/i;
 const SERVER_CODE = [/^functions\//, /^_routes\.json$/, /^_worker\.js$/, /^_worker\.js\//, /^wrangler\.(?:toml|jsonc?)$/];
 
@@ -80,6 +82,7 @@ export function siteProblems(root, siteDir) {
 
   // Direct entry pages are real pages.
   for (const rel of ENTRY_PAGES) if (!fileSet.has(rel)) add(rel, "missing-file", "this direct entry page is not in the site");
+  for (const rel of LINKED_FILES) if (!fileSet.has(rel)) add(rel, "missing-file", "a page links to this file and it is not in the site");
   for (const rel of files.filter((f) => /\.html?$/i.test(f))) {
     const html = readFileSync(join(siteDir, rel), "utf8");
     if (!/<title>[^<]+<\/title>/i.test(html)) add(rel, "blank", "the page has no title");
