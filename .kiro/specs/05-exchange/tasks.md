@@ -38,3 +38,13 @@ Each task writes its test first, sees it fail on the missing behaviour (a stub t
 ## Repair 07 (findings of an independent review)
 
 - [x] 5.15 A review label or site name is refused when it holds a word of a person's name or of the site title (R16.8). A slip is ready only when its fact version equals the open one (R18.6). Files: `template/src/exchange/{packet,slip}.ts`, `template/src/adapter.ts` (`privateNames`), `template/src/ui/exchangeFlow.ts`, `apps/*/src/review.ts`, `tests/unit/{exchange,exchangeFlow}.test.ts`, `tests/properties/exchange.test.ts`, `tests/fixtures/exchange-vectors.json`. T IDs: T24. The Desk holds a pinned copy of these exchange files and the vectors, so its copy must be exported again.
+
+## Task 17: the preview says in plain words what the file holds
+
+- [x] 5.17 The preview lists what the file holds in plain words, and the field names sit behind "Show field names" (X13). Spec first: `requirements.md` X13. Files: `template/src/ui/{Exchange.tsx,exchangeFlow.ts,copyExchange.ts}` (`fileHolds`, `fileHoldsHeading`, `holds*`, `showFieldNames`, `hideFieldNames`, `fieldsInFile` now "Field names in this file"), `tests/unit/{exchangeCopy,exchangeFlow}.test.ts`, browser `desk-return.spec.ts` (written, not run, with one new proof picture `church-preview-names`). T IDs: T35 support. Red command: `npx vitest run tests/unit/exchangeCopy.test.ts tests/unit/exchangeFlow.test.ts`. First red: none of the nine new words existed, the screen drew the raw field names at once with no control, and `fileHolds` (a stub that gave no line) left every field without a plain line.
+
+## Not settled in task 17 (exchange)
+
+- The plain lines are tied to the field names by a table in `exchangeFlow.ts`. A new field of the file gives "More fields. Choose Show field names to see them." until it gets its own line. The Desk holds a pinned copy of `template/src/exchange/*` only, and this task changed no file there, so no new export is needed.
+- The control has no `aria-controls`, because the panel is not drawn while it is closed. Its state is carried by `aria-expanded`.
+- The 12 px gap between "Show field names" and "Download review file" was not measured. The browser spec measures it when it runs.

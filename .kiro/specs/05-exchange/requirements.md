@@ -129,3 +129,10 @@ Tests: browser `judge-guide.spec.ts` at 360 by 640 and 1920 by 1080, on the asse
 3. The slip in both cases is the file the Desk downloaded, read as it came. It is not built by the shared module in the test. The two registers and the Desk are opened from one origin, so the review file and the slip cross between them as files only.
 4. The guide shall say each of these steps in the same click for click style, and the spec shall fail if a word the spec clicks is missing from section 3 of the guide.
 5. The run shall make no request outside the site origin and shall log no console error.
+
+## X13 The preview says in plain words what the file holds
+
+Tests: `tests/unit/exchangeCopy.test.ts`, `tests/unit/exchangeFlow.test.ts`, browser `desk-return.spec.ts`. Implements X4, R16.3, R23.1. Task 17.
+
+1. When the review file preview is shown, it shall list what the file holds in plain words: "The site name you typed", "The review date", the file format, the kind of register and its revision number, random keys that hold no name, and "For each check: your label, the reason and what to do". Each field of the file shall be covered by one of these lines, and a field with no line of its own shall give the line "More fields. Choose Show field names to see them."
+2. When the preview is shown, the exact field names (the whole file, then each check) shall stay behind a button "Show field names". The button shall say "Hide field names" while they are shown, and shall carry `aria-expanded`. The names are not on the page until it is pressed. A change to an input or a new preview shall close them.

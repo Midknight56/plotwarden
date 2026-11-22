@@ -1,6 +1,8 @@
 // The Allotment copy catalog (spec 04, task 4.11, T35 for this app). Every word the plan's Allotment Register
 // table gives is typed here from the plan, not read from the catalog. No dash between words, and every error
 // code an allotment command can give has words.
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { COPY, fill } from "../../template/src/ui/copy";
 import { ALLOT_COPY, allotError, availabilityWords, paymentMessage } from "../../apps/allotment-register/src/copy";
@@ -219,5 +221,20 @@ describe("the words of an error (A10.2)", () => {
     expect(field("end", "bad_interval")).toBe("Check Tenancy ends. That date is out of order.");
     expect(field("applicant", "over_limit")).toBe("Check Applicant. That is more than is allowed.");
     expect(allotError(say, { code: "skip_reason_required", fields: [{ field: "skipReason:abc", code: "required" }] })).toBe("Say why this applicant is skipped.");
+  });
+});
+
+describe("the amount hint names no coin (A13)", () => {
+  it("reads as two decimal places with an example, and names no unit", () => {
+    expect(say("hint_amount")).toBe("An amount with two decimal places, such as 12.00.");
+    expect(ALLOT_COPY["hint_amount"]).not.toMatch(/pence|penny|pennies|pound|coin|£|GBP|whole number/i);
+  });
+
+  it("is the hint of both amount fields, and the error for a bad amount names the same example", () => {
+    for (const file of ["Payments.tsx", "Season.tsx"]) {
+      const text = readFileSync(join(__dirname, "..", "..", "apps", "allotment-register", "src", file), "utf8");
+      expect(text, file).toContain('hint={t("hint_amount")}');
+    }
+    expect(say("enterAmount")).toBe("Enter an amount such as 12.00.");
   });
 });

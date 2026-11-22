@@ -442,10 +442,12 @@ test.describe("a season, its fees and a handover", () => {
     await openBeds(page);
     await giveB03ToTavi(page);
 
-    // Season setup. The fee is whole pence, and a new season is the one to charge.
+    // Season setup. The fee is typed with two decimal places, and a new season is the one to charge.
     await page.getByRole("link", { name: "Season fees" }).first().click();
     await page.getByRole("link", { name: "New season", exact: true }).click();
     await expect(page.getByRole("heading", { level: 1, name: "New season" })).toBeVisible();
+    await expect(page.getByText("An amount with two decimal places, such as 12.00.")).toBeVisible();
+    await expect(page.getByText("A whole number of pence")).toHaveCount(0);
     await page.getByLabel("Season name", { exact: true }).fill("Season 2026");
     await page.getByLabel("Start date", { exact: true }).fill("2026-04-01");
     await page.getByLabel("End date", { exact: true }).fill("2027-04-01");
@@ -473,6 +475,7 @@ test.describe("a season, its fees and a handover", () => {
     await expect(card).toContainText("GBP 36.00");
     await check(page, "payments");
     const amount = card.getByLabel("Amount received", { exact: true });
+    await expect(card.getByText("An amount with two decimal places, such as 12.00.")).toBeVisible();
     await amount.fill("12.00");
     await card.getByLabel("Receipt reference", { exact: true }).fill(RECEIPT_REF);
     await card.getByRole("button", { name: "Record payment", exact: true }).click();

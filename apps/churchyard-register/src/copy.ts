@@ -102,9 +102,11 @@ export const CHURCH_COPY: Readonly<Record<string, string>> = {
   releaseReservation: "Release reservation",
   recordBurialInSpace: "Record burial in this space",
   spaceIsReserved: "{plot}, space {space} is reserved.",
+  reservationWasReleased: "{plot}, space {space} was reserved. Released {date}. {reason}",
   reservationsHeading: "Reservations",
   requestsHeading: "Requests",
   noReservations: "No reservations.",
+  noBurialsInPlot: "No burials in this plot.",
   noRequests: "No requests.",
   requestRecorded: "Request recorded. It holds no space.",
   requestNote: "Note",
@@ -115,7 +117,6 @@ export const CHURCH_COPY: Readonly<Record<string, string>> = {
   reservationReleased: "Reservation released.",
   reservationConverted: "Burial recorded. The reservation is now used.",
   reservedFrom: "{plot}, space {space} · from {date}",
-  releasedOn: "Released {date}. {reason}",
   convertedNote: "Used for a burial.",
   spaceSelect: "Space",
   noFreeSpaces: "No checked free spaces. Check a plot first.",
@@ -392,4 +393,13 @@ export function churchError(t: T, error: DomainError): string {
     }
   }
   return errorMessage(t, error);
+}
+
+/**
+ * The line of one reservation. A reservation that holds its space "is reserved". A released one "was reserved",
+ * with the day it was released and the reason, so the line never says a space is held when it is not.
+ */
+export function reservationLine(t: T, reservation: { plot: string; space: string; released?: { on: string; reason: string } }): string {
+  if (reservation.released === undefined) return t("spaceIsReserved", { plot: reservation.plot, space: reservation.space });
+  return t("reservationWasReleased", { plot: reservation.plot, space: reservation.space, date: reservation.released.on, reason: reservation.released.reason });
 }

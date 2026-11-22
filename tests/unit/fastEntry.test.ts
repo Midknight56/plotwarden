@@ -23,7 +23,6 @@ import {
   rowsToMapped,
   setCell,
   setCurrentRow,
-  setKeepPage,
   toDraft,
   zoomIn,
   zoomOut,
@@ -66,7 +65,6 @@ describe("a new session", () => {
     expect(s.rows[0]).toMatchObject({ cells: {}, saved: false });
     expect(s.currentRow).toBe(0);
     expect(s.page).toEqual({ index: 1, zoom: 1, rotation: 0 });
-    expect(s.keepPage).toBe(false);
     expect(s.pageChosen).toBe(false);
   });
 });
@@ -271,16 +269,16 @@ describe("the pinned page", () => {
     expect(turns).toEqual([90, 180, 270, 0]);
   });
 
-  it("keeps the page only after Keep page with register, and otherwise lets it go on close", () => {
-    const chosen = choosePage(newSession());
+  it("never keeps the page: there is no keep flag, and closing always lets the photo go", () => {
+    const fresh = newSession();
+    expect("keepPage" in fresh).toBe(false);
+    const chosen = choosePage(fresh);
     expect(chosen.pageChosen).toBe(true);
-    expect(chosen.keepPage).toBe(false);
+    expect("keepPage" in chosen).toBe(false);
     const released = closePage(chosen);
     expect(released.releaseImage).toBe(true);
     expect(released.session.pageChosen).toBe(false);
-    const kept = closePage(setKeepPage(chosen, true));
-    expect(kept.releaseImage).toBe(false);
-    expect(kept.session.pageChosen).toBe(true);
+    expect("keepPage" in released.session).toBe(false);
   });
 
   it("has nothing to release when no page was chosen", () => {
@@ -389,9 +387,8 @@ describe("interrupting and coming back", () => {
     expect(draft.mapping["page"]).toBe("3");
   });
 
-  it("says the page photo must be chosen again when it was not kept", () => {
+  it("says the page photo must be chosen again whenever one was chosen, because it is never stored", () => {
     expect(toDraft(interrupted(), meta).pageImageNeedsReselect).toBe(true);
-    expect(toDraft(setKeepPage(interrupted(), true), meta).pageImageNeedsReselect).toBe(false);
     expect(toDraft(newSession(), meta).pageImageNeedsReselect).toBe(false);
   });
 

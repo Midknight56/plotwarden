@@ -145,7 +145,7 @@ Tests: T06 support (`csvExport.test.ts`). Implements R20.7. Owner: 02-paper-and-
 
 Tests: T08 (`fastEntry.test.ts`). Implements R27.3, R31.5, R7. Owner: 02-paper-and-map.
 
-1. When a session starts, the register shall hold the rows, the current row, the page view (page number, zoom, rotation) and whether the page is kept with the register.
+1. When a session starts, the register shall hold the rows, the current row and the page view (page number, zoom, rotation).
 2. When "Repeat section" or "Repeat page" is used, the register shall copy only the fields the adapter marks repeatable, and shall never copy a person's name, a note or a source ref.
 3. When "Fill plot sequence" is used, the register shall take the plot of the row above, add one to its trailing number and keep its prefix and zero padding. A plot with no trailing number is refused.
 4. When rectangular cells are pasted, the register shall fill rows from the current row and columns from the chosen column, add rows as needed up to 5,000, and refuse a paste that does not fit.
@@ -153,7 +153,7 @@ Tests: T08 (`fastEntry.test.ts`). Implements R27.3, R31.5, R7. Owner: 02-paper-a
 6. When a row fails, the register shall keep every row, the page, the zoom, the rotation, the current row and the cell focus target unchanged, and report the first invalid field.
 7. When a session is interrupted, the register shall make a draft that holds the raw rows, the mapping, the current row and the page number, and say whether the page photo must be chosen again. A recovery file restores to a draft preview only.
 8. When a recovery file is read, the register shall check its discriminator `plot.draft.v1`, the kind and the site, refuse a newer version, and never apply any command.
-9. When a page photo is used, the register shall store it only after "Keep page with register" and otherwise release it when the page closes.
+9. When a page photo is used, the register shall never store it. It is held in memory and released when the page closes. Repair 17 (P21.1) took out the control "Keep page with register", because nothing stored the photo and the words promised it did.
 
 ## P12 Photos
 
@@ -281,3 +281,10 @@ Terms. **View date** is the day the Site map or the Plot list is drawn for. It i
 8. When the churchyard adapter is asked, it shall read the burial that the claim names. A burial with a year only date gives the first day of that year. A burial with a month gives the first day of that month. A burial with no date, and a claim that names no burial, give no day, so that claim counts on every date. The template holds no churchyard rule.
 9. When the date is carried in the address, it shall be a query value `asAt` made of a date only. The address shall never hold a name, a search text or a `q` value. A date change adds one history entry and keeps in it any search text the current entry holds.
 10. When the view date has changed, Back shall return to the earlier view date with the filter and the highlighted plot kept, and the field shall show that date.
+
+## P21 Every control does what its words say
+
+Tests: `tests/unit/fastEntry.test.ts`, `tests/unit/screenWords.test.ts`, `tests/unit/paperCopy.test.ts`, browser `paper-entry.spec.ts`. Implements R23, the product rule "never claim more than was done". Owner: 02-paper-and-map. Task 17.
+
+1. When the page panel of Fast entry is shown with a photo, it shall say "Page stays on this device." and shall hold no control "Keep page with register". The photo is never stored, so a control that offers to keep it promises what nothing does. The session holds no keep flag, a draft says the photo must be chosen again whenever one was chosen, and closing the page always releases it.
+2. When the review of an import has no row to check but some rows are marked "Location to confirm", the list "Rows to check" shall say "Nothing to fix before the import. {count} records will need a plot after it." with the real count ("1 record will need a plot after it." for one). With no such row it shall keep "No rows to show.". Every other filter shall keep "No rows to show." when it is empty.

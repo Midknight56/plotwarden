@@ -8,7 +8,7 @@ import { reviewFileName } from "../exchange/packet";
 import { isValidLocalDate } from "../calendar";
 import { Button, ButtonLink, Notice, TextField, focusFirstInvalid } from "./controls";
 import { downloadText } from "./download";
-import { checksAt, planExchange, readSlipFor } from "./exchangeFlow";
+import { checksAt, fileHolds, planExchange, readSlipFor } from "./exchangeFlow";
 import type { ExchangePlan, ReadResult, ReturnedRow } from "./exchangeFlow";
 import { commitMessage, errorMessage } from "./messages";
 import { useRegister, useShell } from "./shellContext";
@@ -70,6 +70,7 @@ export function Exchange() {
   const [typed, setTyped] = useState<Record<string, string>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [plan, setPlan] = useState<ExchangePlan | undefined>();
+  const [showNames, setShowNames] = useState(false);
   const [done, setDone] = useState<Done | undefined>();
   const [note, setNote] = useState<string | undefined>();
   const [status, setStatus] = useState<StatusState>({ phase: "idle" });
@@ -97,6 +98,7 @@ export function Exchange() {
   /** Any change to an input takes the preview and the result away until a preview is made again. */
   const touched = (): void => {
     setPlan(undefined);
+    setShowNames(false);
     setDone(undefined);
     setNote(undefined);
     setErrors({});
@@ -115,6 +117,7 @@ export function Exchange() {
     const result = planExchange({ site: open.site, state: open.state, revision: open.revision, adapter, asOf, alias, labels, mint: newId });
     if (result.ok) {
       setErrors({});
+      setShowNames(false);
       setPlan(result.plan);
       return;
     }
@@ -276,11 +279,26 @@ export function Exchange() {
           </h2>
           <p>{plan.preview.count === 1 ? t("oneCheckInFile") : t("checksInFile", { count: plan.preview.count })}</p>
           <p>{t("fileSize", { bytes: plan.preview.bytes })}</p>
-          <h3>{t("fieldsInFile")}</h3>
+          <h3>{t("fileHoldsHeading")}</h3>
           <ul className="plain stack">
-            <li>{t("wholeFileFields", { fields: plan.preview.siteFields.join(", ") })}</li>
-            <li>{t("eachCheckFields", { fields: plan.preview.issueFields.join(", ") })}</li>
+            {fileHolds(plan.preview).map((key) => (
+              <li key={key}>{t(key)}</li>
+            ))}
           </ul>
+          <div className="actions">
+            <Button aria-expanded={showNames} onClick={() => setShowNames((now) => !now)}>
+              {showNames ? t("hideFieldNames") : t("showFieldNames")}
+            </Button>
+          </div>
+          {showNames ? (
+            <div className="stack">
+              <h3>{t("fieldsInFile")}</h3>
+              <ul className="plain stack">
+                <li>{t("wholeFileFields", { fields: plan.preview.siteFields.join(", ") })}</li>
+                <li>{t("eachCheckFields", { fields: plan.preview.issueFields.join(", ") })}</li>
+              </ul>
+            </div>
+          ) : null}
           <ul className="cards plain">
             {plan.preview.rows.map((row, i) => (
               <li key={`${row.label}-${i}`} className="card">

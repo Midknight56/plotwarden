@@ -64,3 +64,13 @@ pm run assemble:site refused on this machine: the sibling Desk checkout is at an
 - The practice book is written by `npm run church:build`. `npm run church:dev` serves the app without it, so the link on the Import screen finds no file there.
 - Only the Churchyard Register offers a practice book. The Allotment Register has no invented waiting list file yet.
 - Headless Chromium only. No real person tried the practice book, so the words of the guide steps and their order are untried by a person.
+
+## Task 17: the words of a plot agree with the record and with the map
+
+- [x] 3.25 A plot with a reservation and no burial says "No burials in this plot."; a released reservation says it was reserved; the line of Y07 agrees with the family map (C12). Spec first: `requirements.md` C12. Files: `apps/churchyard-register/src/{ChurchyardHome.tsx,Reservation.tsx,copy.ts,walkthrough.ts}` (`reservationLine`, `noBurialsInPlot`, `reservationWasReleased`; `releasedOn` removed), `tests/unit/{churchScreens,churchCopy,visitor,walkthrough}.test.ts`, browser `warden-family.spec.ts` (written, not run). T IDs: T22 (the line), T35 (church part). Red command: `npx vitest run tests/unit/churchScreens.test.ts tests/unit/churchCopy.test.ts tests/unit/walkthrough.test.ts`. First red: the plot screen drew "No reservations." under "Burials", a released reservation read "is reserved" (`reservationLine` was a stub that always said so), and the approved line of LF-07A was "Seventh stone along the walk, on the north side." The pictures `docs/acceptance/layout/churchyard/family-file-*.png` and the print pictures that hold the old line are retaken by the browser run.
+
+## Not settled in task 17
+
+- A released reservation still shows the reason as typed. A reason that ends in a full stop reads with two. The release form does not strip it.
+- A plot with a reservation and no burial shows the reservation line in the same list as the burials under the heading "Burials". The heading was not changed.
+- The plot screen words are checked by drawing `ChurchPlotExtras` to static markup with a fake register and shell. The browser spec was not given a new step for the plot screen. Only the family file line has a browser assertion.

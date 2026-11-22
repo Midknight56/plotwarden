@@ -54,6 +54,37 @@ export type PlanResult =
   | { ok: false; code: "empty_register" | "too_big" }
   | { ok: false; code: "invalid"; fields: FieldProblem[] };
 
+/** The plain line that covers each field of the file. A field that is not here gets the line "More fields." */
+const HOLDS_FOR_FIELD: Readonly<Record<string, string>> = {
+  siteAlias: "holdsSiteName",
+  asOf: "holdsReviewDate",
+  format: "holdsKind",
+  siteKind: "holdsKind",
+  revision: "holdsKind",
+  siteKey: "holdsKeys",
+  lineageId: "holdsKeys",
+  issueKey: "holdsKeys",
+  subjectKey: "holdsKeys",
+  factVersion: "holdsKeys",
+  issues: "holdsEachCheck",
+  label: "holdsEachCheck",
+  rule: "holdsEachCheck",
+  action: "holdsEachCheck",
+};
+
+/** The order the lines are shown in. */
+const HOLDS_ORDER = ["holdsSiteName", "holdsReviewDate", "holdsKind", "holdsKeys", "holdsEachCheck", "holdsMore"] as const;
+
+/**
+ * The catalog keys of the plain lines that say what a review file holds, in a fixed order, each once. Every field
+ * of the file is covered by one line. A field with no line of its own adds "holdsMore", so the list cannot hide it.
+ */
+export function fileHolds(preview: Pick<PacketPreview, "siteFields" | "issueFields">): string[] {
+  const wanted = new Set<string>();
+  for (const field of [...preview.siteFields, ...preview.issueFields]) wanted.add(HOLDS_FOR_FIELD[field] ?? "holdsMore");
+  return HOLDS_ORDER.filter((key) => wanted.has(key));
+}
+
 /** The checks of an adapter, with a fingerprint. An adapter with no review support never raises a version. */
 function sourcesOf(adapter: ExchangeAdapter, state: BaseState, asOf: LocalDate): ReviewSource[] {
   if (adapter.review !== undefined) return adapter.review.sources(state, asOf);

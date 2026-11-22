@@ -191,7 +191,7 @@ export const ALLOT_COPY: Readonly<Record<string, string>> = {
   receiptReversedLine: "Reversed on {date}. {reason}",
   reverseCharge: "Reverse this charge",
   chargeReversedDone: "Charge reversed.",
-  hint_amount: "A whole number of pence, such as 12.00.",
+  hint_amount: "An amount with two decimal places, such as 12.00.",
   // Garden reports
   seasonReport: "Season report",
   seasonLabel: "Season",

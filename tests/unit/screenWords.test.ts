@@ -3,8 +3,14 @@
 // and no hard coded label, title, alt or placeholder slips past the catalog.
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { COPY } from "../../template/src/ui/copy";
+import { COPY, fill } from "../../template/src/ui/copy";
+import { ImportReview, emptyRowsWords } from "../../template/src/ui/ImportReview";
+import type { Staged } from "../../template/src/ui/ImportReview";
+import { ShellContext } from "../../template/src/ui/shellContext";
+import type { ShellValue } from "../../template/src/ui/shellContext";
 
 const UI = join(__dirname, "..", "..", "template", "src", "ui");
 const files = readdirSync(UI)
@@ -71,5 +77,65 @@ describe("the words of the shared screens", () => {
     expect(bad).toEqual([]);
     // "Saved on this device." is the one saved sentence, and only a finished commit shows it.
     expect(COPY["saved"]).toBe("Saved on this device.");
+  });
+});
+
+describe("the page panel of Fast entry promises only what happens (P21.1)", () => {
+  it("offers no control to keep the page photo, because the photo is never stored", () => {
+    const panel = source("ReferencePage.tsx");
+    expect(panel).not.toMatch(/keepPage|setKeepPage|CheckField/);
+    expect(COPY["keepPage"]).toBeUndefined();
+    expect(Object.entries(COPY).filter(([, text]) => /keep page/i.test(text))).toEqual([]);
+  });
+
+  it("keeps the sentence that the page stays on this device", () => {
+    expect(COPY["pageStaysHere"]).toBe("Page stays on this device.");
+    expect(source("ReferencePage.tsx")).toContain('t("pageStaysHere")');
+  });
+});
+
+const say = (key: string, values?: Readonly<Record<string, string | number>>): string => fill(COPY[key] ?? key, values ?? {});
+const textOf = (html: string): string => html.replace(/<[^>]*>/g, " ").replace(/&#x27;/g, "'").replace(/\s+/g, " ").trim();
+
+function reviewOf(unplaced: number, mode: "import" | "entry" = "import"): string {
+  const rows = Array.from({ length: unplaced }, (_, i) => ({ rowNumber: i + 1, sourceRef: `R${i + 1}`, cells: {}, status: "unplaced", errors: [], commands: [] }));
+  const staged = { sheet: "Burials", siteId: "site", baseRevision: 0, rows, counts: { ready: 3, unchanged: 0, unplaced, conflicts: 0, errors: 0, leftOut: 0 }, writes: 3 + unplaced, drafts: [] } as unknown as Staged;
+  const shell = { t: say } as unknown as ShellValue;
+  const sheet = { name: "Burials", required: [], optional: [] };
+  return renderToStaticMarkup(
+    createElement(ShellContext.Provider, { value: shell }, createElement(ImportReview, { staged, onChange: () => undefined, onCommit: () => undefined, onCancel: () => undefined, busy: false, sheet, fields: [], mode })),
+  );
+}
+
+describe("the import review says where rows went when nothing needs a fix (P21.2)", () => {
+  it("with 0 errors, 0 conflicts and 2 rows to confirm, says so with the real count", () => {
+    const text = textOf(reviewOf(2));
+    expect(text).toContain("Nothing to fix before the import. 2 records will need a plot after it.");
+    expect(text).not.toContain("No rows to show.");
+    expect(text).toContain("Location to confirm 2");
+  });
+
+  it("says 1 record for one row", () => {
+    expect(textOf(reviewOf(1))).toContain("Nothing to fix before the import. 1 record will need a plot after it.");
+  });
+
+  it("keeps No rows to show with no row to confirm", () => {
+    const text = textOf(reviewOf(0));
+    expect(text).toContain("No rows to show.");
+    expect(text).not.toContain("Nothing to fix before the import.");
+  });
+
+  it("says nothing of the kind for typed rows, which have no list", () => {
+    expect(textOf(reviewOf(2, "entry"))).not.toContain("Nothing to fix before the import.");
+  });
+
+  it.each(["error", "conflict", "left_out", "ready", "unplaced", "unchanged"] as const)("keeps No rows to show for the empty filter %s", (filter) => {
+    expect(emptyRowsWords(say, filter, 2)).toBe("No rows to show.");
+  });
+
+  it("gives the new words only for the list of rows to check", () => {
+    expect(emptyRowsWords(say, "attention", 2)).toBe("Nothing to fix before the import. 2 records will need a plot after it.");
+    expect(emptyRowsWords(say, "attention", 1)).toBe("Nothing to fix before the import. 1 record will need a plot after it.");
+    expect(emptyRowsWords(say, "attention", 0)).toBe("No rows to show.");
   });
 });

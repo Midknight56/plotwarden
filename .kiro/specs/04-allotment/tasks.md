@@ -34,3 +34,7 @@ Each task writes its test first, sees it fail on the missing behaviour (a stub t
 - The season report "Fees received" is net of reversals. A reversed charge is left out of the totals.
 - The label rules are checked with a letter width of 7.4 px in unit tests and with the real text boxes in the browser. A sheet narrower than 360 px was checked only in unit tests (width 320).
 - The seeker file offers a section choice only when two or more sections are listed. With one section listed the choice is not shown, and the browser spec checks that it is absent. The choice itself is covered in `visitor.test.ts` and was not driven in the browser.
+
+## Task 17: the amount hint names no coin
+
+- [x] 4.19 The amount hint reads "An amount with two decimal places, such as 12.00." (A13). Spec first: `requirements.md` A13. Files: `apps/allotment-register/src/copy.ts` (`hint_amount`), `tests/unit/gardenCopy.test.ts`, browser `secretary-season.spec.ts` (written, not run). T IDs: T35 (allotment part). Red command: `npx vitest run tests/unit/gardenCopy.test.ts`. First red: the hint read "A whole number of pence, such as 12.00.", which named a coin and described the typed amount wrongly.

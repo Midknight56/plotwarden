@@ -47,6 +47,9 @@ test.describe("entering records from paper", () => {
     await page.getByLabel("Choose page photo").setInputFiles(fixturePath("tiny-page.png"));
     await expect(page.getByRole("img", { name: "Register page" })).toBeVisible();
     await expect(page.getByText("Page stays on this device.")).toBeVisible();
+    // The photo is never stored, so there is no control that offers to keep it.
+    await expect(page.getByLabel("Keep page with register")).toHaveCount(0);
+    await expect(page.getByText("Keep page with register")).toHaveCount(0);
     await page.getByRole("button", { name: "Enlarge" }).click();
     await expect(page.getByText("125 percent")).toBeVisible();
     await page.getByRole("button", { name: "Rotate" }).click();
@@ -230,6 +233,13 @@ test.describe("entering records from paper", () => {
     await expect(dialog).toBeHidden();
     await expect(counts(page)).toContainText("Errors 0");
     await expect(counts(page)).toContainText("Ready 198");
+    // With nothing left to fix, the list of rows to check says where the 2 rows to place went.
+    await expect(page.getByText("Nothing to fix before the import. 2 records will need a plot after it.")).toBeVisible();
+    await expect(page.getByText("No rows to show.")).toHaveCount(0);
+    await page.getByLabel("Show rows", { exact: true }).selectOption({ label: "Errors" });
+    await expect(page.getByText("No rows to show.")).toBeVisible();
+    await expect(page.getByText("Nothing to fix before the import.")).toHaveCount(0);
+    await page.getByLabel("Show rows", { exact: true }).selectOption({ label: "Rows to check" });
     const importAll = page.getByRole("button", { name: "Import 200 records" });
     await expect(importAll).toBeEnabled();
     await importAll.click();

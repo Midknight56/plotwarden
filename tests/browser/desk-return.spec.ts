@@ -156,11 +156,24 @@ test.describe("Lantern Fold", () => {
     await expect(preview.getByText("2 checks in this file.")).toBeVisible();
     await expect(preview.getByText("Lower bed · Check the location · version 1")).toBeVisible();
     await expect(preview.getByText("Record 2 · Read the stone again · version 1")).toBeVisible();
-    await expect(preview.getByText("Whole file: format, siteKind, siteKey, lineageId, siteAlias, revision, asOf, issues")).toBeVisible();
-    await expect(preview.getByText("Each check: issueKey, subjectKey, label, rule, factVersion, action")).toBeVisible();
+    await expect(preview.getByText("The site name you typed", { exact: true })).toBeVisible();
+    await expect(preview.getByText("The review date", { exact: true })).toBeVisible();
+    await expect(preview.getByText("For each check: your label, the reason and what to do", { exact: true })).toBeVisible();
     await expect(page.getByRole("heading", { level: 2, name: "Review file preview" })).toBeFocused();
     await expect(page.getByRole("button", { name: "Download review file", exact: true })).toHaveClass(/primary/);
     expect(await page.locator(".button.primary").count()).toBe(1);
+
+    // The exact field names stay behind a control until it is pressed, and go again when it is pressed again.
+    const names = preview.getByRole("button", { name: "Show field names", exact: true });
+    await expect(names).toHaveAttribute("aria-expanded", "false");
+    await expect(preview.getByText("Whole file:")).toHaveCount(0);
+    await names.click();
+    await expect(preview.getByRole("button", { name: "Hide field names", exact: true })).toHaveAttribute("aria-expanded", "true");
+    await expect(preview.getByText("Whole file: format, siteKind, siteKey, lineageId, siteAlias, revision, asOf, issues")).toBeVisible();
+    await expect(preview.getByText("Each check: issueKey, subjectKey, label, rule, factVersion, action")).toBeVisible();
+    await check(page, "church-preview-names");
+    await preview.getByRole("button", { name: "Hide field names", exact: true }).click();
+    await expect(preview.getByText("Whole file:")).toHaveCount(0);
     expect((await ledger(page)).events.length).toBe(start.events.length);
     await check(page, "church-preview");
 

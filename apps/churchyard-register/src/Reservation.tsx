@@ -6,6 +6,7 @@ import { Button, ButtonLink, TextField } from "../../../template/src/ui/controls
 import { useShell } from "../../../template/src/ui/shellContext";
 import { Status } from "../../../template/src/ui/Status";
 import { LocationFields } from "./Burial";
+import { reservationLine } from "./copy";
 import { plotChoices } from "./history";
 import type { PlotChoice } from "./history";
 import { useIntent, useChurch } from "./intent";
@@ -181,10 +182,9 @@ export function ReservationScreen() {
             return (
               <li key={r.reservationId} className="card">
                 <p>
-                  <strong>{t("spaceIsReserved", { plot: code, space: spaceLabelOf(plots, r) })}</strong>
+                  <strong>{reservationLine(t, { plot: code, space: spaceLabelOf(plots, r), ...(r.released === undefined ? {} : { released: r.released }) })}</strong>
                 </p>
                 <p>{[person?.displayName, person?.contact, r.sourceRef, r.start].filter((x) => x !== undefined && x !== "").join(" · ")}</p>
-                {r.released === undefined ? null : <p>{t("releasedOn", { date: r.released.on, reason: r.released.reason })}</p>}
                 {r.convertedTo === undefined ? null : (
                   <>
                     <p>{t("convertedNote")}</p>

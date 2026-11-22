@@ -151,7 +151,7 @@ export const lanternFold: Walkthrough = {
         sectionNames: { [section]: "Yew Walk" },
         pathNames: { [id("path:yew")]: "Yew Walk" },
       },
-      { type: "approve_burial", burialId: id("burial:LF-07A"), includeYear: false, line: "Seventh stone along the walk, on the north side." },
+      { type: "approve_burial", burialId: id("burial:LF-07A"), includeYear: false, line: "First stone on the north side of the walk, by the gate." },
     ];
 
     // One revision for the map, one for the checks, then one each for the burials, the holds, the stone and the family file.

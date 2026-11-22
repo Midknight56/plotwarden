@@ -34,9 +34,7 @@ export interface EntrySession {
   /** Where focus should go after a failed review: a one based row and a field key. */
   focus?: { row: number; field: string };
   page: PageView;
-  /** The keeper chose "Keep page with register". */
-  keepPage: boolean;
-  /** A page photo is in use. */
+  /** A page photo is in use. It is held in memory only. It is never stored with the register. */
   pageChosen: boolean;
   nextRowId: number;
 }
@@ -54,7 +52,6 @@ export function newSession(): EntrySession {
     rows: [emptyRow(1)],
     currentRow: 0,
     page: { index: 1, zoom: 1, rotation: 0 },
-    keepPage: false,
     pageChosen: false,
     nextRowId: 2,
   };
@@ -203,13 +200,9 @@ export function choosePage(s: EntrySession): EntrySession {
   return { ...s, pageChosen: true };
 }
 
-export function setKeepPage(s: EntrySession, keep: boolean): EntrySession {
-  return { ...s, keepPage: keep };
-}
-
-/** Close the page. The image is released unless the keeper chose to keep it. */
+/** Close the page. A chosen photo is always released, because it is never stored. */
 export function closePage(s: EntrySession): { session: EntrySession; releaseImage: boolean } {
-  if (!s.pageChosen || s.keepPage) return { session: s, releaseImage: false };
+  if (!s.pageChosen) return { session: s, releaseImage: false };
   return { session: { ...s, pageChosen: false }, releaseImage: true };
 }
 
@@ -272,7 +265,7 @@ export function toDraft(
     mapping: { page: String(s.page.index), zoom: String(s.page.zoom), rotation: String(s.page.rotation) },
     currentRow: Math.min(before, Math.max(unsaved.length - 1, 0)),
     commands: [],
-    pageImageNeedsReselect: s.pageChosen && !s.keepPage,
+    pageImageNeedsReselect: s.pageChosen,
     savedAt: meta.savedAt,
   };
 }

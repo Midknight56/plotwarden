@@ -20,7 +20,16 @@ export const EXCHANGE_COPY: Readonly<Record<string, string>> = {
 
   // The preview: the exact fields that will leave the device
   reviewFilePreview: "Review file preview",
-  fieldsInFile: "Fields in this file",
+  fileHoldsHeading: "What this file holds",
+  holdsSiteName: "The site name you typed",
+  holdsReviewDate: "The review date",
+  holdsKind: "The file format, the kind of register and its revision number",
+  holdsKeys: "Random keys and a version number. They hold no name and let your slip find its record.",
+  holdsEachCheck: "For each check: your label, the reason and what to do",
+  holdsMore: "More fields. Choose Show field names to see them.",
+  showFieldNames: "Show field names",
+  hideFieldNames: "Hide field names",
+  fieldsInFile: "Field names in this file",
   wholeFileFields: "Whole file: {fields}",
   eachCheckFields: "Each check: {fields}",
   checksInFile: "{count} checks in this file.",

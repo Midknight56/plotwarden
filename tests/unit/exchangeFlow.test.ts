@@ -7,7 +7,8 @@ import type { BaseState } from "../../template/src/base";
 import { buildSlip, encodeSlip } from "../../template/src/exchange/slip";
 import type { SlipInput } from "../../template/src/exchange/slip";
 import { scanForCanaries } from "../../template/src/output/privacy";
-import { checksAt, planExchange, readSlipFor } from "../../template/src/ui/exchangeFlow";
+import { COPY } from "../../template/src/ui/copy";
+import { checksAt, fileHolds, planExchange, readSlipFor } from "../../template/src/ui/exchangeFlow";
 import type { ExchangeAdapter, ExchangePlan, PlanInput } from "../../template/src/ui/exchangeFlow";
 import { allotAdapter } from "../../apps/allotment-register/src/adapter";
 import { churchAdapter } from "../../apps/churchyard-register/src/adapter";
@@ -467,5 +468,53 @@ describe("the state it reads", () => {
   it("is the base state the shell gives it", () => {
     const state: BaseState = applyBase(emptyBase(SITE_ID), { type: "north_set", degrees: 10 } as never) as BaseState;
     expect(state.review).toEqual({ subjects: {}, received: {} });
+  });
+});
+
+describe("the preview says in plain words what the file holds (X13)", () => {
+  const words = (keys: string[]): string[] => keys.map((key) => COPY[key] ?? `missing ${key}`);
+
+  it("gives one plain line for each kind of field of a real preview, in a fixed order", async () => {
+    const env = await ChurchEnv.create();
+    await buildFold(env, { geometry: true });
+    const made = planExchange({ site: env.site, state: env.state, revision: env.revision, adapter: churchAdapter as unknown as ExchangeAdapter, asOf: ON, alias: "Site 1", labels: {}, mint });
+    if (!made.ok) throw new Error("no plan");
+    expect(words(fileHolds(made.plan.preview))).toEqual([
+      "The site name you typed",
+      "The review date",
+      "The file format, the kind of register and its revision number",
+      "Random keys and a version number. They hold no name and let your slip find its record.",
+      "For each check: your label, the reason and what to do",
+    ]);
+  });
+
+  it("covers every field of the file, so no field is left without a line of its own", () => {
+    const fields = {
+      siteFields: ["format", "siteKind", "siteKey", "lineageId", "siteAlias", "revision", "asOf", "issues"],
+      issueFields: ["issueKey", "subjectKey", "label", "rule", "factVersion", "action"],
+    };
+    expect(fileHolds(fields)).not.toContain("holdsMore");
+    // Each field alone brings its own line.
+    for (const field of [...fields.siteFields, ...fields.issueFields]) {
+      const alone = fileHolds({ siteFields: [field], issueFields: [] });
+      expect(alone.length, field).toBe(1);
+      expect(alone, field).not.toContain("holdsMore");
+    }
+  });
+
+  it("adds More fields. when a field has no line of its own, so the list cannot hide one", () => {
+    const got = fileHolds({ siteFields: ["siteAlias", "somethingNew"], issueFields: ["label"] });
+    expect(words(got)).toEqual(["The site name you typed", "For each check: your label, the reason and what to do", "More fields. Choose Show field names to see them."]);
+  });
+
+  it("holds the same lines for the same fields in any order, and each line once", () => {
+    const a = fileHolds({ siteFields: ["asOf", "siteAlias", "issues"], issueFields: ["action", "label"] });
+    const b = fileHolds({ siteFields: ["issues", "siteAlias", "asOf"], issueFields: ["label", "action"] });
+    expect(a).toEqual(b);
+    expect(new Set(a).size).toBe(a.length);
+  });
+
+  it("says nothing for a file with no field", () => {
+    expect(fileHolds({ siteFields: [], issueFields: [] })).toEqual([]);
   });
 });

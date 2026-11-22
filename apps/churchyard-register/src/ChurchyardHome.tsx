@@ -12,6 +12,7 @@ import { useShell } from "../../../template/src/ui/shellContext";
 import { MapKey, SheetSvg, useElementWidth } from "../../../template/src/ui/SiteMap";
 import { Status } from "../../../template/src/ui/Status";
 import { churchRecords } from "./adapter";
+import { reservationLine } from "./copy";
 import { useIntent, useChurch } from "./intent";
 import { unplacedBurials } from "./history";
 import { LANTERN_EXAMPLE } from "./walkthrough";
@@ -286,7 +287,7 @@ export function ChurchPlotExtras({ plotId }: { plotId: string }) {
   return (
     <section className="card stack" aria-labelledby="church-plot-heading">
       <h2 id="church-plot-heading">{t("reportBurials")}</h2>
-      {burials.length === 0 ? <p>{t("noReservations")}</p> : null}
+      {burials.length === 0 ? <p>{t("noBurialsInPlot")}</p> : null}
       <ul className="plain stack">
         {burials.map((b) => (
           <li key={b.burialId} className="stack">
@@ -298,8 +299,11 @@ export function ChurchPlotExtras({ plotId }: { plotId: string }) {
         ))}
         {reservations.map((r) => (
           <li key={r.reservationId}>
-            {t("spaceIsReserved", { plot: plot?.code ?? "", space: plot?.spaces.find((s) => s.spaceId === r.spaceId)?.label ?? "" })}
-            {r.released === undefined ? "" : ` · ${t("releasedOn", { date: r.released.on, reason: r.released.reason })}`}
+            {reservationLine(t, {
+              plot: plot?.code ?? "",
+              space: plot?.spaces.find((s) => s.spaceId === r.spaceId)?.label ?? "",
+              ...(r.released === undefined ? {} : { released: r.released }),
+            })}
           </li>
         ))}
       </ul>

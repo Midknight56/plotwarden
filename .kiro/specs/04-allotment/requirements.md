@@ -140,3 +140,9 @@ Tests: `tests/unit/sheet.test.ts` (label placement), `tests/helpers/measureLayou
 1. When the shared sheet places a gate label, a section label, a path label or a plot label, it shall keep the label's rectangle clear of every path line, of the code tab, of the north arrow, of the gate mark and of every other label, by at least 4 px, and inside the sheet by at least 8 px.
 2. When no candidate place is clear, the sheet shall choose the place with the least overlap and never hide the label.
 3. When a layout measurement runs on a screen with a sheet, it shall report any label that touches a path line, a tab, the north arrow or another label.
+
+## A13 The amount hint names no coin
+
+Tests: `tests/unit/gardenCopy.test.ts`. Implements R23, A4, A10. Task 17.
+
+1. When a screen asks for an amount, its hint shall read "An amount with two decimal places, such as 12.00." The hint names no unit and no coin, because the currency is set once for the garden and the amount is typed in whole units with two decimals. An amount typed in other ways keeps the error "Enter an amount such as 12.00."

@@ -137,6 +137,7 @@ test.describe("the 200 record book on the Churchyard Register", () => {
     await expect(counts(page)).toContainText("Errors 0");
     await expect(counts(page)).toContainText("Ready 198");
     await expect(counts(page)).toContainText("Location to confirm 2");
+    await expect(page.getByText("Nothing to fix before the import. 2 records will need a plot after it.")).toBeVisible();
     const importAll = page.getByRole("button", { name: "Import 200 records" });
     await expect(importAll).toBeEnabled();
     await proof(page, "paper-book-ready");

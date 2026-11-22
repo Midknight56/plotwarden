@@ -129,3 +129,11 @@ Tests: browser `warden-paper-book.spec.ts`, `tests/unit/mapping.test.ts`, `tests
 3. When the heading "Name" is read for the Burials sheet, the register shall match it to "Recorded name" with no choice by the keeper, and the column list shall show the match. When the file also has a column headed "Recorded name", that exact heading keeps the field and "Name" stays unmatched, so no field is filled twice.
 4. When the warden makes the section Paper, 10 by 20, prefix C, 3 digits, imports the practice book, fixes row 117, imports 200, imports the same file again and places R199, the register shall give the counts of hand totals section 3: 200 plots, nothing written by the file with the error, "Import 200 records", "200 saved · 2 still need a plot.", nothing added by the same file again or with its rows reversed, and 1 burial still unplaced once R199 sits at C199.
 5. When a name from the book is searched, the register shall show its plot on the map.
+
+## C12 The words of a plot agree with the record and with the map
+
+Tests: `tests/unit/churchScreens.test.ts`, `tests/unit/churchCopy.test.ts`, `tests/unit/visitor.test.ts`, `tests/unit/walkthrough.test.ts`, browser `warden-family.spec.ts`. Implements R23, C9, C5.11. Task 17.
+
+1. When a plot has a reservation and no burial, the plot screen shall say "No burials in this plot." under the heading "Burials". It shall never say "No reservations." there.
+2. When a reservation was released, its line shall say "{plot}, space {space} was reserved. Released {date}. {reason}". Only a reservation that still holds its space says "is reserved".
+3. When the line of a burial in the family file describes where its stone is, it shall agree with the drawn family map. In Lantern Fold, Y07 is the first plot on the north side of Yew Walk, next to the gate, so its line says "First stone on the north side of the walk, by the gate." A test reads the layout of the practice register to check that Y07 is the north plot nearest the gate.

@@ -149,6 +149,41 @@ describe("a restart rebuilds that practice register alone", () => {
   });
 });
 
+describe("the line to the approved burial agrees with the drawn map (C12.3)", () => {
+  type Pt = [number, number];
+  interface Layout {
+    type: string;
+    plots: { code: string; footprint: Pt[] }[];
+    paths: { points: Pt[] }[];
+    gate: { at: Pt };
+    north: number;
+  }
+  const commands = () => lanternFold.batches(counter(7)).flatMap((b) => b.commands as { type: string; [key: string]: unknown }[]);
+  const centre = (points: Pt[]): Pt => [points.reduce((n, p) => n + p[0], 0) / points.length, points.reduce((n, p) => n + p[1], 0) / points.length];
+
+  it("draws Y07 as the first plot on the north side of Yew Walk, nearest the gate", () => {
+    const layout = commands().find((c) => c.type === "layout_apply") as unknown as Layout;
+    expect(layout.north).toBe(0);
+    const walkY = (layout.paths[0] as { points: Pt[] }).points[0]![1];
+    const northSide = layout.plots.filter((p) => Math.min(...p.footprint.map((pt) => pt[1])) > walkY);
+    expect(northSide.map((p) => p.code).sort()).toEqual(["Y07", "Y08", "Y09", "Y10", "Y11", "Y12"]);
+    const gate = layout.gate.at;
+    const distance = (points: Pt[]): number => {
+      const c = centre(points);
+      return Math.hypot(c[0] - gate[0], c[1] - gate[1]);
+    };
+    const byGate = [...northSide].sort((a, b) => distance(a.footprint) - distance(b.footprint));
+    expect(byGate[0]?.code).toBe("Y07");
+  });
+
+  it("gives the burial of Y07 a line that says so, and no word of the old line", () => {
+    const approvals = commands().filter((c) => c.type === "approve_burial");
+    expect(approvals).toHaveLength(1);
+    expect(approvals[0]?.["line"]).toBe("First stone on the north side of the walk, by the gate.");
+    expect(JSON.stringify(commands())).not.toMatch(/seventh/i);
+  });
+});
+
 describe("no placeholder word and no repeated reference enters a capture", () => {
   const PLACEHOLDER = /\b(lorem|ipsum|todo|tbd|xxx+|placeholder|sample|foobar|undefined|null|nan)\b|\{[A-Za-z]+\}/i;
 

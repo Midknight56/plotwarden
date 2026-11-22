@@ -1,8 +1,8 @@
 // The page of the paper register beside the rows: a photo kept in memory, with zoom, turn and page number.
-// The photo stays on this device. It is never written unless the keeper chooses to keep it.
+// The photo stays on this device and is never written. It is released when the page closes.
 import type { EntrySession } from "../data/fastEntry";
-import { nextPage, previousPage, rotatePage, setKeepPage, zoomIn, zoomOut } from "../data/fastEntry";
-import { Button, CheckField } from "./controls";
+import { nextPage, previousPage, rotatePage, zoomIn, zoomOut } from "../data/fastEntry";
+import { Button } from "./controls";
 import { useShell } from "./shellContext";
 
 export function ReferencePage({
@@ -46,7 +46,6 @@ export function ReferencePage({
             />
           </div>
           <p>{t("pageStaysHere")}</p>
-          <CheckField label={t("keepPage")} checked={session.keepPage} onChange={(on) => onSession((s) => setKeepPage(s, on))} />
         </>
       )}
       <div className="actions">

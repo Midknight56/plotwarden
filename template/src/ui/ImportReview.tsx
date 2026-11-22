@@ -17,7 +17,7 @@ type Row = StagedRow<{ type: string }>;
 
 const PAGE_SIZE = 50;
 
-type Filter = "attention" | "ready" | "unchanged" | "unplaced" | "conflict" | "error" | "left_out";
+export type Filter = "attention" | "ready" | "unchanged" | "unplaced" | "conflict" | "error" | "left_out";
 
 const STATUS_WORD: Record<string, string> = {
   ready: "rowStatusReady",
@@ -34,6 +34,15 @@ export function cellErrorText(t: ReturnType<typeof useShell>["t"], error: CellEr
   const key = `reason_${error.code}`;
   const own = t(key);
   return t("checkField", { field: label ?? error.heading, n: error.row, reason: own === key ? reasonText(error.code) : own });
+}
+
+/**
+ * The words for a filter that shows no row. The list "Rows to check" holds only errors and conflicts, so when it is
+ * empty but some rows wait for a plot, it says where those rows went. Every other filter says "No rows to show.".
+ */
+export function emptyRowsWords(t: ReturnType<typeof useShell>["t"], filter: Filter, unplaced: number): string {
+  if (filter !== "attention" || unplaced < 1) return t("noRowsToShow");
+  return unplaced === 1 ? t("nothingToFixUnplacedOne") : t("nothingToFixUnplaced", { count: unplaced });
 }
 
 function FixForm({ row, fields, onSave }: { row: Row; fields: readonly FieldDef[]; onSave: (cells: Record<string, string>) => void }) {
@@ -148,7 +157,7 @@ export function ImportReview({ staged, onChange, onCommit, onCancel, busy, sheet
 
       {visible.length === 0 ? (
         mode === "import" ? (
-          <p>{t("noRowsToShow")}</p>
+          <p>{emptyRowsWords(t, filter, counts.unplaced)}</p>
         ) : null
       ) : (
         <ul className="cards plain">

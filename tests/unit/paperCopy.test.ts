@@ -125,7 +125,6 @@ const EXACT: [string, string][] = [
   ["fastEntry", "Fast entry"],
   ["registerPage", "Register page"],
   ["choosePagePhoto", "Choose page photo"],
-  ["keepPage", "Keep page with register"],
   ["previousPage", "Previous page"],
   ["nextPage", "Next page"],
   ["rotate", "Rotate"],
@@ -134,6 +133,9 @@ const EXACT: [string, string][] = [
   ["showPage", "Show page"],
   ["showRow", "Show row"],
   ["pageStaysHere", "Page stays on this device."],
+  ["noRowsToShow", "No rows to show."],
+  ["nothingToFixUnplaced", "Nothing to fix before the import. {count} records will need a plot after it."],
+  ["nothingToFixUnplacedOne", "Nothing to fix before the import. 1 record will need a plot after it."],
   ["choosePageOrEnter", "Choose a page or enter records without one."],
   // Fast entry
   ["sourceRef", "Source ref"],

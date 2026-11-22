@@ -62,6 +62,8 @@ const PLAN: [string, string][] = [
   ["releaseReservation", "Release reservation"],
   ["recordBurialInSpace", "Record burial in this space"],
   ["spaceIsReserved", "{plot}, space {space} is reserved."],
+  ["reservationWasReleased", "{plot}, space {space} was reserved. Released {date}. {reason}"],
+  ["noBurialsInPlot", "No burials in this plot."],
   // Unplaced and name matches
   ["burialsWithNoPlot", "Burials with no plot"],
   ["openSource", "Open source"],

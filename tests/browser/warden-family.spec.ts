@@ -480,6 +480,9 @@ test.describe("the family map, the file and the visitor", () => {
     await expect(file.getByRole("listitem").filter({ hasText: "Mirel Quillmoss" })).toBeVisible();
     expect(await file.evaluate(() => document.querySelectorAll("form, img, link, iframe").length)).toBe(0);
     const pageText = await file.content();
+    // The line to the burial agrees with the drawn map: Y07 is the first plot on the north side, by the gate.
+    expect(pageText).toContain("First stone on the north side of the walk, by the gate.");
+    expect(pageText).not.toContain("Seventh stone");
     for (const secret of VISITOR_CANARIES) expect(pageText, secret).not.toContain(secret);
     expect(seen.filter((u) => !u.startsWith("file:") && !u.startsWith("data:") && !u.startsWith("blob:"))).toEqual([]);
     await visitor.close();

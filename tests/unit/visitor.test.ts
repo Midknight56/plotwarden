@@ -859,7 +859,7 @@ const handOutlines = (...except: string[]): [number, number][][] =>
     .filter((p) => !except.includes(p.code))
     .map((p) => p.shape);
 
-const MIREL_LINE = "Seventh stone along the walk, on the north side.";
+const MIREL_LINE = "First stone on the north side of the walk, by the gate.";
 const CORWIN_LINE = "Past the yew, the ninth stone from the gate.";
 const withLine = (ref: string, line?: string): ChurchCommand => ({ type: "approve_burial", burialId: id(`burial:${ref}`), includeYear: false, ...(line === undefined ? {} : { line }) });
 

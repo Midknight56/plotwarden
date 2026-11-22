@@ -1,6 +1,8 @@
 // X8: the words of the Exchange screen. The exact words are typed here from the plan (section 6 and section 5),
 // not read from the catalog. The catalog must hold each exactly, with no dash between words, and its keys must
 // not shadow a key of the shared catalogs.
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { COPY, FOUNDATION_COPY, fill } from "../../template/src/ui/copy";
 import { EXCHANGE_COPY } from "../../template/src/ui/copyExchange";
@@ -37,6 +39,17 @@ const EXACT: [string, string][] = [
   ["noOpenChecks", "No open checks at this date."],
   ["nothingToReceive", "Nothing new to record."],
   ["exProblemOverLimit", "Use 40 characters or fewer."],
+  // The preview in plain words (X13)
+  ["fileHoldsHeading", "What this file holds"],
+  ["holdsSiteName", "The site name you typed"],
+  ["holdsReviewDate", "The review date"],
+  ["holdsKind", "The file format, the kind of register and its revision number"],
+  ["holdsKeys", "Random keys and a version number. They hold no name and let your slip find its record."],
+  ["holdsEachCheck", "For each check: your label, the reason and what to do"],
+  ["holdsMore", "More fields. Choose Show field names to see them."],
+  ["showFieldNames", "Show field names"],
+  ["hideFieldNames", "Hide field names"],
+  ["fieldsInFile", "Field names in this file"],
 ];
 
 describe("the exact words", () => {
@@ -85,6 +98,18 @@ describe("the whole catalog", () => {
     expect(fill(EXCHANGE_COPY["fileSize"] as string, { bytes: 612 })).toBe("612 bytes");
     expect(fill(EXCHANGE_COPY["wholeFileFields"] as string, { fields: "format, siteKind" })).toBe("Whole file: format, siteKind");
     expect(fill(EXCHANGE_COPY["eachCheckFields"] as string, { fields: "issueKey, label" })).toBe("Each check: issueKey, label");
+  });
+
+  it("keeps the exact field names behind a control, and the plain lines on the page", () => {
+    const screen = readFileSync(join(__dirname, "..", "..", "template", "src", "ui", "Exchange.tsx"), "utf8");
+    expect(screen).toContain('t("showFieldNames")');
+    expect(screen).toContain('t("hideFieldNames")');
+    expect(screen).toContain("aria-expanded");
+    expect(screen).toContain("fileHolds(");
+    // The field names are drawn only inside the opened panel.
+    const before = screen.slice(0, screen.indexOf("showNames ? ("));
+    expect(before).not.toContain("siteFields.join");
+    expect(screen.slice(screen.indexOf("showNames ? ("))).toContain("siteFields.join");
   });
 
   it("says the file holds no names, contacts or amounts, and that a receipt changes no record", () => {

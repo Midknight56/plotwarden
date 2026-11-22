@@ -245,7 +245,7 @@ Actions return a new `StagedImport` after re running every row from the first ch
 
 ## H12 Fast entry
 
-`EntrySession { rows: EntryRow[]; currentRow: number; currentField?: string; page: { index: number; zoom: number; rotation: number }; keepPage: boolean; pageChosen: boolean }`. `EntryRow { rowId; cells; saved: boolean }`. Pure functions return a new session. `repeatSection` and `repeatPage` copy the fields the adapter marks `repeatable` (a new optional `FieldDef.repeatable`). `fillPlotSequence` uses a trailing digit run and keeps its width. `pasteCells(session, text, startField, fields)` reads tab separated text with the CSV reader (separator tab, quotes allowed). Zoom steps are 0.25 from 0.5 to 4, rotation steps 90.
+`EntrySession { rows: EntryRow[]; currentRow: number; currentField?: string; page: { index: number; zoom: number; rotation: number }; pageChosen: boolean }` (no keep flag: the photo is never stored, P21.1). `EntryRow { rowId; cells; saved: boolean }`. Pure functions return a new session. `repeatSection` and `repeatPage` copy the fields the adapter marks `repeatable` (a new optional `FieldDef.repeatable`). `fillPlotSequence` uses a trailing digit run and keeps its width. `pasteCells(session, text, startField, fields)` reads tab separated text with the CSV reader (separator tab, quotes allowed). Zoom steps are 0.25 from 0.5 to 4, rotation steps 90.
 
 `rowsToMapped(session, fields)` gives the `MappedRow[]` the importer takes, with `rowNumber` from 1 in screen order. `toDraft` and `fromDraft` use the `Draft` of spec 01. `parseDraftFile(text)` checks the discriminator, the version and the shape and never touches storage.
 
