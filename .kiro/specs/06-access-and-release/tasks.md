@@ -27,6 +27,7 @@ For the browser specs the screens already existed, so the first run is a run aga
 - [x] 6.21 Browser: release. Files: `tests/browser/release.spec.ts`, `tests/helpers/siteOrigin.ts`, `playwright.config.ts` (the site on 4174), `docs/acceptance/layout/site/**`. T IDs: browser. Z16.
 - [x] 6.22 Public docs and the path in the guide. Files: `docs/{judge-guide,kiro-evidence,architecture,privacy,backup-format,exchange-format,verification,rights}.md`, `README.md`, `tests/browser/judge-guide.spec.ts`. T IDs: browser. Z18.
 - [x] 6.24 Banned words outside the repository. Files: `scripts/check-public.mjs`, `scripts/lib/publicText.mjs`, `scripts/lib/publicText.d.mts`, `tests/unit/release.test.ts`, and every other public file that held a banned word (`tests/unit/{copy,paperCopy,siteCopy}.test.ts`, docs, comments). T IDs: T36. Z19.
+- [x] 6.25 The hook log. Files: `scripts/changed-tests.mjs`, `tests/unit/changedTests.test.ts`, `docs/kiro-evidence.md` (the table under "Hooks"). T IDs: none, Z20. Z-D14. Ticked when the unit tests pass and the live record is written.
 ## Not settled in spec 06
 
 - **The inspector is built and switched on.** `.kiro/settings/mcp.json` has `"disabled": false` for `plot-inspector`. A person sets that, because the agent cannot write that folder. `npm run build:inspector` writes `dist/inspector/server.mjs`, and a test starts that file as a process and talks to it. The three tools were called once from a Kiro CLI session (task 6.24, `docs/kiro-evidence.md`, "Live session record"). The reviewer profile's own use of them is untried.

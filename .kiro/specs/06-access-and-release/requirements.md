@@ -213,6 +213,18 @@ Tests: T36 (`tests/unit/release.test.ts`). Implements R22 and Z10.8. Built in ta
 6. The dash and local path checks stay in the repository. The heading and the file name that were allowed for the old fixed list are no longer special, because no list in the repository names them.
 7. The scripts and the tests that held the old lists are scanned like every other file. Four tests are let off the dash and local path rules only, because they hold those as data.
 
+## Z20 The hook log
+
+Tests: `tests/unit/changedTests.test.ts` (group "the hook log"). Implements R25.3 and the evidence rule that a hook run is shown by a file. Built in task 11-hook-proof.
+
+1. When `scripts/changed-tests.mjs` runs without `--list` and the folder exists, it shall append exactly one line to `.local/hook-log.jsonl` in that folder, after the tests have finished. The line is one JSON object with these keys and no others: `time`, `event`, `path`, `tests`, `passed`, `failed`, `exit`.
+2. `time` shall be the UTC time of the line, as an ISO 8601 text. `event` shall be the event name read from standard input. `path` shall be the saved path, relative to the folder and written with forward slashes, or null when there is none. `tests` shall be the list of test files run, in the order run. `passed` and `failed` shall be the counts read from the summary of the test runner, or null when the runner printed none. `exit` shall be the exit code the script returns.
+3. When standard input holds nothing, `event` shall be the word `direct`. When it holds text with no event name, `event` shall be `unknown`. An event name is a JSON text under `hook_event_name`, `event`, `eventName` or `trigger`, made of letters, digits, dot, underscore and hyphen, at most 64 characters. Any other value is `unknown`. Standard input is read for the event name with `--git` too.
+4. The line shall hold no session ID, no account word and no absolute path. A saved path outside the folder, or one that does not exist, shall give a null `path`. Nothing else from standard input is copied into the line.
+5. When a test file fails, the line shall show a non zero `exit` and the count of failed tests. A run that finds no test, or no runner, shall still write its line, with an empty `tests` list and null counts.
+6. A run with `--list` runs no test and writes no line. When the line cannot be written, the script shall print one warning and keep the exit code it had.
+7. `.local/` is not tracked, so the log stays on the machine. The log is evidence of a run of the script, not of who started it. A line with the event `direct` was not started by a hook.
+
 ---
 
 ## Not claimed

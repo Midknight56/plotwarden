@@ -55,7 +55,23 @@ Two command hooks are in `.kiro/hooks/`. Neither makes a model call:
 | `check-save.json` | After a `.ts` or `.tsx` file is saved | `node scripts/changed-tests.mjs`. It reads the saved path and runs the unit tests that import that file, directly or through other files. An unknown path runs a small fixed gate |
 | `check-stop.json` | When a turn ends | `npm run check:changed`. It runs the type check, the import check and the tests of the files changed in the working tree |
 
-What is shown: the two scripts exist and are tested (`tests/unit/changedTests.test.ts`, 23 cases), and `npm run check:changed` was run by hand (log row 1.17: 21 test files, 662 tests, all passed). What is not shown: any record that either hook fired. The "Live session record" below says what one session showed.
+What is shown: the two scripts exist and are tested (`tests/unit/changedTests.test.ts`, 32 cases), and `npm run check:changed` was run by hand (log row 1.17: 21 test files, 662 tests, all passed).
+
+### What the hook log showed
+
+Each run of `scripts/changed-tests.mjs` that runs tests appends one line to `.local/hook-log.jsonl` (spec 06 Z20). A line holds the time, the event name read from standard input, the saved path, the test files run, the pass and fail counts and the exit code. It holds no session ID, no account word and no path outside the repository. A run with nothing on standard input has the event `direct`, so a line with that event was not started by a hook. The file is not tracked, so these rows are a reading of it, not a file in the repository.
+
+How the rows were produced: the agent saved `tests/unit/money.test.ts` with its file editing tool and did not run the script. The log file was read afterwards with a file read. Result: observed in the log. The hook output itself was not shown to the agent. The line is the only record.
+
+| Step | Saved with | Time of line (UTC) | Event | Path | Passed | Failed | Exit |
+|---|---|---|---|---|---|---|---|
+| One expected value made wrong on purpose (`3600` to `3601`) | Editing tool | 2026-11-22 16:58:55 | `PostFileSave` | `tests/unit/money.test.ts` | 19 | 1 | 1 |
+| Value put back | Editing tool | 2026-11-22 16:59:22 | `PostFileSave` | `tests/unit/money.test.ts` | 20 | 0 | 0 |
+| Turn end | No save; the turn ended | 2026-11-22 17:01:05 | `Stop` | None (the changed files come from git) | 32 | 0 | 0 |
+
+What this shows: `check-save` fired on a save made by the editing tool, ran the matching test file, and the log recorded a failing count and exit 1 for the wrong value and a clean line for the right one. A line for `tests/unit/changedTests.test.ts` with the same event, written earlier in the same session, was also seen. It was made by a save of that file and was not counted as a separate trial.
+
+The turn end row was read from the log after that turn ended, and added then. It shows `check-stop` fired when the turn ended, ran the test file changed in that turn (`tests/unit/changedTests.test.ts`) and passed 32 of 32. The same log also holds lines with the event `direct`, from test runs started by hand. They are not hook runs. One machine and one session were used. The same script wrote the log and ran the tests, so the log shows what the script saw, not what Kiro sent beyond the event name.
 
 ## The inspector, an MCP server
 
@@ -140,4 +156,4 @@ The `churchyard` and `allotment` adapters were not run in this session. A pass o
 - It does not show a comparison of Kiro with any other way of building this. None was run.
 - It does not show how long anything took, or how many people used the result. No person has used the registers.
 - It does not show which of Kiro's surfaces other than the command line were used. None is claimed.
-- It does not show that either hook fired in a Kiro session, or that the power started itself. See "Live session record".
+- It does not show that the stop hook fired in a Kiro session, or that the power started itself. The save hook is shown by the hook log under "Hooks". See "Live session record".

@@ -7,8 +7,13 @@
 // every test file that imports it, directly or through other files. A missing,
 // unknown or untested path runs a small fixed gate instead. --list prints the
 // test files and runs nothing. Exit 2 when the folder is missing.
+//
+// Each run that runs tests (or finds none) appends one line to
+// .local/hook-log.jsonl: time, event, path, tests, passed, failed, exit. The
+// event name comes from standard input, or is "direct" when it holds nothing.
+// No session ID and no absolute path is written (spec 06 Z20).
 import { spawnSync } from "node:child_process";
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { resolveImport, scanSource, walkSourceFiles } from "./lib/imports.mjs";
@@ -18,6 +23,9 @@ const GATE = ["tests/unit/limits.test.ts", "tests/unit/site.test.ts"];
 const EXTRA = { "scripts/oracle.py": ["tests/oracle/compare.test.ts"] };
 const TEST_FILE = /^tests\/.*\.test\.ts$/;
 const STDIN_WAIT_MS = 1000;
+const LOG_FILE = "hook-log.jsonl";
+const EVENT_NAME = /^[A-Za-z0-9._-]{1,64}$/;
+const ANSI = new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, "g");
 const EXTENSIONS = ["", ".ts", ".tsx", ".mjs", ".js", ".mts", "/index.ts", "/index.tsx"];
 
 function parseArgs(argv) {
@@ -73,6 +81,45 @@ function pathFromInput(text) {
     return undefined;
   }
   return trimmed.split(/\r?\n/)[0].trim().replace(/^["']|["']$/g, "");
+}
+
+/** The event name in what the hook sent: "direct" for nothing, "unknown" for no usable name. */
+function eventFromInput(text) {
+  const trimmed = text.trim();
+  if (trimmed === "") return "direct";
+  if (!trimmed.startsWith("{")) return "unknown";
+  try {
+    const data = JSON.parse(trimmed);
+    for (const value of [data.hook_event_name, data.event, data.eventName, data.trigger]) {
+      if (typeof value === "string" && EVENT_NAME.test(value)) return value;
+    }
+  } catch {
+    return "unknown";
+  }
+  return "unknown";
+}
+
+/** Passed and failed counts from the runner's summary line, or null when it printed none. */
+function countsFrom(output) {
+  const line = output
+    .replace(ANSI, "")
+    .split(/\r?\n/)
+    .find((l) => /^\s*Tests\s+\d+\s+(failed|passed)/.test(l));
+  if (line === undefined) return { passed: null, failed: null };
+  const passed = /(\d+)\s+passed/.exec(line);
+  const failed = /(\d+)\s+failed/.exec(line);
+  return { passed: passed ? Number(passed[1]) : 0, failed: failed ? Number(failed[1]) : 0 };
+}
+
+/** Append one line to the hook log. A write error warns and changes nothing else. */
+function writeLog(root, entry) {
+  try {
+    const dir = join(root, ".local");
+    mkdirSync(dir, { recursive: true });
+    appendFileSync(join(dir, LOG_FILE), `${JSON.stringify(entry)}\n`, "utf8");
+  } catch {
+    console.error("changed-tests: the hook log could not be written");
+  }
 }
 
 function gitPaths(root) {
@@ -154,12 +201,15 @@ async function main() {
     return 2;
   }
 
+  const input = await readStdin();
+  const event = eventFromInput(input);
   let given = options.paths;
-  if (given.length === 0 && options.git) given = gitPaths(root);
+  let fromInput;
   if (given.length === 0 && !options.git) {
-    const fromInput = pathFromInput(await readStdin());
+    fromInput = pathFromInput(input);
     if (fromInput !== undefined) given = [fromInput];
   }
+  if (given.length === 0 && options.git) given = gitPaths(root);
 
   const changed = given.map((p) => inside(root, p)).filter((p) => p !== undefined);
   let tests = changed.length > 0 ? testsFor(root, changed) : [];
@@ -169,19 +219,40 @@ async function main() {
     for (const file of tests) console.log(file);
     return 0;
   }
+  const entry = (exit, ran, counts) => ({
+    time: new Date().toISOString(),
+    event,
+    path: !options.git && given.length === 1 && changed.length === 1 ? changed[0] : null,
+    tests: ran,
+    passed: counts.passed,
+    failed: counts.failed,
+    exit,
+  });
+  const none = { passed: null, failed: null };
   if (tests.length === 0) {
     console.log("changed-tests: no tests to run");
+    writeLog(root, entry(0, [], none));
     return 0;
   }
   const runner = runnerPath(root);
   if (runner === undefined) {
     console.error("changed-tests: vitest is not installed. Run npm ci.");
+    writeLog(root, entry(2, [], none));
     return 2;
   }
   console.log(`changed-tests: running ${tests.length} file${tests.length === 1 ? "" : "s"}`);
   for (const file of tests) console.log(`  ${file}`);
-  const run = spawnSync(process.execPath, [runner, "run", ...tests], { cwd: root, stdio: "inherit" });
-  return run.status ?? 1;
+  const run = spawnSync(process.execPath, [runner, "run", ...tests], {
+    cwd: root,
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"],
+    maxBuffer: 64 * 1024 * 1024,
+  });
+  process.stdout.write(run.stdout ?? "");
+  process.stderr.write(run.stderr ?? "");
+  const exit = run.status ?? 1;
+  writeLog(root, entry(exit, tests, countsFrom(`${run.stdout ?? ""}\n${run.stderr ?? ""}`)));
+  return exit;
 }
 
 process.exitCode = await main();

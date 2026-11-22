@@ -342,6 +342,16 @@ The last row changes a measurement, not the app. The ring sits 2 px outside the 
 
 The two scripts, which were skipped because they held the words, are scanned like any other file. The four tests that hold dashes and local paths as data stay let off those two rules, and are read for words. The tests write their own placeholder lists to a temporary file under `.local/`. The test process clears the variable before it starts a child, so the result does not depend on the shell that runs it.
 
+## Z-D14 The hook log (Z20)
+
+Only `scripts/changed-tests.mjs` changes. After the test run, `main` builds one object and appends `JSON.stringify(object) + "\n"` to `<root>/.local/hook-log.jsonl`, making the folder if needed. A write error prints one warning and does not change the exit code.
+
+The runner is now started with its output piped, and the script copies that output to its own standard output and error, so the hook shows what it showed before. The counts come from the summary line `Tests  <n> failed | <n> passed (<n>)`, with either part optional. Without that line they are null, because a missing count is unknown, not zero. The child gets no standard input.
+
+Standard input is read in every mode but `--list`. For `--git` it is read for the event name only, never for a path. Event names are checked against a short pattern so a path or a long text cannot pass through the event field. The saved path is the relative path from `inside()`, kept only when exactly one path was given and the run was not `--git`.
+
+The test of the line with a failing file runs the real runner on a small root made under `.local/`, so the count comes from a real summary. The other cases use a fake runner that prints a summary. The time is checked between two readings of the clock around the run.
+
 ## Z-D11 Evidence
 
 Each task row in `docs/kiro-log.md` names its red run and its green run. The log holds no local absolute path. Browser results say headless Chromium on one Windows machine. Results from a unit test, a browser assertion and a person's review of a picture are labelled apart. No claim about users, speed on other machines or other browsers is made.
