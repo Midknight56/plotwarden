@@ -241,10 +241,15 @@ export interface SceneBox {
 export interface SheetScene {
   /** The drawing itself, from its own corner. */
   frame: { width: number; height: number };
-  labels: { text: string; box: SceneBox }[];
+  /** `kind` is the `data-kind` of the text: gate, section, path, plot or tab. A plot code sits inside its own plot. */
+  labels: { text: string; kind?: string; box: SceneBox }[];
   lines: { name: string; points: [number, number][] }[];
   /** The dashed outline of each section, closed. A section's own name sits just above its outline. */
   outlines?: { name: string; points: [number, number][] }[];
+  /** The box of every plot shape. */
+  plots?: SceneBox[];
+  /** The text on the code tab. It is read apart from the labels, because it sits on the tab by design. */
+  tabText?: SceneBox;
   tab?: SceneBox;
   north?: SceneBox;
   gate?: SceneBox;
@@ -262,9 +267,16 @@ export function readSheetScene(): SheetScene[] {
     };
     const scene: SheetScene = { frame: { width: origin.width, height: origin.height }, labels: [], lines: [] };
     for (const text of svg.querySelectorAll<SVGTextElement>("text")) {
-      if (text.classList.contains("tab-text") || (text.textContent ?? "").trim() === "") continue;
-      scene.labels.push({ text: (text.textContent ?? "").trim(), box: rel(text) });
+      if ((text.textContent ?? "").trim() === "") continue;
+      if (text.classList.contains("tab-text")) {
+        scene.tabText = rel(text);
+        continue;
+      }
+      const kind = text.getAttribute("data-kind");
+      scene.labels.push({ text: (text.textContent ?? "").trim(), ...(kind === null ? {} : { kind }), box: rel(text) });
     }
+    scene.plots = [];
+    for (const shape of svg.querySelectorAll("polygon.plot, path.plot")) scene.plots.push(rel(shape));
     for (const line of svg.querySelectorAll<SVGPolylineElement>("polyline.path-line")) {
       const points = (line.getAttribute("points") ?? "")
         .trim()
@@ -296,6 +308,12 @@ export function readSheetScene(): SheetScene[] {
 
 const TOUCH = 1;
 
+/** True when two boxes share area. Boxes that only meet along an edge do not overlap. */
+const overlaps = (a: SceneBox, b: SceneBox): boolean => a.x0 < b.x1 && b.x0 < a.x1 && a.y0 < b.y1 && b.y0 < a.y1;
+
+/** True when the outer box holds the inner one, to within a pixel of rounding. */
+const holds = (outer: SceneBox, inner: SceneBox): boolean => inner.x0 >= outer.x0 - 1 && inner.x1 <= outer.x1 + 1 && inner.y0 >= outer.y0 - 1 && inner.y1 <= outer.y1 + 1;
+
 function boxGap(a: SceneBox, b: SceneBox): number {
   const dx = Math.max(0, a.x0 - b.x1, b.x0 - a.x1);
   const dy = Math.max(0, a.y0 - b.y1, b.y0 - a.y1);
@@ -322,7 +340,7 @@ export function findLabelCollisions(scenes: readonly SheetScene[]): Violation[] 
   const out: Violation[] = [];
   const add = (rule: string, text: string, detail: string) => out.push({ rule, element: `sheet label "${text}"`, detail });
   for (const scene of scenes) {
-    for (const { text, box } of scene.labels) {
+    for (const { text, kind, box } of scene.labels) {
       if (box.x0 < -TOUCH || box.y0 < -TOUCH || box.x1 > scene.frame.width + TOUCH || box.y1 > scene.frame.height + TOUCH) {
         add("label_clipped", text, `box ${Math.round(box.x0)},${Math.round(box.y0)} to ${Math.round(box.x1)},${Math.round(box.y1)} leaves the drawing`);
       }
@@ -339,6 +357,14 @@ export function findLabelCollisions(scenes: readonly SheetScene[]): Violation[] 
       if (scene.tab !== undefined && boxGap(box, scene.tab) < TOUCH) add("label_on_tab", text, "touches the code tab");
       if (scene.north !== undefined && boxGap(box, scene.north) < TOUCH) add("label_on_north", text, "touches the north arrow");
       if (scene.gate !== undefined && boxGap(box, scene.gate) < TOUCH) add("label_on_gate", text, "touches the gate mark");
+      // A name, or the code on the tab, never lies over a plot shape. The code of a plot sits inside its own plot and
+      // only counts when it lies over a plot that does not hold it.
+      for (const plot of scene.plots ?? []) {
+        if (overlaps(box, plot) && !(kind === "plot" && holds(plot, box))) add("label_on_plot", text, "lies over a plot shape");
+      }
+    }
+    if (scene.tabText !== undefined) {
+      for (const plot of scene.plots ?? []) if (overlaps(scene.tabText, plot)) add("label_on_plot", "tab", "the text of the code tab lies over a plot shape");
     }
     for (let i = 0; i < scene.labels.length; i++) {
       for (let j = i + 1; j < scene.labels.length; j++) {

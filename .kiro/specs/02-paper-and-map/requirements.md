@@ -246,3 +246,17 @@ Tests: T01, T10 (`tests/conformance/adapter.test.ts`). Implements F10.5, R14. Ow
 1. When the conformance suite runs an adapter that supplies a sample import, the suite shall check that staging writes nothing, that a commit writes one revision, and that a repeat of the same file gives zero new records.
 2. When the conformance suite runs any adapter, the suite shall check that a backup round trip as a new register gives the same replayed state, and that a backup of another kind is refused.
 3. When the suite runs a broken adapter or a broken import, it shall fail on the check it should.
+
+---
+
+## P19 Names on the sheet keep clear
+
+Tests: T05 (`tests/unit/sheet.test.ts`, `tests/unit/measureLabels.test.ts`), browser `layout.spec.ts`. Implements R23, P6.2, P6.3, P16.1. Owner: 02-paper-and-map. Found in the pictures `docs/acceptance/layout/routes/churchyard/route-map-phone.jpg` and `route-home-phone.jpg`, where the walk name and the gate name lay on the stones.
+
+1. When a sheet is built at any width from 300 to 1200 px, the register shall keep the name of the gate, of each section and of each path at least 2 px clear of every plot footprint, every line and every other name. A name that has no such place shall be written under the drawing as a caption, one to a line, at that width and at every other width. A name shall never be drawn over a plot, a line or another name, and shall never be dropped.
+2. When a name is placed, a place over a plot shall cost more than a caption, so that a clear place or a caption is always chosen first.
+3. When a name is placed, it shall keep 8 px from every path line, because a path is drawn as a strip 14 px wide. A path's own name keeps 4 px from its own line.
+4. When a path has the same name as a section already written on the sheet, the register shall write that name once.
+5. When a plot is selected, the code tab shall sit beside that plot and touch its box, shall cover no other plot, and no name shall lie over it. The tab shall be at 14 px. When the only place that touches is under the lowest plot, the sheet shall grow below the drawing to hold it.
+6. When names are drawn, the text shall stay at 12 px.
+7. When the map routes of both registers are measured in a browser at 360 by 640 and 1920 by 1080, the box of every name drawn as `svg` text (gate, section, path and tab) shall overlap no plot shape. The code of a plot inside its own plot is not a name in this sense.

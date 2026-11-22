@@ -1,7 +1,8 @@
 // Label placement for the shared sheet and for the visitor maps. Pure.
 // A label is tried in a list of places, best first. The first place that is clear wins. When none is clear the
-// place that touches least wins, so a label is never hidden. Clear means: inside the sheet by a margin,
-// away from lines, from the code tab, the north arrow, the gate mark and every label already placed.
+// place that touches least wins. The sheet then writes the name under the drawing instead (spec 02, P19), and the
+// visitor maps, which have no caption, keep that place. Clear means: inside the sheet by a margin,
+// away from lines, from the code tab, the north arrow, the gate mark, every plot and every label already placed.
 
 export type Anchor = "start" | "middle" | "end";
 
@@ -31,9 +32,21 @@ export interface Scene {
   /** Boxes a label must not touch, each with the gap wanted. */
   hard: { box: Box; gap: number }[];
   lines: Line[];
-  /** Boxes a label may lie over at a small cost, such as a plot. */
+  /** Boxes a label may lie over at a small cost. The visitor maps use this. */
   soft: Box[];
+  /** Plot boxes. A place within `PLOT_GAP` of one costs more than a caption (spec 02, P19). */
+  plots?: Box[];
 }
+
+/**
+ * What a caption costs. A place that costs this much or more loses to the caption. Every term of `cost` is at least
+ * this for any shortfall of more than 0.05 px, so only a clear place wins against a caption.
+ */
+export const CAPTION_COST = 1;
+/** How far a name keeps from a plot, in pixels. */
+export const PLOT_GAP = 2;
+/** The base cost of a place that is over a plot or nearer than `PLOT_GAP`. It is above every line shortfall. */
+export const PLOT_COST = 600;
 
 /** The width of a letter at 12 px, a little wide so the check is the stricter one. */
 export const LETTER_WIDTH = 7.4;
@@ -57,7 +70,7 @@ function overlapArea(a: Box, b: Box, gap: number): number {
   return w > 0 && h > 0 ? w * h : 0;
 }
 
-function distanceToLine(box: Box, points: readonly (readonly [number, number])[]): number {
+export function distanceToLine(box: Box, points: readonly (readonly [number, number])[]): number {
   let best = Infinity;
   for (let i = 0; i + 1 < points.length; i++) {
     const a = points[i] as readonly [number, number];
@@ -93,6 +106,10 @@ export function cost(box: Box, scene: Scene): number {
   for (const other of scene.soft) {
     const area = overlapArea(box, other, 0);
     if (area > 0) total += 5 + area * 0.2;
+  }
+  for (const plot of scene.plots ?? []) {
+    const area = overlapArea(box, plot, PLOT_GAP);
+    if (area > 0) total += PLOT_COST + area * 20;
   }
   return total;
 }
@@ -137,13 +154,19 @@ export function spotsAround(x: number, y: number, reach = 0): Spot[] {
   ];
 }
 
-/** Places along the top edge of a box, then above its right end, then below it, then inside its top left. */
-export function spotsAlongTop(box: { x: number; y: number; width: number; height: number }, text: string, size: number): Spot[] {
+/**
+ * Places along the top edge of a box, then above its right end, then below it, then inside its top left. `lifts` are
+ * how far above the edge the baseline stands, nearest first. The sheet adds a higher lift for a box whose edge is
+ * shared by plots, so the name keeps clear of them.
+ */
+export function spotsAlongTop(box: { x: number; y: number; width: number; height: number }, text: string, size: number, lifts: readonly number[] = [4]): Spot[] {
   const w = textWidth(text, size);
   const spots: Spot[] = [];
   const step = 24;
-  for (let x = box.x + 4; x + w <= box.x + box.width + 4; x += step) spots.push({ x, y: box.y - 4, anchor: "start" });
-  spots.push({ x: box.x + box.width - 4, y: box.y - 4, anchor: "end" });
+  for (const lift of lifts) {
+    for (let x = box.x + 4; x + w <= box.x + box.width + 4; x += step) spots.push({ x, y: box.y - lift, anchor: "start" });
+    spots.push({ x: box.x + box.width - 4, y: box.y - lift, anchor: "end" });
+  }
   spots.push({ x: box.x + 4, y: box.y + box.height + 16, anchor: "start" });
   spots.push({ x: box.x + box.width - 4, y: box.y + box.height + 16, anchor: "end" });
   for (let x = box.x + 8; x + w <= box.x + box.width; x += step) spots.push({ x, y: box.y + 16, anchor: "start" });

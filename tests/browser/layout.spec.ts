@@ -5,8 +5,8 @@
 // modes. A picture of each route is kept as proof.
 import { expect, test } from "@playwright/test";
 import type { Page } from "@playwright/test";
-import { measureLayout, trackRequests } from "../helpers/measureLayout";
-import { APPS, LIBRARY_ROUTES, openPractice, proof, routeName, routesOf, settle, sizeOf, startOwn } from "../helpers/routes";
+import { findLabelCollisions, measureLayout, readSheetScene, trackRequests } from "../helpers/measureLayout";
+import { APPS, LIBRARY_ROUTES, openPractice, plotIdOf, proof, routeName, routesOf, settle, sizeOf, startOwn, storedEvents } from "../helpers/routes";
 import type { AppUnderTest } from "../helpers/routes";
 
 const SHOTS = "docs/acceptance/layout/routes";
@@ -45,6 +45,34 @@ for (const app of APPS) {
         await expect(page.getByRole("heading", { level: 1, name: "Page not found" }), `route ${route} was not found`).toHaveCount(0);
         await check(page, `register route ${route}`);
         await proof(page, folder, `route-${routeName(route)}`);
+      }
+      expect(requests.external).toEqual([]);
+    });
+
+    test("no name on the map lies on a plot: every svg text on the map and the home route is read at its real box", async ({ page }) => {
+      const requests = trackRequests(page, app.origin);
+      const siteId = await openPractice(page, app);
+      const events = await storedEvents(page, siteId);
+      const codes = app.key === "churchyard" ? ["Y07", "Y01", "Y12"] : ["B02", "B05", "B06"];
+      const views = [
+        { route: `/#/r/${siteId}/map`, what: "map, nothing chosen", chosen: false },
+        { route: `/#/r/${siteId}`, what: "home", chosen: false },
+        ...codes.map((code) => ({ route: `/#/r/${siteId}/map?plot=${plotIdOf(events, code)}`, what: `map, ${code} chosen`, chosen: true })),
+      ];
+      for (const view of views) {
+        await page.goto(view.route);
+        await settle(page);
+        const scenes = await page.evaluate(readSheetScene);
+        expect(scenes.length, `${view.what}: a map is drawn`).toBeGreaterThanOrEqual(1);
+        for (const scene of scenes) {
+          expect(scene.plots?.length ?? 0, `${view.what}: plot shapes were read`).toBeGreaterThanOrEqual(6);
+          const kinds = new Set(scene.labels.map((l) => l.kind));
+          expect(kinds.has("gate"), `${view.what}: the gate name was read`).toBe(true);
+          expect(kinds.has("section"), `${view.what}: a section name was read`).toBe(true);
+          if (view.chosen) expect(scene.tabText, `${view.what}: the tab text was read`).toBeDefined();
+        }
+        const onPlot = findLabelCollisions(scenes).filter((v) => v.rule === "label_on_plot");
+        expect(onPlot, `${view.what}\n${JSON.stringify(onPlot, null, 1)}`).toEqual([]);
       }
       expect(requests.external).toEqual([]);
     });

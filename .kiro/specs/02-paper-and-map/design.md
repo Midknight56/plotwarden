@@ -334,3 +334,25 @@ The shell writes data attributes on `<html>`: `data-motion` (`follow` or `reduce
 Unit tests follow `tasks.md`. Property tests (1,000 cases each, recorded seeds) in `tests/properties/geometry.test.ts`: a generated grid has distinct codes and no overlapping footprints, rotation by 90 degrees keeps the plot count, `polygonsOverlap` is symmetric, a polygon never overlaps its own translate by its width, a shape that passes `checkPolygon` has positive area, and the CSV writer and reader round trip any text. Browser specs run headless Chromium, one worker, at 360 by 640 and 1920 by 1080. The host is built with Vite and served by `vite preview` on `127.0.0.1:4175` with a strict port, started and stopped by the Playwright config. Every browser test logs every request and expects none outside the host origin. `measureLayout` reports each failure with the element, its rectangle and the rule.
 
 For the red step, each module first exists as a stub with its final exports that throw "not implemented". A browser spec is red when the host renders the stub shell and the first assertion on a real control fails.
+
+## H19 Names on the sheet
+
+Problem seen: a name had a place cost of zero only when it touched nothing, but a plot counted as a "soft" box that cost 5 plus a fifth of the overlap area. A label with no clear place was kept in place at 300 px and wider, so the path name and the gate name were drawn on the stones, and the tab of the selected plot sat at the top left corner, far from its plot.
+
+`template/src/map/labels.ts`:
+
+- `Scene.plots?: Box[]` is new. Each box is kept 2 px clear (`PLOT_GAP`). A place that overlaps one costs `PLOT_COST` (600) plus 20 for each square pixel, so it costs more than any line shortfall and more than `CAPTION_COST`. `Scene.soft` stays for the visitor maps, which do not use captions.
+- `CAPTION_COST` is 1. A caption costs this much. A place that costs this much or more loses to the caption. Every term of `cost` gives at least 1 for any shortfall above 0.05 px, so only a clear place wins.
+- `bestSpot` is unchanged: first clear place, else the cheapest.
+
+`template/src/map/sheet.ts`:
+
+- `place` writes a caption whenever the best place costs `CAPTION_COST` or more, at every width. `NARROW_SHEET` is removed.
+- The scene for names holds the plot boxes in `plots`. Plot codes inside plots stay in `hard`.
+- Section names keep `GATE_CLEAR` (8 px) from path lines, as the gate name already did, and 3 px from the outline of another section. A path keeps `OWN_LINE_CLEAR` (4 px) from its own line.
+- A path whose name equals the name of a section that has an outline has no `label` in the model (`label` is optional on a path). The section label is the one written. The path still lists its name for a reader.
+- The tab is placed before any name. `placeTab` tries the four sides of the selected plot box (above, below, left, right) in that order. Above and below it tries the middle, each end and a place 6 px in from each end. Left and right it tries the middle and each end. A place is clear when it touches the box on one side, overlaps no other plot box, the north arrow box, the gate mark or a path line (8 px), and lies inside the margin of the sheet. The first clear place wins. When none is clear the place with the least overlap wins. A place below the plot is clear even when it lies past the bottom edge, and the sheet grows by what it needs (`height` grows, `view` and every point stay where they were). The captions start below the lowest of the drawing and the tab.
+- `spotsAlongTop` takes the heights above the edge to try. A section name tries 4 px and then 7 px above the top edge of its outline, because an outline that shares its top edge with the plots leaves a 4 px baseline only 1 px from them.
+- `SheetSvg` writes `data-kind` on each `text`: `gate`, `section`, `path`, `plot` or `tab`. The tests use it to tell a name from the code of a plot inside its own plot. It holds no private value.
+
+Tests: `sheet.test.ts` builds Lantern Fold and Thimble Beds at 312, 328, 360, 480 and 1120 px, and sweeps 300 to 1200 px, and measures every box with its own estimate of a letter (7.4 px at 12 px). `measureLabels.test.ts` holds the cost order and the browser rule `label_on_plot` on plain data. `layout.spec.ts` reads the real box of every `svg` text on the map and home routes and finds no overlap with a plot shape. Three older checks changed with P19, and each is named in `docs/kiro-log.md`: the exact place of a section name above an outline that shares its top edge with plots, the rule that every name stays in place from 320 px up, and the path name that was written twice.

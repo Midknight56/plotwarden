@@ -118,7 +118,7 @@ export function SheetSvg({
         s.points === undefined ? null : (
           <g key={s.sectionId}>
             <polygon className="section-outline" points={pointsOf(s.points)} />
-            <text className="label" x={s.label.x} y={s.label.y} fontSize={s.label.size} textAnchor={s.label.anchor}>
+            <text className="label" data-kind="section" x={s.label.x} y={s.label.y} fontSize={s.label.size} textAnchor={s.label.anchor}>
               {s.label.text}
             </text>
           </g>
@@ -128,9 +128,11 @@ export function SheetSvg({
         <g key={p.pathId}>
           <polyline className="path" points={pointsOf(p.points)} />
           <polyline className="path-line" points={pointsOf(p.points)} />
-          <text className="label" x={p.label.x} y={p.label.y} fontSize={p.label.size} textAnchor={p.label.anchor}>
-            {p.label.text}
-          </text>
+          {p.label === undefined ? null : (
+            <text className="label" data-kind="path" x={p.label.x} y={p.label.y} fontSize={p.label.size} textAnchor={p.label.anchor}>
+              {p.label.text}
+            </text>
+          )}
         </g>
       ))}
       {model.plots.map((plot) => (
@@ -155,7 +157,7 @@ export function SheetSvg({
           )}
           <Mark plot={plot} />
           {plot.label === undefined || (plot.selected && model.tab !== undefined) ? null : (
-            <text className="label" x={plot.label.x} y={plot.label.y} fontSize={plot.label.size} textAnchor={plot.label.anchor}>
+            <text className="label" data-kind="plot" x={plot.label.x} y={plot.label.y} fontSize={plot.label.size} textAnchor={plot.label.anchor}>
               {plot.label.text}
             </text>
           )}
@@ -164,7 +166,7 @@ export function SheetSvg({
       {model.gate === undefined ? null : (
         <g>
           <rect className="gate" x={model.gate.x - 6} y={model.gate.y - 6} width={12} height={12} />
-          <text className="label" x={model.gate.label.x} y={model.gate.label.y} fontSize={model.gate.label.size} textAnchor={model.gate.label.anchor}>
+          <text className="label" data-kind="gate" x={model.gate.label.x} y={model.gate.label.y} fontSize={model.gate.label.size} textAnchor={model.gate.label.anchor}>
             {model.gate.label.text}
           </text>
         </g>
@@ -175,7 +177,7 @@ export function SheetSvg({
       {model.tab === undefined ? null : (
         <g>
           <rect className="tab" x={model.tab.x} y={model.tab.y} width={model.tab.width} height={model.tab.height} />
-          <text className="label tab-text" x={model.tab.x + model.tab.width / 2} y={model.tab.y + 20} fontSize={model.tab.size} textAnchor="middle">
+          <text className="label tab-text" data-kind="tab" x={model.tab.x + model.tab.width / 2} y={model.tab.y + 20} fontSize={model.tab.size} textAnchor="middle">
             {model.tab.code}
           </text>
         </g>

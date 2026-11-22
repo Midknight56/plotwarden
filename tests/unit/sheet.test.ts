@@ -180,7 +180,7 @@ describe("text", () => {
     const sizes = [
       ...sheet.plots.flatMap((p) => (p.label === undefined ? [] : [p.label.size])),
       ...sheet.sections.map((s) => s.label.size),
-      ...sheet.paths.map((p) => p.label.size),
+      ...sheet.paths.flatMap((p) => (p.label === undefined ? [] : [p.label.size])),
       ...(sheet.gate === undefined ? [] : [sheet.gate.label.size]),
       ...(sheet.tab === undefined ? [] : [sheet.tab.size]),
     ];
@@ -206,7 +206,9 @@ describe("sections, paths, gate and north", () => {
     expect(section?.name).toBe("Paper");
     expect(section?.label.text).toBe("Paper");
     expect(section?.label.x).toBeCloseTo(28, 6);
-    expect(section?.label.y).toBeCloseTo(44, 6);
+    // The outline shares its top edge with the plots here. A baseline 4 px above the edge stands 1 px from them, so the
+    // name stands 7 px above the edge, the next place the sheet tries (P19.1). It was 44 before the 2 px rule.
+    expect(section?.label.y).toBeCloseTo(41, 6);
     expect(section?.points?.length).toBe(4);
   });
 
@@ -215,7 +217,7 @@ describe("sections, paths, gate and north", () => {
     expect(path?.name).toBe("Yew Walk");
     expect(path?.points[0]?.map((n) => Math.round(n * 1000) / 1000)).toEqual([24, 48]);
     expect(path?.points[1]?.map((n) => Math.round(n * 1000) / 1000)).toEqual([376, 48]);
-    expect(path?.label.text).toBe("Yew Walk");
+    expect(path?.label?.text).toBe("Yew Walk");
   });
 
   it("places the gate by its point and names it", () => {
@@ -460,10 +462,18 @@ describe("labels keep clear (A12)", () => {
     for (const selected of ["B04", "B01", undefined]) checkSheet(buildSheet({ map: m, plots: inputs, ...(selected === undefined ? {} : { selectedPlotId: selected }) }, { width }), `narrow beds ${width} ${selected ?? "none"}`);
   });
 
-  it("writes a name under the drawing only below 300, and keeps every name in place at 320 and above", () => {
+  // P19.1: a name with no clear place is written under the drawing at every width, and only then. From 700 up these two
+  // maps have a clear place for every name. Before P19 the rule read "only below 300, and none at 320 and above".
+  it("writes a name under the drawing only when no place on the drawing is clear, at every width", () => {
     for (const make of [yew, beds]) {
       const { m, inputs } = make();
-      for (const width of [320, 360, 700, 1500]) expect(buildSheet({ map: m, plots: inputs }, { width }).captioned, `captioned at ${width}`).toBe(0);
+      for (const width of [320, 360, 700, 1500, 148, 180]) {
+        const sheet = buildSheet({ map: m, plots: inputs }, { width });
+        const written = [sheet.gate?.label, ...sheet.sections.map((s) => s.label), ...sheet.paths.map((p) => p.label)].filter((l): l is Label => l !== undefined);
+        const under = written.filter((l) => l.anchor === "start" && l.x === 8 && l.y > sheet.view.height);
+        expect(under, `names under the drawing at ${width}`).toHaveLength(sheet.captioned);
+      }
+      for (const width of [700, 1500]) expect(buildSheet({ map: m, plots: inputs }, { width }).captioned, `captioned at ${width}`).toBe(0);
       for (const width of [148, 180]) expect(buildSheet({ map: m, plots: inputs }, { width }).captioned, `captioned at ${width}`).toBeGreaterThan(0);
     }
   });
@@ -506,9 +516,11 @@ describe("labels keep clear (A12)", () => {
     const { m, inputs } = yew();
     const sheet = buildSheet({ map: m, plots: inputs, selectedPlotId: "Y07" }, { width: 120, maxHeight: 140 });
     expect(sheet.sections[0]?.label.text).toBe("Yew Walk");
-    expect(sheet.paths[0]?.label.text).toBe("Yew Walk");
+    // The walk has the name of the section, so that name is written once (P19.4). The walk keeps its name in the model.
+    expect(sheet.paths[0]?.label).toBeUndefined();
+    expect(sheet.paths[0]?.name).toBe("Yew Walk");
     expect(sheet.gate?.label.text).toBe("Main gate");
-    for (const label of [sheet.sections[0]?.label, sheet.paths[0]?.label, sheet.gate?.label]) {
+    for (const label of [sheet.sections[0]?.label, sheet.gate?.label]) {
       expect(Number.isFinite(label?.x)).toBe(true);
       expect(Number.isFinite(label?.y)).toBe(true);
       expect(label?.size).toBeGreaterThanOrEqual(12);
@@ -522,5 +534,254 @@ describe("labels keep clear (A12)", () => {
     expect(a.gate).toEqual(b.gate);
     expect(a.sections).toEqual(b.sections);
     expect(a.paths).toEqual(b.paths);
+  });
+});
+
+// Names keep clear of plots, lines and each other (spec 02, P19, task 09-map-labels). Seen in the pictures of the
+// churchyard map at 360 px: the walk name and the gate name were written on the stones. Lantern Fold is built here
+// from the numbers of its walkthrough, and every distance is measured with this file's own estimate of a letter.
+describe("names keep clear of plots, lines and each other (P19)", () => {
+  const LETTER = 7.4; // a little wider than the drawing assumes, so the check is the stricter one
+
+  interface Box {
+    x0: number;
+    y0: number;
+    x1: number;
+    y1: number;
+  }
+
+  const nameBox = (label: Label): Box => {
+    const w = [...label.text].length * LETTER * (label.size / 12);
+    const x0 = label.anchor === "start" ? label.x : label.anchor === "middle" ? label.x - w / 2 : label.x - w;
+    return { x0, y0: label.y - label.size, x1: x0 + w, y1: label.y + 3 };
+  };
+
+  /** True when two boxes are at least `gap` apart on one axis, so a box grown by `gap` still does not meet the other. */
+  const apart = (a: Box, b: Box, gap: number): boolean => a.x1 + gap <= b.x0 || b.x1 + gap <= a.x0 || a.y1 + gap <= b.y0 || b.y1 + gap <= a.y0;
+
+  const plotBox = (p: SheetModel["plots"][number]): Box => ({ x0: p.box.x, y0: p.box.y, x1: p.box.x + p.box.width, y1: p.box.y + p.box.height });
+
+  /** The shortest distance from a box to a line, found by walking along the line one pixel at a time. */
+  function gapToLine(box: Box, line: readonly (readonly [number, number])[]): number {
+    let best = Infinity;
+    for (let i = 0; i + 1 < line.length; i++) {
+      const a = line[i] as readonly [number, number];
+      const b = line[i + 1] as readonly [number, number];
+      const steps = Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1])));
+      for (let s = 0; s <= steps; s++) {
+        const x = a[0] + ((b[0] - a[0]) * s) / steps;
+        const y = a[1] + ((b[1] - a[1]) * s) / steps;
+        best = Math.min(best, Math.hypot(Math.max(box.x0 - x, 0, x - box.x1), Math.max(box.y0 - y, 0, y - box.y1)));
+      }
+    }
+    return best;
+  }
+
+  interface Named {
+    what: string;
+    label: Label;
+    /** The index of the path this is the name of, so it may sit nearer its own line. */
+    ownPath?: number;
+  }
+
+  function names(m: SheetModel): Named[] {
+    const out: Named[] = [];
+    for (const s of m.sections) out.push({ what: `section ${s.name}`, label: s.label });
+    m.paths.forEach((p, i) => {
+      if (p.label !== undefined) out.push({ what: `path ${p.name}`, label: p.label, ownPath: i });
+    });
+    if (m.gate !== undefined) out.push({ what: `gate ${m.gate.name}`, label: m.gate.label });
+    return out;
+  }
+
+  const tabBox = (m: SheetModel): Box | undefined => (m.tab === undefined ? undefined : { x0: m.tab.x, y0: m.tab.y, x1: m.tab.x + m.tab.width, y1: m.tab.y + m.tab.height });
+
+  /** Every rule of P19.1 and P19.3 for the names of one sheet. */
+  function checkNames(m: SheetModel, name: string): void {
+    const all = names(m);
+    const tab = tabBox(m);
+    for (const { what, label, ownPath } of all) {
+      const b = nameBox(label);
+      expect(label.size, `${name}: ${what} size`).toBe(12);
+      expect(b.x0, `${name}: ${what} left edge`).toBeGreaterThanOrEqual(8);
+      expect(b.x1, `${name}: ${what} right edge`).toBeLessThanOrEqual(m.width - 8);
+      expect(b.y1, `${name}: ${what} bottom edge`).toBeLessThanOrEqual(m.height);
+      for (const p of m.plots) expect(apart(b, plotBox(p), 2), `${name}: ${what} is within 2 px of plot ${p.code}`).toBe(true);
+      m.paths.forEach((path, i) => {
+        const need = ownPath === i ? 4 : 8;
+        expect(gapToLine(b, path.points), `${name}: ${what} is within ${need} px of the line of ${path.name}`).toBeGreaterThanOrEqual(need);
+      });
+      for (const section of m.sections) {
+        if (section.points === undefined || what === `section ${section.name}`) continue;
+        const closed = [...section.points, section.points[0] as readonly [number, number]];
+        expect(gapToLine(b, closed), `${name}: ${what} is within 2 px of the outline of ${section.name}`).toBeGreaterThanOrEqual(2);
+      }
+      if (tab !== undefined) expect(apart(b, tab, 2), `${name}: ${what} lies over the tab`).toBe(true);
+      const north: Box = { x0: m.north.x - 14, y0: m.north.y - 18, x1: m.north.x + 14, y1: m.north.y + 12 };
+      expect(apart(b, north, 2), `${name}: ${what} lies over the north arrow`).toBe(true);
+      if (m.gate !== undefined && !what.startsWith("gate")) {
+        expect(apart(b, { x0: m.gate.x - 6, y0: m.gate.y - 6, x1: m.gate.x + 6, y1: m.gate.y + 6 }, 2), `${name}: ${what} lies over the gate mark`).toBe(true);
+      }
+    }
+    for (let i = 0; i < all.length; i++) {
+      for (let j = i + 1; j < all.length; j++) {
+        const a = all[i] as Named;
+        const c = all[j] as Named;
+        expect(apart(nameBox(a.label), nameBox(c.label), 2), `${name}: ${a.what} is within 2 px of ${c.what}`).toBe(true);
+      }
+    }
+  }
+
+  /** P19.5: the tab touches the box of the selected plot on one side, covers no other plot and keeps off the arrow. */
+  function checkTab(m: SheetModel, selectedCode: string, name: string): void {
+    const tab = tabBox(m) as Box;
+    expect(tab, `${name}: a tab is drawn`).toBeDefined();
+    const chosen = m.plots.find((p) => p.code === selectedCode) as SheetModel["plots"][number];
+    const target = plotBox(chosen);
+    const dx = Math.max(0, tab.x0 - target.x1, target.x0 - tab.x1);
+    const dy = Math.max(0, tab.y0 - target.y1, target.y0 - tab.y1);
+    expect(Math.hypot(dx, dy), `${name}: the tab is ${Math.hypot(dx, dy).toFixed(1)} px from ${selectedCode}`).toBeLessThan(0.01);
+    expect(apart(tab, target, 0), `${name}: the tab lies over ${selectedCode}`).toBe(true);
+    for (const p of m.plots) {
+      if (p.plotId !== chosen.plotId) expect(apart(tab, plotBox(p), 0), `${name}: the tab lies over plot ${p.code}`).toBe(true);
+    }
+    expect(apart(tab, { x0: m.north.x - 14, y0: m.north.y - 18, x1: m.north.x + 14, y1: m.north.y + 12 }, 0), `${name}: the tab lies over the north arrow`).toBe(true);
+    expect(tab.x0, `${name}: tab left edge`).toBeGreaterThanOrEqual(0);
+    expect(tab.x1, `${name}: tab right edge`).toBeLessThanOrEqual(m.width);
+    expect(tab.y0, `${name}: tab top edge`).toBeGreaterThanOrEqual(0);
+    expect(tab.y1, `${name}: tab bottom edge`).toBeLessThanOrEqual(m.height);
+    expect(m.tab?.size).toBe(14);
+  }
+
+  const rectOf = (x0: number, y0: number, x1: number, y1: number): Point[] => [
+    [x0, y0],
+    [x1, y0],
+    [x1, y1],
+    [x0, y1],
+  ];
+
+  /** Lantern Fold: Y01 to Y06 south of Yew Walk, Y07 to Y12 north of it, a gate on the west edge. The walk and the section share a name. */
+  function lanternFold(): { m: MapState; inputs: SheetPlotInput[] } {
+    const shapes: Record<string, Point[]> = {};
+    const inputs: SheetPlotInput[] = [];
+    for (let i = 0; i < 12; i++) {
+      const code = `Y${String(i + 1).padStart(2, "0")}`;
+      const x = 1000 + (i % 6) * 1100;
+      const y = i >= 6 ? 2900 : 1200;
+      shapes[code] = rectOf(x, y, x + 900, y + 1100);
+      inputs.push({ plotId: code, code, mark: { state: i % 3 === 0 ? "taken" : "free", needsChecking: false } });
+    }
+    const m: MapState = {
+      ...emptyMap(),
+      shapes,
+      sections: { s: { sectionId: "s", name: "Yew Walk", displayOrder: 0, outline: rectOf(600, 800, 7800, 4400) } },
+      paths: { p: { pathId: "p", name: "Yew Walk", points: [[700, 2600], [7600, 2600]] } },
+      gate: { name: "Main gate", at: [500, 2600] },
+      north: 0,
+    };
+    return { m, inputs };
+  }
+
+  /** Thimble Beds: three beds in Sunny Row, three in Shady Row, a grass walk between them and a gate at its west end. */
+  function thimbleBeds(): { m: MapState; inputs: SheetPlotInput[] } {
+    const shapes: Record<string, Point[]> = {};
+    const inputs: SheetPlotInput[] = [];
+    for (let i = 0; i < 6; i++) {
+      const code = `B0${i + 1}`;
+      const x = 1000 + (i % 3) * 1700;
+      const y = i >= 3 ? 3300 : 900;
+      shapes[code] = rectOf(x, y, x + 1500, y + 1100);
+      inputs.push({ plotId: code, code, mark: { state: "free", needsChecking: false } });
+    }
+    const m: MapState = {
+      ...emptyMap(),
+      shapes,
+      sections: {
+        a: { sectionId: "a", name: "Sunny Row", displayOrder: 0, outline: rectOf(600, 600, 6200, 2100) },
+        b: { sectionId: "b", name: "Shady Row", displayOrder: 1, outline: rectOf(600, 3200, 6200, 4600) },
+      },
+      paths: { p: { pathId: "p", name: "Grass Walk", points: [[700, 2650], [6100, 2650]] } },
+      gate: { name: "Main gate", at: [500, 2650] },
+      north: 0,
+    };
+    return { m, inputs };
+  }
+
+  const WIDTHS = [312, 328, 360, 480, 1120];
+
+  it.each(WIDTHS)("keeps every name of Lantern Fold clear at width %i, with a top plot, a bottom plot and no plot selected", (width) => {
+    const { m, inputs } = lanternFold();
+    for (const selected of ["Y07", "Y01", undefined]) {
+      const sheet = buildSheet({ map: m, plots: inputs, ...(selected === undefined ? {} : { selectedPlotId: selected }) }, { width });
+      checkNames(sheet, `fold ${width} ${selected ?? "none"}`);
+    }
+  });
+
+  it.each(WIDTHS)("keeps every name of Thimble Beds clear at width %i", (width) => {
+    const { m, inputs } = thimbleBeds();
+    for (const selected of ["B02", "B05", undefined]) {
+      const sheet = buildSheet({ map: m, plots: inputs, ...(selected === undefined ? {} : { selectedPlotId: selected }) }, { width });
+      checkNames(sheet, `beds ${width} ${selected ?? "none"}`);
+    }
+  });
+
+  it("keeps every name clear at each width from 300 to 1200 px, for both registers", () => {
+    for (const make of [lanternFold, thimbleBeds]) {
+      const { m, inputs } = make();
+      const first = inputs[0] as SheetPlotInput;
+      const last = inputs[inputs.length - 1] as SheetPlotInput;
+      for (let width = 300; width <= 1200; width += 12) {
+        for (const selected of [first.plotId, last.plotId, undefined]) {
+          checkNames(buildSheet({ map: m, plots: inputs, ...(selected === undefined ? {} : { selectedPlotId: selected }) }, { width }), `${first.code} ${width} ${selected ?? "none"}`);
+        }
+      }
+    }
+  });
+
+  it.each(WIDTHS)("writes Yew Walk once at width %i, as the section name, and keeps the path in the model", (width) => {
+    const { m, inputs } = lanternFold();
+    const sheet = buildSheet({ map: m, plots: inputs }, { width });
+    const written = [...sheet.sections.map((s) => s.label.text), ...sheet.paths.flatMap((p) => (p.label === undefined ? [] : [p.label.text])), ...(sheet.gate === undefined ? [] : [sheet.gate.label.text])];
+    expect(written.filter((text) => text === "Yew Walk")).toHaveLength(1);
+    expect(written).toContain("Main gate");
+    expect(sheet.paths.map((p) => p.name)).toEqual(["Yew Walk"]);
+  });
+
+  it("writes a path name that no section has, and a path that has the name of a section without an outline", () => {
+    const { m, inputs } = thimbleBeds();
+    const sheet = buildSheet({ map: m, plots: inputs }, { width: 1120 });
+    expect(sheet.paths[0]?.label?.text).toBe("Grass Walk");
+    const bare = { ...m, sections: { ...m.sections, c: { sectionId: "c", name: "Grass Walk", displayOrder: 2 } } };
+    expect(buildSheet({ map: bare, plots: inputs }, { width: 1120 }).paths[0]?.label?.text).toBe("Grass Walk");
+  });
+
+  it.each(WIDTHS)("puts the tab of the selected plot against that plot at width %i", (width) => {
+    const { m, inputs } = lanternFold();
+    for (const code of ["Y07", "Y01", "Y06", "Y12", "Y04"]) {
+      checkTab(buildSheet({ map: m, plots: inputs, selectedPlotId: code }, { width }), code, `fold ${width} ${code}`);
+    }
+    const beds = thimbleBeds();
+    for (const code of ["B01", "B02", "B04", "B06"]) {
+      checkTab(buildSheet({ map: beds.m, plots: beds.inputs, selectedPlotId: code }, { width }), code, `beds ${width} ${code}`);
+    }
+  });
+
+  it("puts the tab against the selected plot at each width from 300 to 1200 px", () => {
+    for (const make of [lanternFold, thimbleBeds]) {
+      const { m, inputs } = make();
+      for (let width = 300; width <= 1200; width += 20) {
+        for (const input of inputs) checkTab(buildSheet({ map: m, plots: inputs, selectedPlotId: input.plotId }, { width }), input.code, `${input.code} ${width}`);
+      }
+    }
+  });
+
+  it("makes the sheet taller when the only place that touches the plot is under it, and keeps every point of the drawing where it was", () => {
+    const { m, inputs } = lanternFold();
+    const plain = buildSheet({ map: m, plots: inputs }, { width: 328 });
+    const chosen = buildSheet({ map: m, plots: inputs, selectedPlotId: "Y01" }, { width: 328 });
+    expect(chosen.plots.map((p) => p.points)).toEqual(plain.plots.map((p) => p.points));
+    expect(chosen.view).toEqual(plain.view);
+    expect(chosen.tab).toBeDefined();
+    expect(chosen.height).toBeGreaterThanOrEqual((chosen.tab?.y ?? 0) + (chosen.tab?.height ?? 0));
   });
 });
