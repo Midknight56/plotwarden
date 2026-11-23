@@ -68,6 +68,7 @@ export function DateFields({
       <RadioGroup
         legend={t("dateKind")}
         name={`${name}-kind`}
+        grid
         value={kind}
         onChange={(v) => onKind(v as DateKind)}
         options={[
@@ -254,10 +255,12 @@ export function BurialForm() {
   };
 
   return (
-    <section className="stack">
-      <h1>{reservation === undefined ? t("recordBurial") : t("recordBurialInSpace")}</h1>
-      <div className="actions">
-        <ButtonLink href={base}>{t("backToRegister")}</ButtonLink>
+    <section className="stack page">
+      <div className="page-head on-ground">
+        <h1>{reservation === undefined ? t("recordBurial") : t("recordBurialInSpace")}</h1>
+        <ButtonLink href={base} quiet>
+          {t("backToRegister")}
+        </ButtonLink>
       </div>
       {reservation === undefined ? null : (
         <section className="card stack" aria-label={t("reservationsHeading")}>
@@ -265,7 +268,7 @@ export function BurialForm() {
           <p>{[holder?.displayName, t("reservedFrom", { plot: open.state.core.plots[reservation.plotId]?.code ?? "", space: chosenPlot?.spaces.find((s) => s.spaceId === reservation.spaceId)?.label ?? "", date: reservation.start })].filter(Boolean).join(" · ")}</p>
         </section>
       )}
-      <form ref={form} className="stack" onSubmit={(e) => void submit(e)} noValidate>
+      <form ref={form} className="stack card form-sheet" onSubmit={(e) => void submit(e)} noValidate>
         <TextField label={t("recordedName")} value={name} onChange={setName} error={errors["recordedName"]} disabled={unknown} autoComplete="off" />
         <CheckField label={t("nameUnknown")} checked={unknown} onChange={(v) => { setUnknown(v); if (v) setName(""); }} />
         {same.length === 0 ? null : (
@@ -279,9 +282,11 @@ export function BurialForm() {
           </section>
         )}
         <DateFields kind={kind} text={dateText} onKind={(k) => { setKind(k); setDateText(""); }} onText={setDateText} error={errors["burialDate"]} />
-        <LocationFields plots={plots} plotId={where.plotId} spaceId={where.spaceId} onChange={setWhere} errors={errors} allowUnknown disabled={reservation !== undefined} />
-        <TextField label={t("sourceRefLabel")} value={sourceRef} onChange={setSourceRef} error={errors["sourceRef"]} autoComplete="off" />
-        <TextField label={t("pageLabel")} value={page} onChange={setPage} autoComplete="off" />
+        <div className="field-grid">
+          <LocationFields plots={plots} plotId={where.plotId} spaceId={where.spaceId} onChange={setWhere} errors={errors} allowUnknown disabled={reservation !== undefined} />
+          <TextField label={t("sourceRefLabel")} value={sourceRef} onChange={setSourceRef} error={errors["sourceRef"]} autoComplete="off" />
+          <TextField label={t("pageLabel")} value={page} onChange={setPage} autoComplete="off" />
+        </div>
         <Status status={intent.status} actions={{ tryAgain: () => intent.setStatus({ phase: "idle" }), openLatest: () => void open.reload(), keepDraft: () => intent.setStatus({ phase: "idle" }) }} />
         <div className="actions">
           <Button primary type="submit" disabled={intent.busy}>
@@ -290,7 +295,7 @@ export function BurialForm() {
         </div>
       </form>
       {saved === undefined ? null : (
-        <div className="actions">
+        <div className="actions on-ground">
           <ButtonLink href={`${base}/burial/${saved.burialId}`}>{t("openBurial")}</ButtonLink>
           <ButtonLink href={`${base}/burial/new`}>{t("recordBurial")}</ButtonLink>
         </div>

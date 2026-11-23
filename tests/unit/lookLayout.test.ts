@@ -1,7 +1,7 @@
 // The layouts and the art of the new look (spec 07, slice 3, tasks 7.15 to 7.19, L7). The test reads the art files, the
 // notes about them and the stylesheets. Sizes in a real browser are measured by tests/browser/layout.spec.ts.
 // The floors and the sizes are the contract of the design, not the output of the code.
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { colourOf, contrast, declOf, lastDecl, readText, rulesFor, rulesOf } from "../helpers/cssRules";
@@ -71,9 +71,8 @@ describe.each(NAMES)("assets/%s.svg (L7.3)", (name) => {
 });
 
 describe("the three drawings together (L7.3)", () => {
-  it("leaves the folder with the three band drawings, the mark symbols and the notes, and no app mark", () => {
-    expect(readdirSync(join(ROOT, "assets")).sort()).toEqual(["churchyard-margin.svg", "garden-margin.svg", "gate-lantern.svg", "origins.md", "plot-symbols.svg"]);
-    expect(existsSync(join(ROOT, "assets", "mark.svg"))).toBe(false);
+  it("leaves the folder with the three band drawings, the app mark, the mark symbols and the notes", () => {
+    expect(readdirSync(join(ROOT, "assets")).sort()).toEqual(["churchyard-margin.svg", "garden-margin.svg", "gate-lantern.svg", "mark.svg", "origins.md", "plot-symbols.svg"]);
   });
 
   it("keeps the garden ids, more than ten uses, and none of the churchyard colours", () => {
@@ -135,11 +134,17 @@ describe("assets/origins.md is true of the files and of the stylesheets", () => 
     expect(garden).toContain("assets/garden-margin.svg");
     expect(garden).not.toMatch(/gate-lantern|churchyard-margin/);
     // Each is the first row of the header, and nothing else: the one rule that holds the drawing is `header.app::before`.
-    for (const [file, name] of [[CHURCH, "gate-lantern"], [CHURCH, "churchyard-margin"], [GARDEN, "garden-margin"]] as const) {
+    // The churchyard margin is also the foot band at the bottom of a churchyard screen, which holds no word.
+    for (const [file, name, selectors] of [
+      [CHURCH, "gate-lantern", ["header.app::before"]],
+      [CHURCH, "churchyard-margin", ["header.app::before", ".shell:has(.desk, .page)::after"]],
+      [GARDEN, "garden-margin", ["header.app::before"]],
+    ] as const) {
       const holders = rulesOf(readText(file)).filter((r) => r.body.includes(`${name}.svg`));
-      expect(holders.map((r) => r.selector), name).toEqual(["header.app::before"]);
+      expect(holders.map((r) => r.selector), name).toEqual(selectors);
     }
     expect(notes).toContain("header.app::before");
+    expect(notes).toContain("foot band");
   });
 
   it("says what moves: the mist is a soft gradient in a layer of its own, and no file moves", () => {

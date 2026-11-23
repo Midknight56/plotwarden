@@ -31,94 +31,102 @@ export function Settings() {
   };
 
   return (
-    <section className="stack">
-      <h1>{t("settingsTitle")}</h1>
-      <div className="actions">
+    <section className="stack page">
+      <div className="page-head on-ground">
+        <h1>{t("settingsTitle")}</h1>
         {open === null ? (
-          <ButtonLink href="#/">{t("backToRegisters")}</ButtonLink>
+          <ButtonLink href="#/" quiet>
+            {t("backToRegisters")}
+          </ButtonLink>
         ) : (
-          <ButtonLink href={`#/r/${open.site.id}`}>{t("backToRegister")}</ButtonLink>
+          <ButtonLink href={`#/r/${open.site.id}`} quiet>
+            {t("backToRegister")}
+          </ButtonLink>
         )}
       </div>
 
-      <form
-        className="stack"
-        onSubmit={(event) => {
-          event.preventDefault();
-          setSettings({ motion, contrast, paper });
-          setSaved(true);
-        }}
-      >
-        <h2>{t("deviceSettings")}</h2>
-        <RadioGroup
-          legend={t("motionLabel")}
-          name="motion"
-          value={motion}
-          onChange={(v) => {
-            setMotion(v === "reduce" ? "reduce" : "follow");
-            setSaved(false);
+      <div className="settings-layout">
+        <form
+          className="stack card settings-device"
+          onSubmit={(event) => {
+            event.preventDefault();
+            setSettings({ motion, contrast, paper });
+            setSaved(true);
           }}
-          options={[
-            { value: "follow", label: t("followDeviceMotion") },
-            { value: "reduce", label: t("reduceMotion") },
-          ]}
-        />
-        <RadioGroup
-          legend={t("mapContrast")}
-          name="contrast"
-          value={contrast}
-          onChange={(v) => {
-            setContrast(v === "high" ? "high" : "standard");
-            setSaved(false);
-          }}
-          options={[
-            { value: "standard", label: t("contrastStandard") },
-            { value: "high", label: t("contrastHigh") },
-          ]}
-        />
-        <RadioGroup
-          legend={t("printPaper")}
-          name="paper"
-          value={paper}
-          onChange={(v) => {
-            setPaper(v === "Letter" ? "Letter" : "A4");
-            setSaved(false);
-          }}
-          options={[
-            { value: "A4", label: t("paperA4") },
-            { value: "Letter", label: t("paperLetter") },
-          ]}
-        />
-        <div className="actions">
-          <button type="submit" className="button primary">
-            {t("saveSettings")}
-          </button>
-        </div>
-        {saved ? <Notice tone="good">{t("settingsSaved")}</Notice> : null}
-      </form>
-
-      {open === null ? null : (
-        <section className="stack" aria-label={t("removeHeading")}>
-          <h2>{t("removeHeading")}</h2>
-          <p>{t("onlySiteRemoved", { site: open.site.title })}</p>
-          <p>{t("removeBackupFirst")}</p>
-          <TextField
-            label={t("typeSiteName")}
-            value={typed}
-            error={removeError}
-            onChange={(v) => {
-              setTyped(v);
-              setRemoveError(undefined);
-            }}
-            autoComplete="off"
-          />
-          <div className="actions">
-            <Button onClick={() => void remove()} disabled={busy || typed.trim() !== open.site.title}>
-              {t("removeThis")}
-            </Button>
+        >
+          <h2>{t("deviceSettings")}</h2>
+          <div className="choice-columns">
+            <RadioGroup
+              legend={t("motionLabel")}
+              name="motion"
+              value={motion}
+              onChange={(v) => {
+                setMotion(v === "reduce" ? "reduce" : "follow");
+                setSaved(false);
+              }}
+              options={[
+                { value: "follow", label: t("followDeviceMotion") },
+                { value: "reduce", label: t("reduceMotion") },
+              ]}
+            />
+            <RadioGroup
+              legend={t("mapContrast")}
+              name="contrast"
+              value={contrast}
+              onChange={(v) => {
+                setContrast(v === "high" ? "high" : "standard");
+                setSaved(false);
+              }}
+              options={[
+                { value: "standard", label: t("contrastStandard") },
+                { value: "high", label: t("contrastHigh") },
+              ]}
+            />
+            <RadioGroup
+              legend={t("printPaper")}
+              name="paper"
+              value={paper}
+              onChange={(v) => {
+                setPaper(v === "Letter" ? "Letter" : "A4");
+                setSaved(false);
+              }}
+              options={[
+                { value: "A4", label: t("paperA4") },
+                { value: "Letter", label: t("paperLetter") },
+              ]}
+            />
           </div>
-        </section>
-      )}
+          <div className="actions">
+            <button type="submit" className="button primary">
+              {t("saveSettings")}
+            </button>
+          </div>
+          {saved ? <Notice tone="good">{t("settingsSaved")}</Notice> : null}
+        </form>
+
+        {open === null ? null : (
+          <section className="stack card settings-remove" aria-label={t("removeHeading")}>
+            <h2>{t("removeHeading")}</h2>
+            <p>{t("onlySiteRemoved", { site: open.site.title })}</p>
+            <p>{t("removeBackupFirst")}</p>
+            <TextField
+              label={t("typeSiteName")}
+              value={typed}
+              error={removeError}
+              onChange={(v) => {
+                setTyped(v);
+                setRemoveError(undefined);
+              }}
+              autoComplete="off"
+            />
+            <div className="actions">
+              <Button onClick={() => void remove()} disabled={busy || typed.trim() !== open.site.title}>
+                {t("removeThis")}
+              </Button>
+            </div>
+          </section>
+        )}
+      </div>
     </section>
   );
 }

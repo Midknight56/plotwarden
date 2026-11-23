@@ -126,12 +126,14 @@ interface ChoiceProps {
   value: string;
   onChange: (value: string) => void;
   options: readonly { value: string; label: string }[];
+  /** Lay the options in a grid where they fit, instead of one under the other. */
+  grid?: boolean;
 }
 
 /** One choice out of a few, as radio buttons in a group named by its legend. */
-export function RadioGroup({ legend, name, value, onChange, options }: ChoiceProps) {
+export function RadioGroup({ legend, name, value, onChange, options, grid }: ChoiceProps) {
   return (
-    <fieldset className="choice">
+    <fieldset className={grid === true ? "choice choice-grid" : "choice"}>
       <legend>{legend}</legend>
       {options.map((o) => (
         <label key={o.value} className="check">
@@ -177,10 +179,19 @@ export function LinkGroup({ id, title, children }: { id: string; title: string; 
   );
 }
 
+/** The classes of a button: the main action (`primary`), a quiet underlined action (`quiet`), or an outlined one. */
+const tierOf = (primary: boolean | undefined, quiet: boolean | undefined): string => `button${primary === true ? " primary" : ""}${quiet === true ? " quiet" : ""}`;
+
 /** A link that looks like a button. */
-export function ButtonLink({ href, children, primary, ...rest }: { href: string; children: ReactNode; primary?: boolean } & Omit<React.AnchorHTMLAttributes<HTMLAnchorElement>, "href">) {
+export function ButtonLink({
+  href,
+  children,
+  primary,
+  quiet,
+  ...rest
+}: { href: string; children: ReactNode; primary?: boolean; quiet?: boolean } & Omit<React.AnchorHTMLAttributes<HTMLAnchorElement>, "href">) {
   return (
-    <a className={`button${primary === true ? " primary" : ""}`} href={href} {...rest}>
+    <a className={tierOf(primary, quiet)} href={href} {...rest}>
       {children}
     </a>
   );
@@ -189,12 +200,32 @@ export function ButtonLink({ href, children, primary, ...rest }: { href: string;
 export function Button({
   children,
   primary,
+  quiet,
   ...rest
-}: { children: ReactNode; primary?: boolean } & React.ButtonHTMLAttributes<HTMLButtonElement>) {
+}: { children: ReactNode; primary?: boolean; quiet?: boolean } & React.ButtonHTMLAttributes<HTMLButtonElement>) {
   return (
-    <button type="button" className={`button${primary === true ? " primary" : ""}`} {...rest}>
+    <button type="button" className={tierOf(primary, quiet)} {...rest}>
       {children}
     </button>
+  );
+}
+
+/**
+ * The stand in for a plot code inside a line of words. A line is made with the catalog as usual, with this mark where the
+ * code goes, and `CodeTabbed` draws the code in its tab at the mark. The words that a person reads are the same.
+ */
+export const CODE_MARK = "\u0001";
+
+export function CodeTabbed({ text, code }: { text: string; code: string }) {
+  const at = text.indexOf(CODE_MARK);
+  // A line with no code to show has no tab: the words stand as they are, with nothing in place of the code.
+  if (at === -1 || code === "") return <>{text.replace(CODE_MARK, code)}</>;
+  return (
+    <>
+      {text.slice(0, at)}
+      <span className="code-tab">{code}</span>
+      {text.slice(at + 1)}
+    </>
   );
 }
 

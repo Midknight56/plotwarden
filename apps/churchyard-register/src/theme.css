@@ -130,9 +130,23 @@ header.app .brand {
   grid-column: 1;
   display: flex;
   align-items: center;
+  gap: 10px;
   min-height: 52px;
   padding: 4px 0 0 clamp(16px, 2.8vw, 40px);
   font-size: 22px;
+}
+
+/* The mark of the register beside its name: a small arch with the lantern lit in it. It is drawn here, has no text, and a
+   screen reader hears nothing of it. */
+header.app .brand::before {
+  content: "";
+  flex: none;
+  box-sizing: border-box;
+  width: 17px;
+  height: 21px;
+  border: 2.5px solid var(--sky-ink);
+  border-radius: 9px 9px 1px 1px;
+  background: radial-gradient(circle, var(--tab) 0 3.5px, transparent 4px) center 36% / 10px 10px no-repeat;
 }
 
 header.app nav {
@@ -182,9 +196,22 @@ html:not([data-contrast="high"]) .on-ground .button:not(.primary):not(.quiet):ac
   background: rgba(250, 245, 233, 0.24);
 }
 
-/* The page stands on the night. A screen that is not the desk is one ivory sheet, until each of its parts is a sheet of
-   its own. Headings on the ground are ivory by inheritance, and a sheet sets its own ink. */
-html:not([data-contrast="high"]) main:not(:has(.desk)) {
+/* A quiet button on the night is ivory text with an underline, and the same ivory veil as the outlined buttons. */
+html:not([data-contrast="high"]) .on-ground .button.quiet {
+  color: var(--on-ground);
+}
+
+html:not([data-contrast="high"]) .on-ground .button.quiet:hover:not(:disabled) {
+  background: rgba(250, 245, 233, 0.16);
+}
+
+html:not([data-contrast="high"]) .on-ground .button.quiet:active:not(:disabled) {
+  background: rgba(250, 245, 233, 0.24);
+}
+
+/* The page stands on the night. A screen that is not the desk and is not a `.page` is one ivory sheet, until each of its
+   parts is a sheet of its own. Headings on the ground are ivory by inheritance, and a sheet sets its own ink. */
+html:not([data-contrast="high"]) main:not(:has(.desk)):not(:has(.page)) {
   margin-block: 20px 32px;
   padding-block: 20px 28px;
   border-radius: var(--radius-card);
@@ -234,6 +261,38 @@ html:not([data-contrast="high"]) .on-ground .link-group li > .button:not(.primar
 html:not([data-contrast="high"]) .on-ground .mark-swatch .plot {
   fill: var(--stone);
   stroke: var(--sky-ink);
+}
+
+/* A screen with sheets of its own (`.page`): the heading row is on the night, and each part is a sheet. A sheet heading has a
+   3 px double rule under it. A card inside a sheet is a paper box with a 1 px edge. */
+.page .card {
+  padding: 18px 18px 20px;
+}
+
+.page .card > h2 {
+  margin: 0;
+  padding-bottom: 8px;
+  border-bottom: 3px double var(--soft-line);
+}
+
+.page .card .card {
+  padding: 12px 14px;
+  border: 1px solid var(--ink);
+  border-radius: 0;
+  background: var(--paper);
+}
+
+/* The foot band of the churchyard: the margin of the header again, 56 px high, at the foot of a screen with sheets. It holds no
+   word and no control. High contrast and print draw none. */
+.shell:has(.desk, .page)::after {
+  content: "";
+  display: block;
+  height: 56px;
+  background: url("../../../assets/churchyard-margin.svg") repeat-x left bottom / auto 100%;
+}
+
+html[data-contrast="high"] .shell:has(.desk, .page)::after {
+  display: none;
 }
 
 /* Sheets lie on the night with no edge. Their corners are the card corners. High contrast draws the edge. */
@@ -335,19 +394,72 @@ svg.sheet .path-line {
   fill: var(--ink);
 }
 
+/* The state mark and its words are one row that does not wrap: the mark stays on the line of the first word, and the words
+   take what is left of the row and wrap among themselves. */
 .summary-line {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
+  flex-wrap: nowrap;
+  align-items: flex-start;
   gap: 12px;
   font-size: 20px;
   font-weight: 700;
+}
+
+.summary-line > span {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.desk-head .summary-line > .mark-swatch {
+  margin-top: -2px;
 }
 
 .mark-swatch {
   flex: none;
   width: 28px;
   height: 28px;
+}
+
+.mark-swatch.small {
+  width: 22px;
+  height: 22px;
+}
+
+/* The first line of the chosen plot sheet and of a result: the state mark, then the code in its tab and the words. */
+.state-line {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 0;
+  font-weight: 700;
+}
+
+.state-line > span {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.state-line > .mark-swatch {
+  margin-top: 1px;
+}
+
+.desk-find .state-line {
+  font-weight: 400;
+}
+
+/* A result names the burial in the heading font, and so does each burial of the chosen plot. */
+.desk-find .card strong {
+  font-family: var(--font-heading);
+  font-size: 19px;
+  line-height: 1.3;
+}
+
+.burial-name {
+  font-family: var(--font-heading);
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.3;
 }
 
 .mark-swatch .plot {
@@ -416,19 +528,39 @@ svg.sheet .path-line {
     padding: 0 16px 8px;
   }
 
-  html:not([data-contrast="high"]) main:not(:has(.desk)) {
+  html:not([data-contrast="high"]) main:not(:has(.desk)):not(:has(.page)) {
     margin-block: 12px 24px;
     padding-block: 16px 24px;
   }
 }
 
+/* From 60rem, what you type and the return slip are one sheet: the slip lies under a double rule with no gap and no corner
+   between the two. */
+@media (min-width: 60rem) {
+  .review-layout {
+    row-gap: 0;
+  }
+
+  .review-input {
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+  }
+
+  .review-slip {
+    border-top: 3px double var(--soft-line);
+    border-top-left-radius: 0;
+    border-top-right-radius: 0;
+  }
+}
+
 @media print {
   header.app::before,
-  header.app .mist {
+  header.app .mist,
+  .shell:has(.desk, .page)::after {
     display: none;
   }
 
-  html:not([data-contrast="high"]) main:not(:has(.desk)) {
+  html:not([data-contrast="high"]) main:not(:has(.desk)):not(:has(.page)) {
     margin: 0;
     padding: 0;
     border-radius: 0;

@@ -196,6 +196,7 @@ export function AllotmentHome() {
                 )}
                 {practice && nextPlot !== undefined ? (
                   <Button
+                    quiet
                     onClick={() => {
                       setText(nextPlot.code);
                       go(nextPlot.code);

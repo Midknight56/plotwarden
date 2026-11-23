@@ -1,9 +1,10 @@
-/* The look of the hub and the two visitor pages. The same paper and ink as the registers, the same sky strip,
-   plain edges and large targets. Edge inset 16 px, gap 12 px or more, target 44 by 44 px, text 16 px.
-   Nothing here moves, so there is no motion to reduce. Ink #22252C on ivory #FAF5E9.
+/* The look of the hub and the two visitor pages. The same paper and ink as the registers. Edge inset 16 px, gap 12 px or
+   more, target 44 by 44 px, text 16 px. Nothing here moves, so there is no motion to reduce, and a hover or a press changes
+   a colour at once. Ink #22252C on ivory #FAF5E9.
 
-   The values follow the design of spec 07. The start page layout, its title size, the stripe and the doors come in
-   slice 3. The fonts are the two self hosted files in fonts/. */
+   The values follow the design of spec 07. The start page has a 6 px stripe in the three app colours, a 60 px bar with the
+   mark and the brand, a title, two doors (the churchyard door on the night, the allotment door on paper), the Review Desk
+   card and the sheets for visitors. The fonts are the two self hosted files in fonts/. */
 
 @import "../../fonts/atkinson.css";
 @import "../../fonts/gelasio.css";
@@ -13,8 +14,28 @@
   --paper: #faf5e9;
   --muted: #4a4d55;
   --field: #fffef8;
-  --sky: #232a5c;
+  --soft: #efe8d6; /* a button of the sheets while hovered */
+  --gravel: #d9cdb0; /* and while pressed */
+  --sky: #232a5c; /* the night: the churchyard door, and a third of the stripe */
+  --sky-ink: #faf5e9; /* ivory text on the night */
+  --amber: #f2c96b; /* the main action on the night */
+  --amber-hover: #f6d68f;
+  --amber-pressed: #e3b24f;
+  --ring-night: #ffd27a; /* the focus ring on the night */
   --leaf: #2f6b4f;
+  --leaf-hover: #1f4f38;
+  --leaf-pressed: #173b2a;
+  --garden-ink: #1b312a;
+  --garden-paper: #fffef6;
+  --garden-soft: #e7eeda;
+  --garden-pressed: #d5e0c2;
+  --garden-line: #6f8576;
+  --garden-sky: #cfe7df;
+  --garden-tab: #bfe0ea;
+  --teal: #2b5a5f; /* the Review Desk */
+  --teal-soft: #e3ecea;
+  --teal-pressed: #d2e0dd;
+  --desk-paper: #fffdf8;
   --focus: #0b4faf;
   --font-text: "Atkinson Hyperlegible Next", system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --font-heading: "Gelasio", Georgia, "Times New Roman", serif;
@@ -26,8 +47,11 @@
     --paper: #ffffff;
     --muted: #000000;
     --field: #ffffff;
+    --sky-ink: #000000;
+    --ring-night: #0000cc;
     --focus: #0000cc;
   }
+
 }
 
 * {
@@ -64,6 +88,13 @@ h1 {
   line-height: 1.15;
 }
 
+/* The title of the start page. */
+h1.title {
+  font-size: clamp(40px, 3vw + 22px, 64px);
+  line-height: 1.05;
+  letter-spacing: -0.01em;
+}
+
 h2 {
   font-size: 22px;
 }
@@ -90,31 +121,40 @@ h3 {
   padding: 0;
 }
 
-/* The sky strip. Its first row holds the lantern and nothing else, so no word ever sits on a picture. */
-.sky {
-  border-bottom: 2px solid var(--ink);
+/* The stripe in the three app colours, then the bar. The stripe holds nothing. The mark beside the brand is a picture of the
+   stylesheet and has no text, so a screen reader hears the brand alone. */
+.stripe {
+  height: 6px;
+  background: linear-gradient(to right, var(--sky) 0 33.4%, var(--leaf) 33.4% 66.7%, var(--teal) 66.7%);
 }
 
-.sky::before {
-  content: "";
-  display: block;
-  height: 72px;
-  border-bottom: 3px solid var(--ink);
-  background: url("../../assets/gate-lantern.svg") no-repeat right 16px top 0 / auto 100%, var(--sky);
-}
-
-.sky-row {
+.bar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: 12px 16px;
+  gap: 16px;
+  min-height: 60px;
+  padding: 0 clamp(16px, 2.8vw, 40px);
+  border-bottom: 1px solid var(--ink);
 }
 
 .brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 100%;
   font-size: 22px;
   font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.brand::before {
+  content: "";
+  flex: none;
+  width: 28px;
+  height: 28px;
+  background: url("../../assets/mark.svg") center / contain no-repeat;
 }
 
 nav {
@@ -127,9 +167,14 @@ main {
   display: flex;
   flex-direction: column;
   gap: 32px;
-  max-width: 64rem;
+  max-width: 105rem;
   margin: 0 auto;
-  padding: 24px 16px;
+  padding: clamp(20px, 2.2vw, 34px) clamp(16px, 2.8vw, 40px) 56px;
+}
+
+/* A page that is only text (About, Page not found, the two visitor pages) keeps a line of a readable length. */
+main > .stack:only-child {
+  max-width: 64rem;
 }
 
 .stack {
@@ -137,6 +182,10 @@ main {
   flex-direction: column;
   gap: 16px;
   min-width: 0;
+}
+
+.intro {
+  gap: 10px;
 }
 
 .tagline {
@@ -158,6 +207,7 @@ main {
   min-height: 44px;
   padding: 8px 16px;
   border: 2px solid var(--ink);
+  border-radius: 2px;
   background: var(--ink);
   color: var(--paper);
   font-weight: 700;
@@ -168,6 +218,15 @@ main {
 .button.secondary {
   background: var(--field);
   color: var(--ink);
+  font-weight: 600;
+}
+
+.button.secondary:hover {
+  background: var(--soft);
+}
+
+.button.secondary:active {
+  background: var(--gravel);
 }
 
 a:focus-visible {
@@ -181,63 +240,302 @@ h1:focus:not(:focus-visible) {
   outline: none;
 }
 
-/* The job line comes first, in a larger type. The line about the device is plain text under it. */
+/* The job line comes first, in the heading face. The line about the device is plain text under it. */
 .job {
   font-family: var(--font-heading);
-  font-size: 22px;
-  font-weight: 700;
-  line-height: 1.3;
+  font-size: clamp(21px, 1vw + 15px, 28px);
+  font-weight: 600;
+  line-height: 1.25;
+  text-wrap: balance;
 }
 
 .tagline {
   color: var(--muted);
 }
 
-/* The choices. One column on a phone, the two registers side by side on a wide page, and the Desk under them.
-   Each has a bar of its own colour. */
-.choices {
+/* The two doors. One column on a phone, side by side where there is room for two of 560 px. Each door is its own ground:
+   the churchyard door is the night with ivory text, and the allotment door is paper with soft corners. */
+.doors {
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 560px), 1fr));
+  gap: 24px;
 }
 
-.choice {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 12px;
+.door {
   min-width: 0;
-  padding: 16px;
+  overflow: hidden;
   border: 2px solid var(--ink);
-  border-left-width: 10px;
-  background: var(--field);
 }
 
-.choice.church {
-  border-left-color: var(--sky);
+.door.church {
+  background: var(--sky);
+  color: var(--sky-ink);
+  border-radius: 16px 16px 2px 2px;
 }
 
-.choice.garden {
-  border-left-color: var(--leaf);
-}
-
-.choice.desk {
-  border-left-color: var(--muted);
+.door.garden {
+  background: var(--garden-paper);
+  color: var(--garden-ink);
+  border-color: var(--garden-ink);
+  border-radius: 14px;
 }
 
 .register-card {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
-  gap: 12px;
   width: 100%;
   min-width: 0;
 }
 
+/* The art band is a row of its own. It holds no word and no control, so nothing stands on a picture. */
+.door-art {
+  display: block;
+  height: clamp(84px, 7vw, 112px);
+}
+
+.door.church .door-art {
+  background: url("../../assets/gate-lantern.svg") right 16px bottom / auto 100% no-repeat, url("../../assets/churchyard-margin.svg") left bottom / auto 100% repeat-x, var(--sky);
+}
+
+.door.garden .door-art {
+  background: url("../../assets/garden-margin.svg") left bottom / auto 100% repeat-x, var(--garden-sky);
+}
+
+.door-body {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px 28px;
+  padding: clamp(16px, 1.6vw, 24px);
+}
+
+.door-text {
+  flex: 1 1 240px;
+  min-width: 0;
+}
+
+.door h3 {
+  font-size: 26px;
+  line-height: 1.2;
+}
+
+.door.garden h3 {
+  font-family: var(--font-text);
+  color: var(--leaf);
+}
+
+.door-text p {
+  margin: 8px 0 18px;
+}
+
+.door .actions {
+  gap: 12px;
+}
+
+.door .button {
+  min-height: 48px;
+}
+
+/* The main action of the night door is lantern amber, and its other button is an ivory outline on the night. */
+.door.church .button {
+  background: var(--amber);
+  color: var(--ink);
+  border-color: var(--ink);
+}
+
+.door.church .button:hover {
+  background: var(--amber-hover);
+}
+
+.door.church .button:active {
+  background: var(--amber-pressed);
+}
+
+.door.church .button.secondary {
+  background: transparent;
+  color: var(--sky-ink);
+  border-color: var(--sky-ink);
+}
+
+.door.church .button.secondary:hover {
+  background: rgba(250, 245, 233, 0.14);
+}
+
+.door.church .button.secondary:active {
+  background: rgba(250, 245, 233, 0.24);
+}
+
+.door.church a:focus-visible {
+  outline-color: var(--ring-night);
+}
+
+/* The main action of the allotment door is leaf green with white text, and its other button is an ink outline on paper. */
+.door.garden .button {
+  background: var(--leaf);
+  color: #ffffff;
+  border-color: var(--leaf);
+  border-radius: 10px;
+}
+
+.door.garden .button:hover {
+  background: var(--leaf-hover);
+  border-color: var(--leaf-hover);
+}
+
+.door.garden .button:active {
+  background: var(--leaf-pressed);
+  border-color: var(--leaf-pressed);
+}
+
+.door.garden .button.secondary {
+  background: var(--garden-paper);
+  color: var(--garden-ink);
+  border-color: var(--garden-ink);
+}
+
+.door.garden .button.secondary:hover {
+  background: var(--garden-soft);
+  border-color: var(--garden-ink);
+}
+
+.door.garden .button.secondary:active {
+  background: var(--garden-pressed);
+  border-color: var(--garden-ink);
+}
+
+/* Below the doors: the Review Desk card, and the sheets for visitors, each with a small picture of the sheet. */
+.below {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 24px clamp(24px, 3vw, 48px);
+}
+
+.review-card {
+  flex: 1 1 340px;
+  min-width: 0;
+  padding: clamp(16px, 1.6vw, 22px);
+  background: var(--desk-paper);
+  border: 2px solid var(--teal);
+  border-radius: 10px;
+}
+
+.review-card h3 {
+  font-size: 22px;
+}
+
+.review-card p {
+  margin: 8px 0 16px;
+}
+
+.review-card .button {
+  min-height: 46px;
+  background: var(--desk-paper);
+  color: var(--teal);
+  border-color: var(--teal);
+  border-radius: 8px;
+  font-weight: 700;
+}
+
+.review-card .button:hover {
+  background: var(--teal-soft);
+}
+
+.review-card .button:active {
+  background: var(--teal-pressed);
+}
+
+.visitors {
+  flex: 2 1 520px;
+  min-width: 0;
+  gap: 8px;
+}
+
+.sheet-rows {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px 28px;
+  margin-top: 8px;
+}
+
+.sheet-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+}
+
+.sheet-row .button {
+  min-height: 46px;
+}
+
+.sheet-pic.garden + .button {
+  background: var(--garden-paper);
+  color: var(--garden-ink);
+  border-color: var(--garden-ink);
+  border-radius: 10px;
+}
+
+.sheet-pic.garden + .button:hover {
+  background: var(--garden-soft);
+}
+
+.sheet-pic.garden + .button:active {
+  background: var(--garden-pressed);
+}
+
+/* A small picture of a visitor sheet, drawn here with no text and no file: a band, two lines and a plot. It is hidden from a
+   screen reader and sits beside the button that opens the sheet. */
+.sheet-pic {
+  position: relative;
+  flex: none;
+  width: 54px;
+  height: 70px;
+  border: 1.5px solid var(--ink);
+  background:
+    linear-gradient(var(--sky), var(--sky)) 0 0 / 100% 9px no-repeat,
+    linear-gradient(var(--ink), var(--ink)) 7px 17px / 30px 2px no-repeat,
+    linear-gradient(#6b6557, #6b6557) 7px 24px / 22px 2px no-repeat,
+    #ffffff;
+  box-shadow: 3px 3px 0 #d8cdb4;
+}
+
+.sheet-pic::after {
+  content: "";
+  position: absolute;
+  bottom: 8px;
+  left: 19px;
+  width: 14px;
+  height: 18px;
+  border: 2px solid var(--ink);
+  border-radius: 7px 7px 1px 1px;
+  background: var(--amber);
+}
+
+.sheet-pic.garden {
+  border-color: var(--garden-ink);
+  border-radius: 4px;
+  background:
+    linear-gradient(var(--leaf), var(--leaf)) 0 0 / 100% 9px no-repeat,
+    linear-gradient(var(--garden-ink), var(--garden-ink)) 7px 17px / 30px 2px no-repeat,
+    linear-gradient(var(--garden-line), var(--garden-line)) 7px 24px / 22px 2px no-repeat,
+    #ffffff;
+  box-shadow: 3px 3px 0 #cbd3bd;
+}
+
+.sheet-pic.garden::after {
+  bottom: 10px;
+  left: 17px;
+  width: 20px;
+  height: 14px;
+  border-color: var(--garden-ink);
+  border-radius: 2px;
+  background: var(--garden-tab);
+}
 /* The practice map: the shared sheet, drawn when the project is built and kept as text. It stays at its own size,
    272 px, so its words are never drawn under 14 px. On a page narrower than the drawing, as at 200 percent zoom on a
    phone, the frame scrolls sideways and the page does not. */
 .practice-map {
+  width: fit-content;
   max-width: 100%;
   overflow-x: auto;
   border: 2px solid var(--sheet-ink);
@@ -252,7 +550,7 @@ h1:focus:not(:focus-visible) {
 }
 
 /* Each tone names its own lawn or grass, turf, base, walk edge, bed soil and crops. A part that a tone does not draw is none. */
-.choice.church .practice-map {
+.door.church .practice-map {
   --sheet-ink: #22252c;
   --sheet-paper: #faf5e9;
   --sheet-stone: #fffef8;
@@ -265,7 +563,7 @@ h1:focus:not(:focus-visible) {
   --sheet-crop: none;
 }
 
-.choice.garden .practice-map {
+.door.garden .practice-map {
   --sheet-ink: #1b312a;
   --sheet-paper: #efe6cc;
   --sheet-stone: #fffef6;
@@ -395,37 +693,36 @@ h1:focus:not(:focus-visible) {
   stroke-linecap: round;
 }
 
-.choice.church .practice-map .gate {
+.door.church .practice-map .gate {
   fill: var(--sheet-ink);
 }
 
-.choice.garden .practice-map .gate {
+.door.garden .practice-map .gate {
   fill: var(--sheet-stone);
   stroke: var(--sheet-ink);
   stroke-width: 2;
 }
 
-@media (min-width: 44rem) {
-  .choices {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .choice.wide {
-    grid-column: 1 / -1;
-  }
-}
-
-/* Phones: a lower sky strip, so the job and the first button are in the first screen. */
+/* Phones: the stripe and the bar keep their height, and the page starts a little closer to the bar. */
 @media (max-width: 37.4375rem) {
-  .sky::before {
-    height: 44px;
-  }
-
   main {
     padding-top: 16px;
   }
 }
+
 noscript {
   display: block;
   padding: 16px;
+}
+
+/* High contrast, after the rules it replaces: the night door is plain white with a black edge, and it has no picture. */
+@media (prefers-contrast: more) {
+  .door.church {
+    background: #ffffff;
+    color: #000000;
+  }
+
+  .door-art {
+    display: none;
+  }
 }

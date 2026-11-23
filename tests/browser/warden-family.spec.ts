@@ -666,7 +666,16 @@ test("every map page of the keeper's own register shows the same plot a name sea
   const zoomIn = await page.getByRole("button", { name: "Zoom in" }).boundingBox();
   expect(sheet && key && zoomIn).toBeTruthy();
   expect((key?.y ?? 0) >= (sheet?.y ?? 0) + (sheet?.height ?? 0)).toBe(true);
-  expect((zoomIn?.y ?? 0) >= (key?.y ?? 0) + (key?.height ?? 0)).toBe(true);
+  // In the page the key comes before the zoom controls, on every screen. On a phone the controls are under the key. On a wide
+  // screen they are in the side sheet, beside the map and its key (spec 07, L7.9).
+  const keyFirst = await page.evaluate(() => {
+    const keyEl = document.querySelector(".map-key") as Element;
+    const zoomEl = [...document.querySelectorAll("button")].find((b) => b.textContent === "Zoom in") as Element;
+    return (keyEl.compareDocumentPosition(zoomEl) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+  });
+  expect(keyFirst).toBe(true);
+  if (sizeOf(page) === "phone") expect((zoomIn?.y ?? 0) >= (key?.y ?? 0) + (key?.height ?? 0)).toBe(true);
+  else expect((zoomIn?.x ?? 0) >= (sheet?.x ?? 0) + (sheet?.width ?? 0)).toBe(true);
   if (sizeOf(page) === "phone") expect(sheet?.y ?? 9999).toBeLessThanOrEqual(360);
   // The plot chooser never shows a blank choice, and a zoom that cannot act is unavailable to the keyboard and the reader.
   expect(await page.getByLabel("Choose a plot", { exact: true }).evaluate((s) => (s as HTMLSelectElement).selectedOptions[0]?.textContent)).toBe("No plot chosen");

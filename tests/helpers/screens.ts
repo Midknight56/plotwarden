@@ -4,6 +4,7 @@ import { expect } from "@playwright/test";
 import type { Download, Page } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { addressHoldsWord } from "./addressWords";
 
 export const fixturePath = (name: string): string => fileURLToPath(new URL(`../fixtures/${name}`, import.meta.url));
 
@@ -106,9 +107,8 @@ export async function expectNoNameInAddress(page: Page, names: readonly string[]
   const addresses = [seen.href, page.url(), ...seen.entries];
   const words = names.flatMap((name) => name.split(/\s+/)).filter((w) => w !== "");
   for (const address of addresses) {
-    const decoded = decodeURIComponent(address).toLowerCase();
     expect(/[?&]q=/.test(address), `a q parameter in ${address}`).toBe(false);
-    for (const word of words) expect(decoded.includes(word.toLowerCase()), `"${word}" in the address ${address}`).toBe(false);
+    for (const word of words) expect(addressHoldsWord(address, word), `"${word}" in the address ${address}`).toBe(false);
   }
 }
 
@@ -124,9 +124,8 @@ export async function expectSearchOutOfAddress(page: Page, text: string): Promis
   const addresses = [seen.href, page.url(), ...seen.entries];
   const words = text.split(/\s+/).filter((w) => w !== "");
   for (const address of addresses) {
-    const decoded = decodeURIComponent(address).toLowerCase();
     expect(/[?&]q=/.test(address), `a q parameter in ${address}`).toBe(false);
-    for (const word of words) expect(decoded.includes(word.toLowerCase()), `"${word}" in the address ${address}`).toBe(false);
+    for (const word of words) expect(addressHoldsWord(address, word), `"${word}" in the address ${address}`).toBe(false);
   }
   expect(seen.state, "the search text is kept in history.state").toContain(text);
 }

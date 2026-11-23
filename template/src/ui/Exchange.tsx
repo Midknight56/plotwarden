@@ -208,128 +208,143 @@ export function Exchange() {
     return row.rule === undefined ? label : `${label} · ${reasonOf(row.rule)}`;
   };
 
-  return (
-    <section className="stack">
-      <h1>{t("committeeReview")}</h1>
-      <div className="actions">
-        <ButtonLink href={base}>{t("backToRegister")}</ButtonLink>
-      </div>
-      <p>{t("committeeReviewHint")}</p>
-
-      {empty ? (
-        <Notice>{t("emptyRegisterReview")}</Notice>
-      ) : (
-        <form ref={form} className="stack" onSubmit={preview} noValidate>
-          <TextField
-            label={t("chooseReviewDate")}
-            type="date"
-            value={asOf}
-            error={errors["asOf"]}
-            onChange={(v) => {
-              touched();
-              setAsOf(v);
-            }}
-          />
-          <TextField
-            label={t("siteNameForCommittee")}
-            value={alias}
-            error={errors["alias"]}
-            autoComplete="off"
-            onChange={(v) => {
-              touched();
-              setAlias(v);
-            }}
-          />
-          {checks.length === 0 ? (
-            isValidLocalDate(asOf) ? <p>{t("noOpenChecks")}</p> : null
-          ) : (
-            <fieldset className="choice">
-              <legend>{t("reviewPlotLabels")}</legend>
-              <p className="hint">{t("labelsHint")}</p>
-              {checks.map((check, i) => (
-                <TextField
-                  key={check.subjectId}
-                  label={t("labelForItem", { n: i + 1 })}
-                  value={labelOf(check.subjectId, check.label)}
-                  error={errors[`label:${check.subjectId}`]}
-                  autoComplete="off"
-                  onChange={(v) => {
-                    touched();
-                    setTyped((now) => ({ ...now, [check.subjectId]: v }));
-                  }}
-                />
-              ))}
-            </fieldset>
-          )}
-          <div className="actions">
-            <Button type="submit" primary={primary === "preview"}>
-              {t("previewReviewFile")}
-            </Button>
-          </div>
-        </form>
-      )}
-
+  // What the last action said, and the buttons that go with it. It stands at the foot of what you type.
+  const notices = (
+    <>
       {note === undefined ? null : <Notice tone="error">{note}</Notice>}
       <Status status={status} actions={{ openLatest: () => void open.reload(), keepDraft: () => setStatus({ phase: "idle" }), tryAgain: () => setStatus({ phase: "idle" }) }} />
+    </>
+  );
 
-      {plan === undefined ? null : (
-        <section className="card stack" aria-labelledby="preview-heading">
-          <h2 id="preview-heading" ref={previewHeading} tabIndex={-1}>
-            {t("reviewFilePreview")}
-          </h2>
-          <p>{plan.preview.count === 1 ? t("oneCheckInFile") : t("checksInFile", { count: plan.preview.count })}</p>
-          <p>{t("fileSize", { bytes: plan.preview.bytes })}</p>
-          <h3>{t("fileHoldsHeading")}</h3>
-          <ul className="plain stack">
-            {fileHolds(plan.preview).map((key) => (
-              <li key={key}>{t(key)}</li>
-            ))}
-          </ul>
-          <div className="actions">
-            <Button aria-expanded={showNames} onClick={() => setShowNames((now) => !now)}>
-              {showNames ? t("hideFieldNames") : t("showFieldNames")}
-            </Button>
-          </div>
-          {showNames ? (
-            <div className="stack">
-              <h3>{t("fieldsInFile")}</h3>
-              <ul className="plain stack">
-                <li>{t("wholeFileFields", { fields: plan.preview.siteFields.join(", ") })}</li>
-                <li>{t("eachCheckFields", { fields: plan.preview.issueFields.join(", ") })}</li>
-              </ul>
+  return (
+    <section className="stack page">
+      <div className="page-head on-ground">
+        <h1>{t("committeeReview")}</h1>
+        <ButtonLink href={base} quiet>
+          {t("backToRegister")}
+        </ButtonLink>
+      </div>
+      <p className="ground-note">{t("committeeReviewHint")}</p>
+
+      <div className="review-layout">
+        {empty ? (
+          <>
+            <Notice>{t("emptyRegisterReview")}</Notice>
+            {notices}
+          </>
+        ) : (
+          <form ref={form} className="stack card review-input" onSubmit={preview} noValidate>
+            <div className="field-grid">
+              <TextField
+                label={t("chooseReviewDate")}
+                type="date"
+                value={asOf}
+                error={errors["asOf"]}
+                onChange={(v) => {
+                  touched();
+                  setAsOf(v);
+                }}
+              />
+              <TextField
+                label={t("siteNameForCommittee")}
+                value={alias}
+                error={errors["alias"]}
+                autoComplete="off"
+                onChange={(v) => {
+                  touched();
+                  setAlias(v);
+                }}
+              />
             </div>
-          ) : null}
-          <ul className="cards plain">
-            {plan.preview.rows.map((row, i) => (
-              <li key={`${row.label}-${i}`} className="card">
-                {t("checkRowLine", { label: row.label, reason: reasonOf(row.rule), version: row.factVersion })}
-              </li>
-            ))}
-          </ul>
-          <div className="actions">
-            {done === undefined ? (
-              <Button primary={primary === "download"} onClick={() => void download()} disabled={status.phase === "saving"}>
-                {t("downloadReviewFile")}
-              </Button>
+            {checks.length === 0 ? (
+              isValidLocalDate(asOf) ? <p>{t("noOpenChecks")}</p> : null
             ) : (
-              <Button onClick={downloadAgain}>{t("downloadAgain")}</Button>
+              <fieldset className="choice">
+                <legend>{t("reviewPlotLabels")}</legend>
+                <p className="hint">{t("labelsHint")}</p>
+                {checks.map((check, i) => (
+                  <TextField
+                    key={check.subjectId}
+                    label={t("labelForItem", { n: i + 1 })}
+                    value={labelOf(check.subjectId, check.label)}
+                    error={errors[`label:${check.subjectId}`]}
+                    autoComplete="off"
+                    onChange={(v) => {
+                      touched();
+                      setTyped((now) => ({ ...now, [check.subjectId]: v }));
+                    }}
+                  />
+                ))}
+              </fieldset>
             )}
-          </div>
-        </section>
-      )}
-
-      <div className="stack">
-        <div className="field">
-          <label htmlFor="slip-file">{t("openReturnSlip")}</label>
-          <input id="slip-file" type="file" accept=".json,application/json" onChange={(e) => void chooseSlip(e)} />
-          <p className="hint">{t("openReturnSlipHint")}</p>
-        </div>
-        {reading === undefined || reading.ok ? null : (
-          <div className="notice error" role="alert">
-            <p>{t(REFUSAL_KEYS[reading.code] ?? "reason_unknown")}</p>
-            <p>{t("chooseAnotherFile")}</p>
-          </div>
+            <div className="actions">
+              <Button type="submit" primary={primary === "preview"}>
+                {t("previewReviewFile")}
+              </Button>
+            </div>
+            {notices}
+          </form>
         )}
+
+        {plan === undefined ? null : (
+          <section className="card stack review-preview" aria-labelledby="preview-heading">
+            <h2 id="preview-heading" ref={previewHeading} tabIndex={-1}>
+              {t("reviewFilePreview")}
+            </h2>
+            <p>{plan.preview.count === 1 ? t("oneCheckInFile") : t("checksInFile", { count: plan.preview.count })}</p>
+            <p>{t("fileSize", { bytes: plan.preview.bytes })}</p>
+            <h3>{t("fileHoldsHeading")}</h3>
+            <ul className="plain stack">
+              {fileHolds(plan.preview).map((key) => (
+                <li key={key}>{t(key)}</li>
+              ))}
+            </ul>
+            <div className="actions">
+              <Button aria-expanded={showNames} onClick={() => setShowNames((now) => !now)}>
+                {showNames ? t("hideFieldNames") : t("showFieldNames")}
+              </Button>
+            </div>
+            {showNames ? (
+              <div className="stack">
+                <h3>{t("fieldsInFile")}</h3>
+                <ul className="plain stack">
+                  <li>{t("wholeFileFields", { fields: plan.preview.siteFields.join(", ") })}</li>
+                  <li>{t("eachCheckFields", { fields: plan.preview.issueFields.join(", ") })}</li>
+                </ul>
+              </div>
+            ) : null}
+            <ul className="cards plain">
+              {plan.preview.rows.map((row, i) => (
+                <li key={`${row.label}-${i}`} className="card">
+                  {t("checkRowLine", { label: row.label, reason: reasonOf(row.rule), version: row.factVersion })}
+                </li>
+              ))}
+            </ul>
+            <div className="actions">
+              {done === undefined ? (
+                <Button primary={primary === "download"} onClick={() => void download()} disabled={status.phase === "saving"}>
+                  {t("downloadReviewFile")}
+                </Button>
+              ) : (
+                <Button onClick={downloadAgain}>{t("downloadAgain")}</Button>
+              )}
+            </div>
+          </section>
+        )}
+
+        <div className="stack card review-slip">
+          <div className="field">
+            <label htmlFor="slip-file">{t("openReturnSlip")}</label>
+            <input id="slip-file" type="file" accept=".json,application/json" onChange={(e) => void chooseSlip(e)} />
+            <p className="hint">{t("openReturnSlipHint")}</p>
+          </div>
+          {reading === undefined || reading.ok ? null : (
+            <div className="notice error" role="alert">
+              <p>{t(REFUSAL_KEYS[reading.code] ?? "reason_unknown")}</p>
+              <p>{t("chooseAnotherFile")}</p>
+            </div>
+          )}
+        </div>
       </div>
 
       {reading === undefined || !reading.ok ? null : (

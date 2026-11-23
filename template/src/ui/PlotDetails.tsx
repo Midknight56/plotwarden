@@ -311,209 +311,213 @@ export function PlotDetails({ plotId }: { plotId: string }) {
   const errorFor = (field: string) => (fieldError?.field === field ? fieldError.text : undefined);
 
   return (
-    <section className="stack" ref={form}>
-      <h1>{t("plotTitle", { code: plot.code })}</h1>
-      <p>{row.line}</p>
-      <div className="actions">
-        <ButtonLink href={`${base}/list?plot=${plotId}`}>{t("backToPlotList")}</ButtonLink>
-        <ButtonLink href={base}>{t("backToRegister")}</ButtonLink>
-        <ButtonLink href={`${base}/map?plot=${plotId}`}>{t("showOnMap")}</ButtonLink>
+    <section className="stack page" ref={form}>
+      <div className="page-head on-ground">
+        <h1>{t("plotTitle", { code: plot.code })}</h1>
+        <p>{row.line}</p>
+        <div className="actions">
+          <ButtonLink href={`${base}/list?plot=${plotId}`}>{t("backToPlotList")}</ButtonLink>
+          <ButtonLink href={base}>{t("backToRegister")}</ButtonLink>
+          <ButtonLink href={`${base}/map?plot=${plotId}`}>{t("showOnMap")}</ButtonLink>
+        </div>
       </div>
-      {app.plotExtras === undefined ? null : <app.plotExtras plotId={plotId} />}
-      <Status
-        status={status}
-        actions={{
-          tryAgain: () => setStatus({ phase: "idle" }),
-          keepEditing: () => setStatus({ phase: "idle" }),
-          openLatest: () => void open.reload(),
-          ...kept.actions(typedText, setStatus),
-        }}
-      />
-      <DraftOffer draft={kept} onResume={restoreTyped} />
-      {needsCorrection ? (
-        <div className="actions">
-          <Button onClick={() => setCorrecting(true)}>{t("correctAnEntry")}</Button>
-        </div>
-      ) : null}
-
-      <section className="card stack" aria-labelledby="codes-heading">
-        <h2 id="codes-heading">{t("previousCodes")}</h2>
-        {plot.priorCodes.length === 0 ? (
-          <p>{t("noPreviousCodes")}</p>
-        ) : (
-          <ul className="plain">
-            {plot.priorCodes.map((c) => (
-              <li key={c}>{t("wasCode", { code: c })}</li>
-            ))}
-          </ul>
-        )}
-      </section>
-
-      <section className="card stack" aria-labelledby="spaces-heading">
-        <h2 id="spaces-heading">{t("spaces")}</h2>
-        <ul className="plain stack">
-          {spaces.map((s) => {
-            const view = spaceStateAt(open.state.core, s.spaceId, open.today);
-            return (
-              <li key={s.spaceId}>
-                {t("spaceLine", { label: s.label, state: view?.state === undefined ? t("needsChecking") : stateWord(view.state) })}
-              </li>
-            );
-          })}
-        </ul>
-      </section>
-
-      <section className="card stack" aria-labelledby="status-heading">
-        <h2 id="status-heading">{t("physicalStatus")}</h2>
-        {spaces.length > 1 ? (
-          <SelectField label={t("chooseSpace")} value={chosenSpace} onChange={setSpaceId} options={spaces.map((s) => ({ value: s.spaceId, label: s.label }))} />
-        ) : null}
-        <div className="actions">
-          <Button aria-pressed={action === "check"} onClick={() => setAction("check")}>
-            {t("checkPlot")}
-          </Button>
-          <Button aria-pressed={action === "free"} onClick={() => setAction("free")}>
-            {t("markFree")}
-          </Button>
-          <Button aria-pressed={action === "unusable"} onClick={() => setAction("unusable")}>
-            {t("markUnusable")}
-          </Button>
-          <Button aria-pressed={action === "return"} onClick={() => setAction("return")}>
-            {t("returnToUse")}
-          </Button>
-        </div>
-        {action === undefined ? null : (
-          <div className="stack">
-            <TextArea label={t("reason")} value={reason} onChange={setReason} error={errorFor("reason")} name="reason" />
-            <TextField label={t("effectiveDate")} type="date" value={date} onChange={setDate} />
-            <div className="actions">
-              <Button primary onClick={() => void confirm()} disabled={busy}>
-                {t("confirmChange")}
-              </Button>
-              <Button onClick={() => setAction(undefined)}>{t("cancel")}</Button>
-            </div>
-          </div>
-        )}
-        {claims.length === 0 ? null : (
-          <div className="actions">
+      <div className="sheet-columns">
+        {app.plotExtras === undefined ? null : <app.plotExtras plotId={plotId} />}
+        <Status
+          status={status}
+          actions={{
+            tryAgain: () => setStatus({ phase: "idle" }),
+            keepEditing: () => setStatus({ phase: "idle" }),
+            openLatest: () => void open.reload(),
+            ...kept.actions(typedText, setStatus),
+          }}
+        />
+        <DraftOffer draft={kept} onResume={restoreTyped} />
+        {needsCorrection ? (
+          <div className="actions on-ground">
             <Button onClick={() => setCorrecting(true)}>{t("correctAnEntry")}</Button>
           </div>
-        )}
-      </section>
+        ) : null}
 
-      <Dialog open={correcting} title={t("correctAnEntry")} onClose={() => setCorrecting(false)}>
-        <p>{t("correctionHint")}</p>
-        <SelectField
-          label={t("chooseEntry")}
-          value={claimChoice === "" ? (claims[0]?.claimId ?? "") : claimChoice}
-          onChange={setClaimChoice}
-          options={claims.map((c) => ({ value: c.claimId, label: `${t(c.mode === "taken" ? "stateTaken" : c.mode === "held" ? "stateReserved" : "stateUnusable")} · ${c.sourceRef ?? c.start ?? c.claimId.slice(0, 8)}` }))}
-        />
-        <TextArea label={t("reasonForCorrection")} value={correctionReason} onChange={setCorrectionReason} error={errorFor("correction")} />
-        <div className="actions">
-          <Button primary onClick={() => void correct()} disabled={busy}>
-            {t("recordCorrection")}
-          </Button>
-        </div>
-      </Dialog>
+        <section className="card stack" aria-labelledby="codes-heading">
+          <h2 id="codes-heading">{t("previousCodes")}</h2>
+          {plot.priorCodes.length === 0 ? (
+            <p>{t("noPreviousCodes")}</p>
+          ) : (
+            <ul className="plain">
+              {plot.priorCodes.map((c) => (
+                <li key={c}>{t("wasCode", { code: c })}</li>
+              ))}
+            </ul>
+          )}
+        </section>
 
-      <section className="card stack" aria-labelledby="rename-heading">
-        <h2 id="rename-heading">{t("renamePlot")}</h2>
-        <form className="stack" onSubmit={(e) => void rename(e)} noValidate>
-          <TextField label={t("newPlotCode")} value={newCode} onChange={setNewCode} error={errorFor("code")} autoComplete="off" />
-          <div className="actions">
-            <Button primary type="submit" disabled={busy}>
-              {t("renamePlot")}
-            </Button>
-          </div>
-        </form>
-      </section>
-
-      <section className="card stack" aria-labelledby="history-heading">
-        <h2 id="history-heading">{t("history")}</h2>
-        {history.length === 0 ? (
-          <p>{t("noEventsYet")}</p>
-        ) : (
+        <section className="card stack" aria-labelledby="spaces-heading">
+          <h2 id="spaces-heading">{t("spaces")}</h2>
           <ul className="plain stack">
-            {history.map((h) => {
-              const event = open.events.find((e) => e.eventId === h.eventId);
-              const when = h.effectiveOn ?? localDateOf(h.recordedAt, open.site.zone);
-              const ref = h.sourceRef === undefined ? "" : ` · ${t("sourceOf", { ref: h.sourceRef })}`;
+            {spaces.map((s) => {
+              const view = spaceStateAt(open.state.core, s.spaceId, open.today);
               return (
-                <li key={h.eventId}>
-                  {t("historyLine", { what: eventWord(t, event?.type ?? ""), date: when })}
-                  {ref}
+                <li key={s.spaceId}>
+                  {t("spaceLine", { label: s.label, state: view?.state === undefined ? t("needsChecking") : stateWord(view.state) })}
                 </li>
               );
             })}
           </ul>
-        )}
-      </section>
+        </section>
 
-      <section className="card stack" aria-labelledby="notes-heading">
-        <h2 id="notes-heading">{t("notes")}</h2>
-        {notes.length === 0 ? (
-          <p>{t("noNotes")}</p>
-        ) : (
-          <ul className="plain stack">
-            {notes.map((n) => (
-              <li key={n.noteId} className="note-text">
-                {n.text}
-              </li>
-            ))}
-          </ul>
-        )}
-        <form className="stack" onSubmit={(e) => void addNote(e)} noValidate>
-          <TextArea label={t("noteLabel")} value={note} onChange={setNote} error={errorFor("note")} />
+        <section className="card stack" aria-labelledby="status-heading">
+          <h2 id="status-heading">{t("physicalStatus")}</h2>
+          {spaces.length > 1 ? (
+            <SelectField label={t("chooseSpace")} value={chosenSpace} onChange={setSpaceId} options={spaces.map((s) => ({ value: s.spaceId, label: s.label }))} />
+          ) : null}
           <div className="actions">
-            <Button primary type="submit" disabled={busy}>
-              {t("addNote")}
+            <Button aria-pressed={action === "check"} onClick={() => setAction("check")}>
+              {t("checkPlot")}
+            </Button>
+            <Button aria-pressed={action === "free"} onClick={() => setAction("free")}>
+              {t("markFree")}
+            </Button>
+            <Button aria-pressed={action === "unusable"} onClick={() => setAction("unusable")}>
+              {t("markUnusable")}
+            </Button>
+            <Button aria-pressed={action === "return"} onClick={() => setAction("return")}>
+              {t("returnToUse")}
             </Button>
           </div>
-        </form>
-      </section>
+          {action === undefined ? null : (
+            <div className="stack">
+              <TextArea label={t("reason")} value={reason} onChange={setReason} error={errorFor("reason")} name="reason" />
+              <TextField label={t("effectiveDate")} type="date" value={date} onChange={setDate} />
+              <div className="actions">
+                <Button onClick={() => void confirm()} disabled={busy}>
+                  {t("confirmChange")}
+                </Button>
+                <Button onClick={() => setAction(undefined)}>{t("cancel")}</Button>
+              </div>
+            </div>
+          )}
+          {claims.length === 0 ? null : (
+            <div className="actions">
+              <Button onClick={() => setCorrecting(true)}>{t("correctAnEntry")}</Button>
+            </div>
+          )}
+        </section>
 
-      <section className="card stack" aria-labelledby="photos-heading">
-        <h2 id="photos-heading">{t("photos")}</h2>
-        {photos.length === 0 ? (
-          <p>{t("noPhotos")}</p>
-        ) : (
-          <ul className="plain stack">
-            {photos.map((p) => (
-              <li key={p.photoId} className="stack">
-                <PhotoImage blobId={p.blobId} alt={"text" in p.caption ? p.caption.text : t("descriptionPending")} />
-                <p>{"text" in p.caption ? p.caption.text : t("descriptionPending")}</p>
-                <div className="actions">
-                  <Button onClick={() => void removePhoto(p.photoId)} disabled={busy}>
-                    {t("removePhoto")}
-                  </Button>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-        <form className="stack" onSubmit={(e) => void addPhoto(e)} noValidate>
-          <div className="field">
-            <label htmlFor="photo-file">{t("choosePhoto")}</label>
-            <input
-              id="photo-file"
-              data-photo="true"
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              aria-invalid={errorFor("photo") === undefined ? undefined : true}
-              onChange={(e) => setPhotoFile(e.target.files?.[0])}
-            />
-            {errorFor("photo") === undefined ? null : <p className="error" role="alert">{errorFor("photo")}</p>}
-          </div>
-          <TextField label={t("description")} value={caption} onChange={setCaption} error={errorFor("caption")} disabled={pending} autoComplete="off" />
-          <CheckField label={t("descriptionPending")} checked={pending} onChange={setPending} />
+        <Dialog open={correcting} title={t("correctAnEntry")} onClose={() => setCorrecting(false)}>
+          <p>{t("correctionHint")}</p>
+          <SelectField
+            label={t("chooseEntry")}
+            value={claimChoice === "" ? (claims[0]?.claimId ?? "") : claimChoice}
+            onChange={setClaimChoice}
+            options={claims.map((c) => ({ value: c.claimId, label: `${t(c.mode === "taken" ? "stateTaken" : c.mode === "held" ? "stateReserved" : "stateUnusable")} · ${c.sourceRef ?? c.start ?? c.claimId.slice(0, 8)}` }))}
+          />
+          <TextArea label={t("reasonForCorrection")} value={correctionReason} onChange={setCorrectionReason} error={errorFor("correction")} />
           <div className="actions">
-            <Button primary type="submit" disabled={busy}>
-              {t("addPhoto")}
+            <Button primary onClick={() => void correct()} disabled={busy}>
+              {t("recordCorrection")}
             </Button>
           </div>
-        </form>
-      </section>
+        </Dialog>
+
+        <section className="card stack" aria-labelledby="rename-heading">
+          <h2 id="rename-heading">{t("renamePlot")}</h2>
+          <form className="stack" onSubmit={(e) => void rename(e)} noValidate>
+            <TextField label={t("newPlotCode")} value={newCode} onChange={setNewCode} error={errorFor("code")} autoComplete="off" />
+            <div className="actions">
+              <Button type="submit" disabled={busy}>
+                {t("renamePlot")}
+              </Button>
+            </div>
+          </form>
+        </section>
+
+        <section className="card stack" aria-labelledby="history-heading">
+          <h2 id="history-heading">{t("history")}</h2>
+          {history.length === 0 ? (
+            <p>{t("noEventsYet")}</p>
+          ) : (
+            <ul className="plain stack">
+              {history.map((h) => {
+                const event = open.events.find((e) => e.eventId === h.eventId);
+                const when = h.effectiveOn ?? localDateOf(h.recordedAt, open.site.zone);
+                const ref = h.sourceRef === undefined ? "" : ` · ${t("sourceOf", { ref: h.sourceRef })}`;
+                return (
+                  <li key={h.eventId}>
+                    {t("historyLine", { what: eventWord(t, event?.type ?? ""), date: when })}
+                    {ref}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </section>
+
+        <section className="card stack" aria-labelledby="notes-heading">
+          <h2 id="notes-heading">{t("notes")}</h2>
+          {notes.length === 0 ? (
+            <p>{t("noNotes")}</p>
+          ) : (
+            <ul className="plain stack">
+              {notes.map((n) => (
+                <li key={n.noteId} className="note-text">
+                  {n.text}
+                </li>
+              ))}
+            </ul>
+          )}
+          <form className="stack" onSubmit={(e) => void addNote(e)} noValidate>
+            <TextArea label={t("noteLabel")} value={note} onChange={setNote} error={errorFor("note")} />
+            <div className="actions">
+              <Button type="submit" disabled={busy}>
+                {t("addNote")}
+              </Button>
+            </div>
+          </form>
+        </section>
+
+        <section className="card stack" aria-labelledby="photos-heading">
+          <h2 id="photos-heading">{t("photos")}</h2>
+          {photos.length === 0 ? (
+            <p>{t("noPhotos")}</p>
+          ) : (
+            <ul className="plain stack">
+              {photos.map((p) => (
+                <li key={p.photoId} className="stack">
+                  <PhotoImage blobId={p.blobId} alt={"text" in p.caption ? p.caption.text : t("descriptionPending")} />
+                  <p>{"text" in p.caption ? p.caption.text : t("descriptionPending")}</p>
+                  <div className="actions">
+                    <Button onClick={() => void removePhoto(p.photoId)} disabled={busy}>
+                      {t("removePhoto")}
+                    </Button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+          <form className="stack" onSubmit={(e) => void addPhoto(e)} noValidate>
+            <div className="field">
+              <label htmlFor="photo-file">{t("choosePhoto")}</label>
+              <input
+                id="photo-file"
+                data-photo="true"
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                aria-invalid={errorFor("photo") === undefined ? undefined : true}
+                onChange={(e) => setPhotoFile(e.target.files?.[0])}
+              />
+              {errorFor("photo") === undefined ? null : <p className="error" role="alert">{errorFor("photo")}</p>}
+            </div>
+            <TextField label={t("description")} value={caption} onChange={setCaption} error={errorFor("caption")} disabled={pending} autoComplete="off" />
+            <CheckField label={t("descriptionPending")} checked={pending} onChange={setPending} />
+            <div className="actions">
+              <Button type="submit" disabled={busy}>
+                {t("addPhoto")}
+              </Button>
+            </div>
+          </form>
+        </section>
+      </div>
     </section>
   );
 }

@@ -242,6 +242,55 @@ describe("the hub", () => {
     expect(html).not.toMatch(/https?:\/\//);
   });
 
+  it("starts with the stripe in the three app colours and the bar with the brand and About, neither with a word on a picture", () => {
+    const html = hub();
+    expect(html).toMatch(/^<div class="stripe" aria-hidden="true"><\/div><header class="bar">/);
+    const bar = /<header class="bar">([\s\S]*?)<\/header>/.exec(html)?.[1] ?? "";
+    expect(textOf(bar)).toBe("Plotwarden About");
+    expect(bar).toMatch(/<span class="brand">Plotwarden<\/span>/);
+    expect(bar).not.toMatch(/<img\b|<svg\b|\.svg/);
+    expect(html).not.toMatch(/class="sky/);
+  });
+
+  it("lays the two registers as doors, each with an art band that has no words and no control in it", () => {
+    const html = hub();
+    expect(html).toMatch(/<ul class="doors plain">/);
+    const doors = [...html.matchAll(/<li class="door (church|garden)">([\s\S]*?)<\/li>/g)];
+    expect(doors.map((d) => d[1])).toEqual(["church", "garden"]);
+    for (const door of doors) {
+      const art = /<div class="door-art" aria-hidden="true">([\s\S]*?)<\/div>/.exec(door[2] as string);
+      expect(art, door[1]).not.toBeNull();
+      expect(art?.[1], `${door[1]}: nothing in the band`).toBe("");
+      expect(door[2], door[1]).toMatch(/<article\b[^>]*aria-labelledby="choice-(church|garden)"/);
+      expect(door[2], door[1]).not.toMatch(/<img\b|\sstyle=/);
+    }
+  });
+
+  it("puts the Review Desk in a card of its own, not an article, and the sheets for visitors after it, each with a picture drawn in code", () => {
+    const html = hub();
+    expect((html.match(/<article\b/g) ?? []).length, "only the two doors are articles").toBe(2);
+    const desk = /<section class="review-card"[^>]*>([\s\S]*?)<\/section>/.exec(html);
+    expect(desk, "the Review Desk card").not.toBeNull();
+    expect(desk?.[1]).toMatch(/<h3[^>]*>Plotwarden Review Desk<\/h3>/);
+    expect(links(desk?.[1] ?? "").map((l) => l.text)).toEqual(["Open Review Desk preview"]);
+    const rows = [...html.matchAll(/<div class="sheet-row">([\s\S]*?)<\/div>/g)].map((m) => m[1] as string);
+    expect(rows.length).toBe(2);
+    rows.forEach((row, i) => {
+      expect(row, `row ${i}`).toMatch(/^<span class="sheet-pic (church|garden)" aria-hidden="true"><\/span><a\b/);
+      expect(textOf(row.replace(/<span class="sheet-pic[^>]*><\/span>/, "")), `row ${i}`).toBe(i === 0 ? "See the family map" : "See the plot seeker map");
+    });
+    expect(html.indexOf('class="review-card"')).toBeGreaterThan(html.indexOf('class="doors plain"'));
+    expect(html.indexOf('class="sheet-row"')).toBeGreaterThan(html.indexOf('class="review-card"'));
+  });
+
+  it("keeps the links in the order of the page: About, each door twice, the Desk, then the two sheets", () => {
+    expect(links(hub()).map((l) => l.text)).toEqual(["About", "Try the practice register", "Start your own", "Try the practice register", "Start your own", "Open Review Desk preview", "See the family map", "See the plot seeker map"]);
+  });
+
+  it("gives the page one stripe and the same bar to About and Page not found", () => {
+    for (const hash of ["#/about", "#/nope"]) expect(hub(hash)).toMatch(/^<div class="stripe" aria-hidden="true"><\/div><header class="bar">/);
+  });
+
   it("makes no claim on the home page that the places are invented, which About says", () => {
     expect(textOf(hub())).not.toMatch(/invented/i);
     expect(textOf(hub("#/about"))).toContain(SITE_COPY.aboutInvented);

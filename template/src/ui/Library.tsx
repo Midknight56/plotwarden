@@ -224,9 +224,11 @@ export function NewSite() {
   };
 
   return (
-    <section className="stack">
-      <h1>{t("startRegister")}</h1>
-      <form ref={form} className="stack" onSubmit={(e) => void submit(e)} noValidate>
+    <section className="stack page">
+      <div className="page-head on-ground">
+        <h1>{t("startRegister")}</h1>
+      </div>
+      <form ref={form} className="stack card form-sheet" onSubmit={(e) => void submit(e)} noValidate>
         <TextField label={t("siteName")} value={title} onChange={setTitle} error={errors.title} autoComplete="off" />
         <SelectField label={t("localTimeZone")} value={zone} onChange={setZone} options={options.map((z) => ({ value: z, label: z }))} />
         {app.adapter.usesCurrency === true ? (

@@ -6,7 +6,7 @@
 import { expect, test } from "@playwright/test";
 import type { Page } from "@playwright/test";
 import { findLabelCollisions, measureLayout, readSheetScene, trackRequests } from "../helpers/measureLayout";
-import { APPS, CHURCH, GARDEN, LIBRARY_ROUTES, openPractice, plotIdOf, proof, routeName, routesOf, settle, sizeOf, startOwn, storedEvents, tabTo } from "../helpers/routes";
+import { APPS, CHURCH, GARDEN, LIBRARY_ROUTES, focusedName, openPractice, plotIdOf, proof, routeName, routesOf, settle, sizeOf, startOwn, storedEvents, storedSites, tabTo } from "../helpers/routes";
 import type { AppUnderTest } from "../helpers/routes";
 import { SITE, hubCard } from "../helpers/siteOrigin";
 
@@ -907,6 +907,818 @@ test.describe("Allotment Register, the desk card", () => {
     await check(page, "the plan with a chosen bed");
   });
 });
+// ---- The screens of tasks 7.20 and 7.22, and the mends of the lead's review (spec 07, L7.4, L7.5, L7.7) ---------------
+//
+// Each screen is measured at its own size (360 or 1920) and at 1440: no sideways scroll, every target 44 by 44 with 12
+// between, the sheets where the design puts them, the one main action, the heading on the ground, and the reading and
+// tab order of today. The expected sizes are the numbers of the design and the task.
+
+type Size = { width: number; height: number };
+type Box = { x: number; y: number; w: number; h: number; right: number; bottom: number };
+
+const IVORY = "rgb(250, 245, 233)";
+const AMBER = "rgb(242, 201, 107)";
+const STONE = "rgb(255, 254, 248)";
+const LEAF = "rgb(47, 107, 79)";
+const CLEAR = "rgba(0, 0, 0, 0)";
+
+const sizesOf = (page: Page): Size[] => [page.viewportSize() as Size, { width: 1440, height: 900 }];
+
+async function expectNoSideways(page: Page, label: string): Promise<void> {
+  const read = await page.evaluate(() => ({ scroll: document.documentElement.scrollWidth, client: document.documentElement.clientWidth }));
+  expect(read.scroll, `${label}: no sideways scroll`).toBeLessThanOrEqual(read.client);
+}
+
+/**
+ * The names of the next `count` tab stops, from the page heading, which has focus after a route opens. A date field has
+ * a stop for each of its parts (day, month, year), so a stop that is still on the same element as the last one is not a
+ * new stop.
+ */
+async function tabNames(page: Page, count: number): Promise<string[]> {
+  await page.locator("main h1").first().focus();
+  await page.evaluate(() => {
+    (window as unknown as { __lastStop?: Element | null }).__lastStop = document.activeElement;
+  });
+  const names: string[] = [];
+  for (let presses = 0; names.length < count && presses < count * 4; presses += 1) {
+    await page.keyboard.press("Tab");
+    const same = await page.evaluate(() => {
+      const holder = window as unknown as { __lastStop?: Element | null };
+      const now = document.activeElement;
+      const was = holder.__lastStop === now;
+      holder.__lastStop = now;
+      return was;
+    });
+    if (!same) names.push(await focusedName(page));
+  }
+  return names;
+}
+
+const boxOf = (page: Page, selector: string): Promise<Box> =>
+  page
+    .locator(selector)
+    .first()
+    .evaluate((el) => {
+      const r = el.getBoundingClientRect();
+      return { x: r.x + window.scrollX, y: r.y + window.scrollY, w: r.width, h: r.height, right: r.right + window.scrollX, bottom: r.bottom + window.scrollY };
+    });
+
+async function styleOf<K extends string>(page: Page, selector: string, props: readonly K[], pseudo?: string): Promise<Record<K, string>> {
+  return page.locator(selector).first().evaluate(
+    (el, a) => {
+      const style = getComputedStyle(el, a.pseudo ?? null) as unknown as Record<string, string>;
+      return Object.fromEntries(a.props.map((p) => [p, style[p] ?? ""]));
+    },
+    { props: [...props], pseudo },
+  ) as Promise<Record<K, string>>;
+}
+
+/** The heading is on the ground in ivory, and nothing but the two ground colours stands on the night. */
+async function expectHeadingOnNight(page: Page, label: string): Promise<void> {
+  const h1 = await styleOf(page, "main h1", ["color"]);
+  expect(h1.color, `${label}: the heading is ivory`).toBe(IVORY);
+  const onNight = (await textOnGround(page, "main")).filter((t) => t.behind === "#232a5c");
+  expect(onNight.length, `${label}: the heading stands on the night`).toBeGreaterThanOrEqual(1);
+  for (const t of onNight) expect(["#faf5e9", "#c9cee6"], `${label}: "${t.text}" stands on the night in ${t.colour}`).toContain(t.colour);
+}
+
+/** How far the page runs on below its main part: the foot band of the churchyard, 56 px, or nothing. */
+const footBand = (page: Page): Promise<number> =>
+  page.evaluate(() => (document.querySelector(".shell") as Element).getBoundingClientRect().bottom - (document.querySelector("main") as Element).getBoundingClientRect().bottom);
+
+/**
+ * What a person sees of one button at rest: its fill, its edge, and whether it is drawn as a link. The pointer is moved to the
+ * corner first and the colour change of a hover is waited out, so a fill that is read is never a hover that a click left behind.
+ */
+async function buttonLook(locator: ReturnType<Page["getByRole"]>) {
+  const page = locator.page();
+  await page.mouse.move(0, 0);
+  await page.waitForFunction(() =>
+    document.getAnimations().every((a) => {
+      const timing = a.effect?.getComputedTiming();
+      return timing === undefined || timing.iterations === Infinity || a.playState === "finished" || a.playState === "idle";
+    }),
+  );
+  return locator.evaluate((el) => {
+    const s = getComputedStyle(el);
+    return { classes: [...el.classList], bg: s.backgroundColor, colour: s.color, border: s.borderTopWidth, borderColour: s.borderTopColor, line: s.textDecorationLine, h: el.getBoundingClientRect().height };
+  });
+}
+
+/** The new register form, in either app: a sheet at most 600 wide, an error with its mark, focus on the field, nothing saved. */
+async function checkNewRegister(page: Page, app: AppUnderTest): Promise<void> {
+  const night = app.key === "churchyard";
+  for (const size of sizesOf(page)) {
+    await page.setViewportSize(size);
+    await page.goto("/#/new");
+    await settle(page);
+    const label = `${app.title} at ${size.width}`;
+    await expectNoSideways(page, label);
+    const sheet = await boxOf(page, "form.form-sheet");
+    expect(sheet.w, `${label}: the form sheet is at most 600 wide`).toBeLessThanOrEqual(600);
+    if (size.width >= 700) expect(sheet.w, `${label}: and uses its 600`).toBeCloseTo(600, 0);
+    const look = await styleOf(page, "form.form-sheet", ["backgroundColor", "borderTopLeftRadius"]);
+    expect(look.backgroundColor).toBe(night ? STONE : "rgb(255, 254, 246)");
+    expect(look.borderTopLeftRadius).toBe(night ? "16px" : "14px");
+    if (night) await expectHeadingOnNight(page, label);
+    // One main action, 48 high, and Cancel outlined beside it.
+    const create = await buttonLook(page.getByRole("button", { name: "Create register" }));
+    expect(create.classes).toContain("primary");
+    expect(create.h, `${label}: Create register is 48 high`).toBeGreaterThanOrEqual(48);
+    const cancel = await buttonLook(page.getByRole("link", { name: "Cancel" }));
+    expect(cancel.classes).not.toContain("primary");
+    expect(cancel.classes).not.toContain("quiet");
+    expect(cancel.h).toBeGreaterThanOrEqual(48);
+    // An empty form: the field has the 3 px solid error border, the message has its mark, focus is on the field, and no register was added.
+    const before = (await storedSites(page)).length;
+    if (app.currency !== undefined) await page.getByLabel("Currency").selectOption(app.currency);
+    await page.getByRole("button", { name: "Create register" }).click();
+    const name = page.getByLabel("Site name", { exact: true });
+    await expect(name).toBeFocused();
+    const border = await styleOf(page, "input[aria-invalid='true']", ["borderTopWidth", "borderTopStyle", "borderTopColor"]);
+    expect(border).toEqual({ borderTopWidth: "3px", borderTopStyle: "solid", borderTopColor: "rgb(139, 26, 26)" });
+    const mark = await styleOf(page, ".field .error", ["width", "height", "backgroundColor"], "::before");
+    expect([mark.width, mark.height]).toEqual(["20px", "20px"]);
+    expect((await storedSites(page)).length, `${label}: nothing was saved`).toBe(before);
+    await check(page, `${label}, the error`);
+  }
+}
+
+// ---- Churchyard Register -----------------------------------------------------------------------------------------
+
+test.describe("Churchyard Register, the screens with sheets of their own (7.20, 7.22)", () => {
+  test.use({ baseURL: CHURCH.origin });
+
+  test("has no sideways scroll, keeps every target, and stands each heading on the night, on every screen", async ({ page }) => {
+    test.setTimeout(180_000);
+    const requests = trackRequests(page, CHURCH.origin);
+    const siteId = await openPractice(page, CHURCH);
+    const plot = plotIdOf(await storedEvents(page, siteId), "Y07");
+    const routes: [string, string][] = [
+      ["site map", `/#/r/${siteId}/map`],
+      ["site map with a plot", `/#/r/${siteId}/map?plot=${plot}`],
+      ["plot record", `/#/r/${siteId}/plot/${plot}`],
+      ["record a burial", `/#/r/${siteId}/burial/new`],
+      ["committee review", `/#/r/${siteId}/exchange`],
+      ["settings", `/#/r/${siteId}/settings`],
+      ["start a register", "/#/new"],
+    ];
+    for (const size of sizesOf(page)) {
+      await page.setViewportSize(size);
+      for (const [name, route] of routes) {
+        await page.goto(route);
+        await settle(page);
+        const label = `${name} at ${size.width}`;
+        await expectNoSideways(page, label);
+        await expectHeadingOnNight(page, label);
+        await check(page, label);
+        const main = await boxOf(page, "main");
+        expect(main.w, `${label}: main is at most 105rem`).toBeLessThanOrEqual(1680);
+        if (!name.startsWith("site map")) expect(main.w, `${label}: main is at most 90rem`).toBeLessThanOrEqual(1440);
+      }
+    }
+    expect(requests.external).toEqual([]);
+  });
+
+  test("site map: the map takes the room, a side sheet holds the controls, Back is quiet and Open plot list is the main action", async ({ page }) => {
+    const siteId = await openPractice(page, CHURCH);
+    for (const size of sizesOf(page)) {
+      await page.setViewportSize(size);
+      await page.goto(`/#/r/${siteId}/map`);
+      await settle(page);
+      const label = `at ${size.width}`;
+      const [main, mapMain, side] = [await boxOf(page, "main"), await boxOf(page, ".map-main"), await boxOf(page, ".map-side")];
+      if (size.width >= 1000) {
+        expect(side.x, `${label}: the side sheet is beside the map`).toBeGreaterThanOrEqual(mapMain.right);
+        expect(mapMain.w, `${label}: the map is wider than the side sheet`).toBeGreaterThan(side.w * 2);
+        expect(side.w, `${label}: the side sheet is at least 280`).toBeGreaterThanOrEqual(280);
+        expect(side.y, `${label}: they start together`).toBeCloseTo(mapMain.y, 0);
+        // The weights are 3 and 1: of the room above the two bases, the map has three parts and the side sheet one.
+        expect(mapMain.w - 560, `${label}: the map takes three parts of the spare room`).toBeCloseTo(3 * (side.w - 280), -1);
+      } else {
+        expect(side.y, `${label}: the side sheet is under the map`).toBeGreaterThanOrEqual(mapMain.bottom - 1);
+        expect(side.w).toBeLessThanOrEqual(size.width - 32 + 1);
+      }
+      if (size.width === 1920) expect(main.w, "main is 105rem").toBeCloseTo(1680, 0);
+      const sheet = await styleOf(page, ".map-side", ["backgroundColor", "borderTopLeftRadius"]);
+      expect(sheet.backgroundColor).toBe(STONE);
+      // The side sheet holds the date field, the plot select, the zoom line and buttons, and Print site map. Nothing else of the screen is in it.
+      const inside = await page.locator(".map-side").evaluate((el) => ({
+        fields: [...el.querySelectorAll("label")].map((l) => l.textContent),
+        text: el.textContent ?? "",
+        buttons: [...el.querySelectorAll("button, a.button")].map((b) => b.textContent),
+      }));
+      expect(inside.fields).toEqual(["Show the site as at", "Choose a plot"]);
+      expect(inside.text).toContain("Zoom 100 percent");
+      expect(inside.buttons).toEqual(["Zoom in", "Zoom out", "Fit site", "Print site map"]);
+      // The key is directly under the map, inside the map column.
+      const key = await boxOf(page, ".map-main .map-key");
+      const frame = await boxOf(page, ".map-main .sheet-scroll");
+      expect(Math.abs(key.y - frame.bottom), `${label}: the key touches the map`).toBeLessThanOrEqual(1);
+      // The three heading buttons.
+      const back = await buttonLook(page.getByRole("link", { name: "Back to register" }));
+      expect(back.classes).toContain("quiet");
+      expect(back.line).toBe("underline");
+      expect(back.bg).toBe(CLEAR);
+      expect(back.colour, "a quiet button on the night is ivory").toBe(IVORY);
+      const list = await buttonLook(page.getByRole("link", { name: "Open plot list" }));
+      expect(list.classes).toContain("primary");
+      expect(list.bg).toBe(AMBER);
+      const edit = await buttonLook(page.getByRole("link", { name: "Edit map" }));
+      expect(edit.classes).not.toContain("primary");
+      expect(edit.classes).not.toContain("quiet");
+      expect(edit.borderColour).toBe(IVORY);
+      expect(await page.locator("main .button.primary").count(), `${label}: one main action`).toBe(1);
+      await check(page, `site map ${label}`);
+    }
+  });
+
+  test("site map: choosing a plot keeps its card in the side sheet, and the map and the key stay one frame", async ({ page }) => {
+    const siteId = await openPractice(page, CHURCH);
+    const plot = plotIdOf(await storedEvents(page, siteId), "Y07");
+    await page.goto(`/#/r/${siteId}/map?plot=${plot}`);
+    await settle(page);
+    const card = page.locator(".map-side").getByRole("region", { name: "Selected plot" });
+    await expect(card).toContainText("Y07 · Yew Walk · Taken");
+    await expect(card.getByRole("link", { name: "Open plot" })).toBeVisible();
+    await check(page, "site map with a plot chosen");
+  });
+
+  test("plot record: sheets in two columns on a wide screen and one on a phone, in today's order, with no main action", async ({ page }) => {
+    const siteId = await openPractice(page, CHURCH);
+    const plot = plotIdOf(await storedEvents(page, siteId), "Y07");
+    for (const size of sizesOf(page)) {
+      await page.setViewportSize(size);
+      await page.goto(`/#/r/${siteId}/plot/${plot}`);
+      await settle(page);
+      const label = `at ${size.width}`;
+      const read = await page.evaluate(() => {
+        const sheets = [...document.querySelectorAll<HTMLElement>(".sheet-columns > .card")];
+        const rect = (el: Element) => el.getBoundingClientRect();
+        return {
+          headings: sheets.map((s) => s.querySelector("h2")?.textContent),
+          lefts: [...new Set(sheets.map((s) => Math.round(rect(s).left)))],
+          widths: sheets.map((s) => Math.round(rect(s).width)),
+          bg: sheets.map((s) => getComputedStyle(s).backgroundColor),
+          primaries: [...document.querySelectorAll("main .button.primary, main .button.quiet")].map((b) => b.textContent),
+          outlined: [...document.querySelectorAll<HTMLElement>("main .button:not(:disabled)")].map((b) => [b.textContent, getComputedStyle(b).borderTopWidth]),
+          line: document.querySelector(".page-head p")?.textContent,
+        };
+      });
+      expect(read.headings, `${label}: today's order of sheets`).toEqual(["Burials", "Previous codes", "Spaces", "Physical status", "Rename plot", "History", "Notes", "Photos"]);
+      expect(read.primaries, `${label}: no main action and no quiet button, every button outlined`).toEqual([]);
+      for (const [text, border] of read.outlined) expect(border, `${label}: ${text} has the outline`).toBe("2px");
+      expect(read.bg.every((b) => b === STONE)).toBe(true);
+      expect(read.line).toBe("Y07 · Yew Walk · Taken · 2 of 2 spaces used");
+      if (size.width >= 1000) {
+        expect(read.lefts.length, `${label}: two columns`).toBe(2);
+        for (const w of read.widths) expect(w, `${label}: a sheet is at least 440 wide`).toBeGreaterThanOrEqual(440);
+      } else {
+        expect(read.lefts.length, `${label}: one column`).toBe(1);
+      }
+      // Rows inside a sheet are split by 1 px lines in the rule colour, and the last row has none.
+      const rows = await page.locator("section[aria-labelledby='history-heading'] ul > li").evaluateAll((items) =>
+        items.map((li) => {
+          const s = getComputedStyle(li);
+          return [s.borderBottomWidth, s.borderBottomColor];
+        }),
+      );
+      expect(rows.length).toBeGreaterThanOrEqual(3);
+      for (const row of rows.slice(0, -1)) expect(row, `${label}: a row line`).toEqual(["1px", "rgb(216, 205, 180)"]);
+      expect(rows[rows.length - 1]?.[0], `${label}: none under the last row`).toBe("0px");
+      // The sheet headings carry the double rule of the churchyard.
+      const heading = await styleOf(page, ".sheet-columns .card > h2", ["borderBottomStyle", "borderBottomWidth"]);
+      expect(heading).toEqual({ borderBottomStyle: "double", borderBottomWidth: "3px" });
+      await check(page, `plot record ${label}`);
+    }
+  });
+
+  test("record a burial: a form sheet at most 600 wide, the fields in a grid, Kind of date as one group, Save burial the main action", async ({ page }) => {
+    const siteId = await openPractice(page, CHURCH);
+    for (const size of sizesOf(page)) {
+      await page.setViewportSize(size);
+      await page.goto(`/#/r/${siteId}/burial/new`);
+      await settle(page);
+      const label = `at ${size.width}`;
+      const sheet = await boxOf(page, "form.form-sheet");
+      expect(sheet.w, `${label}: at most 600 wide`).toBeLessThanOrEqual(600);
+      expect((await styleOf(page, "form.form-sheet", ["backgroundColor"])).backgroundColor).toBe(STONE);
+      const grid = await page.locator("form.form-sheet .field-grid").evaluate((el) => ({ tracks: getComputedStyle(el).gridTemplateColumns.split(" ").length, labels: [...el.querySelectorAll("label")].map((l) => l.textContent) }));
+      expect(grid.labels).toEqual(["Section", "Plot", "Source ref", "Page"]);
+      expect(grid.tracks, `${label}: the fields are in ${size.width >= 700 ? "two columns" : "one column"}`).toBe(size.width >= 700 ? 2 : 1);
+      const group = await page.locator("form.form-sheet fieldset").evaluate((el) => ({ legend: el.querySelector("legend")?.textContent, radios: [...el.querySelectorAll("input[type=radio]")].map((r) => (r.closest("label") as HTMLElement).textContent) }));
+      expect(group).toEqual({ legend: "Kind of date", radios: ["Exact date", "Month and year", "Year only", "Date unknown"] });
+      expect(await page.locator("form.form-sheet fieldset").count(), "Kind of date is the one group").toBe(1);
+      const save = await buttonLook(page.getByRole("button", { name: "Save burial" }));
+      expect(save.classes).toContain("primary");
+      expect(save.bg).toBe(AMBER);
+      expect(save.h).toBeGreaterThanOrEqual(48);
+      expect(await page.locator("main .button.primary").count(), `${label}: one main action`).toBe(1);
+      const back = await buttonLook(page.getByRole("link", { name: "Back to register" }));
+      expect(back.classes).toContain("quiet");
+      // An error: nothing is saved, focus goes to the first invalid field.
+      const before = (await storedEvents(page, siteId)).length;
+      await page.getByRole("button", { name: "Save burial" }).click();
+      await expect(page.locator("[aria-invalid='true']").first()).toBeFocused();
+      expect((await storedEvents(page, siteId)).length, `${label}: nothing was saved`).toBe(before);
+      await check(page, `record a burial ${label}`);
+    }
+  });
+
+  test("start a register: a form sheet on the night, with the error on the field and nothing saved", async ({ page }) => {
+    await checkNewRegister(page, CHURCH);
+  });
+
+  test("committee review: two sheets, what you type with the slip under a double rule, and what leaves the device with Download as the main action", async ({ page }) => {
+    const siteId = await openPractice(page, CHURCH);
+    for (const size of sizesOf(page)) {
+      await page.setViewportSize(size);
+      await page.goto(`/#/r/${siteId}/exchange`);
+      await page.reload();
+      await settle(page);
+      const label = `at ${size.width}`;
+      const wide = size.width >= 1000;
+      const input = await boxOf(page, ".review-input");
+      const slip = await boxOf(page, ".review-slip");
+      expect(slip.y, `${label}: the slip is under what you type`).toBeGreaterThanOrEqual(input.bottom - 1);
+      expect(Math.abs(slip.x - input.x)).toBeLessThanOrEqual(1);
+      expect(await page.locator(".review-slip").getByLabel("Open return slip", { exact: true }).count()).toBe(1);
+      if (wide) {
+        expect(Math.abs(slip.y - input.bottom), `${label}: the two parts are one sheet`).toBeLessThanOrEqual(1);
+        expect(await styleOf(page, ".review-slip", ["borderTopStyle", "borderTopWidth"])).toEqual({ borderTopStyle: "double", borderTopWidth: "3px" });
+      }
+      expect(await page.locator("main .button.primary").allTextContents(), `${label}: the main action before a preview`).toEqual(["Preview review file"]);
+      await page.getByRole("button", { name: "Preview review file", exact: true }).click();
+      await expect(page.getByRole("heading", { level: 2, name: "Review file preview" })).toBeVisible();
+      const preview = await boxOf(page, ".review-preview");
+      if (wide) {
+        expect(preview.x, `${label}: what leaves the device is beside what you type`).toBeGreaterThanOrEqual(input.right);
+        expect(preview.y).toBeCloseTo(input.y, 0);
+        expect(input.w).toBeLessThan(preview.w);
+      } else {
+        expect(preview.y, `${label}: under it on a phone`).toBeGreaterThanOrEqual(input.bottom - 1);
+      }
+      const heading = await styleOf(page, ".review-preview > h2", ["borderBottomStyle", "borderBottomWidth"]);
+      expect(heading).toEqual({ borderBottomStyle: "double", borderBottomWidth: "3px" });
+      expect(await page.locator("main .button.primary").allTextContents(), `${label}: the main action after a preview`).toEqual(["Download review file"]);
+      expect((await buttonLook(page.getByRole("button", { name: "Download review file" }))).bg).toBe(AMBER);
+      expect((await buttonLook(page.getByRole("button", { name: "Preview review file", exact: true }))).classes).not.toContain("primary");
+      await check(page, `committee review ${label}`);
+    }
+  });
+
+  test("settings: a sheet This device with the three groups side by side, Save settings the main action, and a sheet Remove with the disabled button", async ({ page }) => {
+    const siteId = await openPractice(page, CHURCH);
+    for (const size of sizesOf(page)) {
+      await page.setViewportSize(size);
+      await page.goto(`/#/r/${siteId}/settings`);
+      await settle(page);
+      const label = `at ${size.width}`;
+      const wide = size.width >= 1000;
+      const groups = await page.locator(".settings-device fieldset").evaluateAll((els) => els.map((el) => ({ legend: el.querySelector("legend")?.textContent, x: el.getBoundingClientRect().x, y: el.getBoundingClientRect().y })));
+      expect(groups.map((g) => g.legend)).toEqual(["Motion", "Map contrast", "Print paper"]);
+      if (wide) {
+        expect(groups.every((g) => Math.abs(g.y - (groups[0]?.y ?? 0)) <= 1), `${label}: the three groups are side by side`).toBe(true);
+        expect(groups[1]?.x).toBeGreaterThan(groups[0]?.x ?? 0);
+        expect(groups[2]?.x).toBeGreaterThan(groups[1]?.x ?? 0);
+      } else {
+        expect(groups[1]?.y).toBeGreaterThan(groups[0]?.y ?? 0);
+        expect(groups[2]?.y).toBeGreaterThan(groups[1]?.y ?? 0);
+      }
+      const device = await boxOf(page, ".settings-device");
+      const remove = await boxOf(page, ".settings-remove");
+      if (wide) expect(remove.x, `${label}: Remove is beside This device`).toBeGreaterThanOrEqual(device.right);
+      else expect(remove.y).toBeGreaterThanOrEqual(device.bottom - 1);
+      expect(await page.locator(".settings-device > h2").textContent()).toBe("This device");
+      expect(await page.locator(".settings-remove > h2").textContent()).toBe("Remove");
+      expect(await page.locator("main .button.primary").allTextContents()).toEqual(["Save settings"]);
+      expect((await buttonLook(page.getByRole("button", { name: "Save settings" }))).bg).toBe(AMBER);
+      const disabled = await styleOf(page, ".settings-remove button:disabled", ["borderTopStyle", "cursor"]);
+      expect(disabled.borderTopStyle).toBe("dashed");
+      expect(await page.getByRole("button", { name: "Remove this register" }).isDisabled()).toBe(true);
+      await check(page, `settings ${label}`);
+    }
+  });
+
+  test("keeps the reading order and the tab order of today on each rebuilt screen", async ({ page }) => {
+    const siteId = await openPractice(page, CHURCH);
+    const plot = plotIdOf(await storedEvents(page, siteId), "Y07");
+    const visit = async (route: string): Promise<void> => {
+      await page.goto(`/#/r/${siteId}${route}`);
+      await settle(page);
+    };
+    await visit("/map");
+    expect(await tabNames(page, 8)).toEqual(["Back to register", "Open plot list", "Edit map", "Site map", "Show the site as at", "Choose a plot", "Zoom in", "Print site map"]);
+    await visit(`/plot/${plot}`);
+    expect(await tabNames(page, 23)).toEqual([
+      "Back to plot list", "Back to register", "Show on map", "Open burial", "Open burial", "Record a burial", "Reserve a space", "Space label", "Add a space",
+      "Choose a space", "Check plot", "Mark free", "Mark unusable", "Return to use", "Correct an entry", "New plot code", "Rename plot", "Note", "Add note",
+      "Choose photo", "Description", "Description pending", "Add photo",
+    ]);
+    await visit("/burial/new");
+    expect(await tabNames(page, 9)).toEqual(["Back to register", "Recorded name", "Name unknown", "Date unknown", "Section", "Plot", "Source ref", "Page", "Save burial"]);
+    await visit("/settings");
+    expect(await tabNames(page, 6)).toEqual(["Back to register", "Follow device motion", "Standard", "A4", "Save settings", "Type the site name"]);
+    await visit("/exchange");
+    await page.getByRole("button", { name: "Preview review file", exact: true }).click();
+    await expect(page.getByRole("heading", { level: 2, name: "Review file preview" })).toBeVisible();
+    const order = await page.evaluate(() => {
+      const names = ["Choose a review date", "Site name for committee", "Preview review file", "Show field names", "Download review file", "Open return slip"];
+      const stops = [...document.querySelectorAll<HTMLElement>("main a[href], main button:not(:disabled), main input, main select, main textarea")];
+      const text = (el: HTMLElement): string => {
+        const label = el.id === "" ? null : document.querySelector(`label[for="${CSS.escape(el.id)}"]`);
+        return (label ?? el).textContent?.trim() ?? "";
+      };
+      return names.map((n) => stops.findIndex((s) => text(s) === n));
+    });
+    expect(order.every((i) => i >= 0), "every named stop is on the page").toBe(true);
+    expect([...order].sort((a, b) => a - b), "the stops come in the order of today: the form, the preview, then the slip").toEqual(order);
+  });
+
+  test("keeps the one example search quiet and the tiers of a desk: Search is the main action, Clear search is outlined, Try Quillmoss is quiet", async ({ page }) => {
+    const siteId = await openPractice(page, CHURCH);
+    await page.goto(`/#/r/${siteId}`);
+    await settle(page);
+    await page.getByRole("button", { name: "Try Quillmoss" }).click();
+    await expect(page.getByRole("heading", { level: 3, name: "Results" })).toBeVisible();
+    // The pointer rests on the place where Try Quillmoss was, which Clear search now fills. Move it away, so no fill is a hover.
+    await page.mouse.move(0, 0);
+    await settle(page);
+    const search = await buttonLook(page.getByRole("button", { name: "Search", exact: true }));
+    expect(search.classes).toContain("primary");
+    expect(search.bg).toBe(AMBER);
+    const clear = await buttonLook(page.getByRole("button", { name: "Clear search" }));
+    expect(clear.classes).not.toContain("primary");
+    expect(clear.classes).not.toContain("quiet");
+    expect(clear.bg, "Clear search is outlined on the field fill, with no tint").toBe(STONE);
+    expect(clear.border).toBe("2px");
+    const example = await buttonLook(page.getByRole("button", { name: "Try Quillmoss" }));
+    expect(example.classes).toContain("quiet");
+    expect(example.bg).toBe(CLEAR);
+    expect(example.line).toBe("underline");
+    expect(example.borderColour).toBe(CLEAR);
+    expect(await page.locator("main .button.primary").allTextContents(), "one main action on the desk").toEqual(["Search"]);
+    await check(page, "the desk after the example search");
+  });
+
+  test("puts the brand mark beside the register name and a foot band at the foot of the desk, and none in high contrast or print", async ({ page }) => {
+    const siteId = await openPractice(page, CHURCH);
+    await page.goto(`/#/r/${siteId}`);
+    await settle(page);
+    const mark = await styleOf(page, "header.app .brand", ["width", "height", "borderTopWidth", "borderTopLeftRadius", "content", "backgroundImage"], "::before");
+    expect([mark.width, mark.height, mark.borderTopWidth, mark.borderTopLeftRadius]).toEqual(["17px", "21px", "2px", "9px"]);
+    expect(mark.content).toBe('""');
+    expect(mark.backgroundImage).toContain("radial-gradient");
+    expect(await page.locator("header.app .brand").textContent(), "the mark adds no word").toBe("Churchyard Register");
+    const brand = await boxOf(page, "header.app .brand");
+    const text = await page.locator("header.app .brand").evaluate((el) => {
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      const r = range.getBoundingClientRect();
+      return { left: r.left };
+    });
+    expect(text.left, "the mark is at the left of the name").toBeGreaterThan(brand.x + 16 + 17);
+    const foot = await styleOf(page, ".shell", ["display", "height", "backgroundImage", "backgroundRepeat"], "::after");
+    expect([foot.display, foot.height]).toEqual(["block", "56px"]);
+    expect(foot.backgroundImage).toContain("churchyard-margin");
+    expect(foot.backgroundRepeat).toBe("repeat-x");
+    expect(await footBand(page), "the band is 56 high and the last thing on the page").toBeCloseTo(56, 0);
+    // A screen with no sheets of its own has none: the library.
+    await page.goto("/#/");
+    await settle(page);
+    expect(await footBand(page)).toBeLessThan(56);
+    // Print draws none.
+    await page.goto(`/#/r/${siteId}`);
+    await settle(page);
+    await page.emulateMedia({ media: "print" });
+    expect(await footBand(page)).toBeLessThan(1);
+    await page.emulateMedia({ media: "screen" });
+  });
+
+  test("starts the selected plot sheet with the state mark and the code in its tab, names in the heading font, and the result card likewise", async ({ page }) => {
+    const siteId = await openPractice(page, CHURCH);
+    const plot = plotIdOf(await storedEvents(page, siteId), "Y07");
+    await page.goto(`/#/r/${siteId}`);
+    await settle(page);
+    await page.getByRole("button", { name: "Try Quillmoss" }).click();
+    await expect(page.getByRole("heading", { level: 3, name: "Results" })).toBeVisible();
+    const result = await page.locator(".desk-find .results .card").first().evaluate((el) => {
+      const title = el.querySelector("strong") as HTMLElement;
+      const line = el.querySelector(".state-line") as HTMLElement;
+      return { title: getComputedStyle(title).fontFamily, size: getComputedStyle(title).fontSize, line: line.textContent, mark: line.querySelectorAll("svg.mark-swatch").length, hidden: line.querySelector("svg")?.getAttribute("aria-hidden") };
+    });
+    expect(result.title).toContain("Gelasio");
+    expect(result.size).toBe("19px");
+    expect(result.line).toBe("Y07 · Yew Walk · Taken · 2 of 2 spaces used");
+    expect(result.mark).toBe(1);
+    expect(result.hidden).toBe("true");
+    await page.goto(`/#/r/${siteId}?plot=${plot}`);
+    await settle(page);
+    const sheet = await page.locator(".desk-main .card").first().evaluate((el) => {
+      const line = el.querySelector(".state-line") as HTMLElement;
+      const first = line.firstElementChild as Element;
+      const tab = line.querySelector(".code-tab") as HTMLElement;
+      const names = [...el.querySelectorAll<HTMLElement>(".burial-name")].map((n) => [n.textContent, getComputedStyle(n).fontFamily, getComputedStyle(n).fontSize, getComputedStyle(n).fontWeight]);
+      return { first: first.tagName.toLowerCase(), firstClass: first.getAttribute("class"), tab: tab.textContent, tabBg: getComputedStyle(tab).backgroundColor, text: line.textContent, names };
+    });
+    expect(sheet.first, "the mark is first").toBe("svg");
+    expect(sheet.tab).toBe("Y07");
+    expect(sheet.tabBg).toBe(AMBER);
+    expect(sheet.text).toBe("Y07 · Yew Walk · Taken · 2 of 2 spaces used");
+    expect(sheet.names.map((n) => n[0])).toEqual(["Mirel Quillmoss", "Torin Pellwick"]);
+    for (const [, family, size, weight] of sheet.names) {
+      expect(family).toContain("Gelasio");
+      expect([size, weight]).toEqual(["18px", "700"]);
+    }
+    await check(page, "the selected plot sheet");
+  });
+
+  test("keeps the state mark on the line of its words beside the site name, at every width", async ({ page }) => {
+    const siteId = await openPractice(page, CHURCH);
+    const plot = plotIdOf(await storedEvents(page, siteId), "Y07");
+    for (const size of [{ width: 360, height: 640 }, { width: 1440, height: 900 }, { width: 1920, height: 1080 }]) {
+      await page.setViewportSize(size);
+      await page.goto(`/#/r/${siteId}?plot=${plot}`);
+      await settle(page);
+      const read = await page.evaluate(() => {
+        const line = document.querySelector(".desk-head .summary-line") as HTMLElement;
+        const mark = line.querySelector("svg") as SVGElement;
+        const words = line.querySelector("span") as HTMLElement;
+        const range = document.createRange();
+        range.selectNodeContents(words);
+        const first = range.getClientRects()[0] as DOMRect;
+        const m = mark.getBoundingClientRect();
+        return { markTop: m.top, markBottom: m.bottom, markRight: m.right, firstTop: first.top, firstBottom: first.bottom, wordsLeft: words.getBoundingClientRect().left, lines: Math.round(words.getBoundingClientRect().height / parseFloat(getComputedStyle(words).lineHeight)) };
+      });
+      const label = `at ${size.width}`;
+      const markMiddle = (read.markTop + read.markBottom) / 2;
+      expect(markMiddle, `${label}: the mark is level with the first line of its words`).toBeGreaterThanOrEqual(read.firstTop - 4);
+      expect(markMiddle).toBeLessThanOrEqual(read.firstBottom + 4);
+      expect(read.markRight, `${label}: the mark is at the left of its words`).toBeLessThanOrEqual(read.wordsLeft);
+      await check(page, `the state line ${label}`);
+    }
+  });
+
+  test("stays readable in high contrast: no night, black on white, and every measure kept on every rebuilt screen", async ({ page }) => {
+    test.setTimeout(180_000);
+    await page.addInitScript(() => window.localStorage.setItem("plotwarden.settings", JSON.stringify({ motion: "follow", contrast: "high", paper: "A4" })));
+    const siteId = await openPractice(page, CHURCH);
+    const plot = plotIdOf(await storedEvents(page, siteId), "Y07");
+    for (const size of sizesOf(page)) {
+      await page.setViewportSize(size);
+      for (const route of [`/#/r/${siteId}`, `/#/r/${siteId}/map?plot=${plot}`, `/#/r/${siteId}/plot/${plot}`, `/#/r/${siteId}/burial/new`, `/#/r/${siteId}/exchange`, `/#/r/${siteId}/settings`, "/#/new"]) {
+        await page.goto(route);
+        await settle(page);
+        const label = `${route.replace(/[0-9a-f-]{36}/g, "id")} at ${size.width}`;
+        await expectNoSideways(page, label);
+        expect((await styleOf(page, "body", ["backgroundColor", "color"])), label).toEqual({ backgroundColor: "rgb(255, 255, 255)", color: "rgb(0, 0, 0)" });
+        expect((await styleOf(page, "main h1", ["color"])).color, label).toBe("rgb(0, 0, 0)");
+        await check(page, `high contrast, ${label}`);
+        expect(await footBand(page), `${label}: no foot band`).toBeLessThan(1);
+        const sheets = await page.locator("main .card, main .form-sheet, main .map-side").evaluateAll((els) => els.map((el) => getComputedStyle(el).borderTopWidth));
+        for (const border of sheets) expect(parseFloat(border), `${label}: a sheet keeps its edge`).toBeGreaterThanOrEqual(1);
+      }
+    }
+  });
+});
+
+// ---- Allotment Register ------------------------------------------------------------------------------------------
+
+test.describe("Allotment Register, the screens with cards of their own (7.20, 7.22)", () => {
+  test.use({ baseURL: GARDEN.origin });
+
+  test("has no sideways scroll and keeps every target on every screen, with the heading in leaf green on the paper", async ({ page }) => {
+    test.setTimeout(180_000);
+    const requests = trackRequests(page, GARDEN.origin);
+    const siteId = await openPractice(page, GARDEN);
+    const plot = plotIdOf(await storedEvents(page, siteId), "B02");
+    const routes: [string, string][] = [
+      ["site map", `/#/r/${siteId}/map`],
+      ["plot record", `/#/r/${siteId}/plot/${plot}`],
+      ["make an offer", `/#/r/${siteId}/offer`],
+      ["season fees", `/#/r/${siteId}/payments`],
+      ["committee review", `/#/r/${siteId}/exchange`],
+      ["settings", `/#/r/${siteId}/settings`],
+      ["start a register", "/#/new"],
+    ];
+    for (const size of sizesOf(page)) {
+      await page.setViewportSize(size);
+      for (const [name, route] of routes) {
+        await page.goto(route);
+        await settle(page);
+        const label = `${name} at ${size.width}`;
+        await expectNoSideways(page, label);
+        expect((await styleOf(page, "main h1", ["color"])).color, `${label}: the heading is leaf green`).toBe(LEAF);
+        await check(page, label);
+        const main = await boxOf(page, "main");
+        if (!name.startsWith("site map")) expect(main.w, `${label}: main is at most 90rem`).toBeLessThanOrEqual(1440);
+      }
+    }
+    expect(requests.external).toEqual([]);
+  });
+
+  test("site map: the map beside a side sheet of controls, as in the churchyard, on the garden's paper", async ({ page }) => {
+    const siteId = await openPractice(page, GARDEN);
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto(`/#/r/${siteId}/map`);
+    await settle(page);
+    const mapMain = await boxOf(page, ".map-main");
+    const side = await boxOf(page, ".map-side");
+    expect(side.x).toBeGreaterThanOrEqual(mapMain.right);
+    expect(mapMain.w).toBeGreaterThan(side.w * 2);
+    const back = await buttonLook(page.getByRole("link", { name: "Back to register" }));
+    expect(back.classes).toContain("quiet");
+    expect(back.colour, "ink on the garden paper").toBe("rgb(27, 49, 42)");
+    expect((await buttonLook(page.getByRole("link", { name: "Open plot list" }))).bg).toBe(LEAF);
+    await check(page, "garden site map");
+  });
+
+  test("make an offer: the saved notice, then the card Plot and applicant with the two selects side by side and the passed over applicants in a tinted panel", async ({ page }) => {
+    test.setTimeout(120_000);
+    const siteId = await openPractice(page, GARDEN);
+    for (const size of sizesOf(page)) {
+      await page.setViewportSize(size);
+      await page.goto(`/#/r/${siteId}/offer`);
+      await settle(page);
+      const label = `at ${size.width}`;
+      const wide = size.width >= 1000;
+      await page.getByLabel("Offer to", { exact: true }).selectOption({ label: "Position 2 · Olin Reedwhorl" });
+      const [one, two] = [await boxOf(page, ".offer-card .field:has(label:text-is('Choose a free plot'))"), await boxOf(page, ".offer-card .field:has(label:text-is('Offer to'))")];
+      if (wide) {
+        expect(Math.abs(one.y - two.y), `${label}: the two selects are side by side`).toBeLessThanOrEqual(1);
+        expect(two.x).toBeGreaterThanOrEqual(one.right);
+      } else {
+        expect(two.y, `${label}: one under the other on a phone`).toBeGreaterThanOrEqual(one.bottom - 1);
+      }
+      const panel = await styleOf(page, ".offer-card .soft-panel", ["backgroundColor", "borderTopWidth", "borderTopColor", "borderTopLeftRadius"]);
+      expect(panel).toEqual({ backgroundColor: "rgb(231, 238, 218)", borderTopWidth: "1px", borderTopColor: "rgb(111, 133, 118)", borderTopLeftRadius: "10px" });
+      const card = await boxOf(page, ".offer-card");
+      const reply = await boxOf(page, ".offer-card .field:has(label:text-is('Reply by'))");
+      expect(reply.y, `${label}: Reply by is under the panel`).toBeGreaterThanOrEqual((await boxOf(page, ".offer-card .soft-panel")).bottom - 1);
+      const review = await buttonLook(page.getByRole("button", { name: "Review offer" }));
+      expect(review.classes).toContain("primary");
+      expect(review.bg).toBe(LEAF);
+      expect(await page.locator("main .button.primary").allTextContents()).toEqual(["Review offer"]);
+      if (wide) expect((await boxOf(page, ".offer-list")).x, `${label}: the open offers are beside the card`).toBeGreaterThanOrEqual(card.right);
+      await check(page, `make an offer ${label}`);
+    }
+    // Record an offer. The saved notice comes first, and the card is under it.
+    await page.setViewportSize(sizesOf(page)[0] as Size);
+    await page.goto(`/#/r/${siteId}/offer`);
+    await page.reload();
+    await settle(page);
+    await page.getByLabel("Reply by", { exact: true }).fill("2026-04-30");
+    await page.getByRole("button", { name: "Review offer" }).click();
+    await page.getByRole("button", { name: "Record offer" }).click();
+    const notice = page.locator("main .notice.good").first();
+    await expect(notice).toContainText("Saved on this device.");
+    const [n, c] = [await boxOf(page, "main .notice.good"), await boxOf(page, ".offer-card")];
+    expect(n.bottom, "the saved notice is above the card").toBeLessThanOrEqual(c.y + 1);
+    await check(page, "make an offer, saved");
+  });
+
+  test("season fees: Back, New season and Season report outlined, one card in two halves, Still due in the tab colour, Record payment the main action", async ({ page }) => {
+    const siteId = await openPractice(page, GARDEN);
+    for (const size of sizesOf(page)) {
+      await page.setViewportSize(size);
+      await page.goto(`/#/r/${siteId}/payments`);
+      await settle(page);
+      const label = `at ${size.width}`;
+      const wide = size.width >= 1000;
+      for (const name of ["Back to register", "New season", "Season report"]) {
+        const look = await buttonLook(page.getByRole("link", { name }));
+        expect(look.classes, `${label}: ${name} is outlined`).not.toContain("primary");
+        expect(look.classes).not.toContain("quiet");
+        expect(look.border).toBe("2px");
+      }
+      const card = await boxOf(page, ".charge-card");
+      expect(card.w, `${label}: the card is at most 1040 wide`).toBeLessThanOrEqual(1040);
+      if (size.width >= 1200) expect(card.w).toBeCloseTo(1040, 0);
+      const [left, right, reverse] = [await boxOf(page, ".charge-half"), await boxOf(page, ".pay-half"), await boxOf(page, ".charge-reverse")];
+      if (wide) {
+        expect(right.x, `${label}: the payment is the right half`).toBeGreaterThanOrEqual(left.right);
+        expect(Math.abs(right.y - left.y)).toBeLessThanOrEqual(1);
+        expect(Math.abs(reverse.x - left.x), `${label}: Reverse stands under the charge`).toBeLessThanOrEqual(1);
+        expect(reverse.y).toBeGreaterThanOrEqual(left.bottom - 1);
+        expect(reverse.y, `${label}: right under the due date, not under the payment`).toBeLessThan(left.bottom + 40);
+      } else {
+        expect(right.y).toBeGreaterThanOrEqual(left.bottom - 1);
+        expect(reverse.y, `${label}: in the order of today, Reverse is last`).toBeGreaterThanOrEqual(right.bottom - 1);
+      }
+      const facts = await page.locator(".charge-card .facts > div").evaluateAll((els) => els.map((el) => [el.querySelector("dt")?.textContent, getComputedStyle(el).backgroundColor, getComputedStyle(el).borderTopWidth]));
+      expect(facts.map((f) => f[0])).toEqual(["Amount charged", "Amount received", "Still due"]);
+      expect(facts[2]).toEqual(["Still due", "rgb(191, 224, 234)", "2px"]);
+      expect(facts[0]?.[2]).toBe("1px");
+      expect((await page.locator(".charge-card h3 .code-tab").textContent())).toBe("B02");
+      expect(await page.locator(".charge-card h3").textContent()).toBe("Season 2025 · B02 · Ada Stonecrop");
+      const chip = await styleOf(page, ".charge-card .badge", ["borderTopLeftRadius"]);
+      expect(chip.borderTopLeftRadius).not.toBe("0px");
+      const ring = await styleOf(page, ".charge-card .badge", ["width", "borderTopWidth", "borderTopLeftRadius"], "::before");
+      expect(ring).toEqual({ width: "12px", borderTopWidth: "2px", borderTopLeftRadius: "50%" });
+      expect(await page.locator("main .button.primary").allTextContents()).toEqual(["Record payment"]);
+      expect((await buttonLook(page.getByRole("button", { name: "Record payment" }))).bg).toBe(LEAF);
+      const quiet = await buttonLook(page.getByRole("button", { name: "Reverse this charge: B02" }));
+      expect(quiet.classes).toContain("quiet");
+      expect(quiet.line).toBe("underline");
+      await check(page, `season fees ${label}`);
+    }
+  });
+
+  test("season fees: an empty payment is refused with focus on the amount, and nothing is saved", async ({ page }) => {
+    const siteId = await openPractice(page, GARDEN);
+    await page.goto(`/#/r/${siteId}/payments`);
+    await settle(page);
+    const before = (await storedEvents(page, siteId)).length;
+    await page.getByRole("button", { name: "Record payment" }).click();
+    await expect(page.getByLabel("Amount received", { exact: true })).toBeFocused();
+    expect((await storedEvents(page, siteId)).length).toBe(before);
+    await check(page, "season fees, refused payment");
+  });
+
+  test("committee review and settings on the garden's paper: two cards, the main action filled in leaf green", async ({ page }) => {
+    const siteId = await openPractice(page, GARDEN);
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto(`/#/r/${siteId}/exchange`);
+    await settle(page);
+    await page.getByRole("button", { name: "Preview review file", exact: true }).click();
+    await expect(page.getByRole("heading", { level: 2, name: "Review file preview" })).toBeVisible();
+    const [input, preview] = [await boxOf(page, ".review-input"), await boxOf(page, ".review-preview")];
+    expect(preview.x).toBeGreaterThanOrEqual(input.right);
+    expect((await buttonLook(page.getByRole("button", { name: "Download review file" }))).bg).toBe(LEAF);
+    await check(page, "garden committee review");
+    await page.goto(`/#/r/${siteId}/settings`);
+    await settle(page);
+    expect((await buttonLook(page.getByRole("button", { name: "Save settings" }))).bg).toBe(LEAF);
+    expect(await page.locator(".settings-device fieldset").count()).toBe(3);
+    await check(page, "garden settings");
+  });
+
+  test("start a register: a form sheet with the currency, the error on the field and nothing saved", async ({ page }) => {
+    await checkNewRegister(page, GARDEN);
+  });
+
+  test("keeps the reading order and the tab order of today on the offer, the fees and the new register", async ({ page }) => {
+    const siteId = await openPractice(page, GARDEN);
+    const visit = async (route: string): Promise<void> => {
+      await page.goto(route);
+      await settle(page);
+    };
+    await visit(`/#/r/${siteId}/offer`);
+    expect(await tabNames(page, 6)).toEqual(["Back to register", "Waiting list", "Choose a free plot", "Offer to", "Reply by", "Review offer"]);
+    await visit(`/#/r/${siteId}/payments`);
+    expect(await tabNames(page, 8)).toEqual(["Back to register", "New season", "Season report", "Amount received", "Payment date", "Receipt reference", "Record payment", "Reverse this charge: B02"]);
+    await visit("/#/new");
+    expect(await tabNames(page, 5)).toEqual(["Site name", "Local time zone", "Currency", "Create register", "Cancel"]);
+  });
+
+  test("keeps the tiers of the secretary desk: Make an offer is the main action, Search is outlined, and the example is quiet", async ({ page }) => {
+    const siteId = await openPractice(page, GARDEN);
+    await page.goto(`/#/r/${siteId}`);
+    await settle(page);
+    await page.mouse.move(0, 0);
+    const example = await buttonLook(page.getByRole("button", { name: /^Try B\d+$/ }));
+    expect(example.classes).toContain("quiet");
+    expect(example.bg).toBe(CLEAR);
+    expect(example.line).toBe("underline");
+    const search = await buttonLook(page.getByRole("button", { name: "Search", exact: true }));
+    expect(search.classes).not.toContain("primary");
+    expect(search.classes).not.toContain("quiet");
+    expect(search.bg).toBe("rgb(255, 254, 246)");
+    expect(await page.locator("main .button.primary").allTextContents()).toEqual(["Make an offer"]);
+    await check(page, "the secretary desk with its example");
+  });
+
+  test("puts the brand mark beside the register name, with no foot band", async ({ page }) => {
+    const siteId = await openPractice(page, GARDEN);
+    await page.goto(`/#/r/${siteId}`);
+    await settle(page);
+    const mark = await styleOf(page, "header.app .brand", ["width", "height", "borderTopWidth", "borderTopLeftRadius", "content", "backgroundImage"], "::before");
+    expect([mark.width, mark.height, mark.borderTopWidth, mark.borderTopLeftRadius]).toEqual(["22px", "17px", "2px", "4px"]);
+    expect(mark.content).toBe('""');
+    expect(mark.backgroundImage).toContain("repeating-linear-gradient");
+    expect(await page.locator("header.app .brand").textContent(), "the mark adds no word").toBe("Allotment Register");
+    expect(await footBand(page), "no foot band on the allotment").toBeLessThan(1);
+  });
+
+  test("stays readable in high contrast on every rebuilt screen", async ({ page }) => {
+    test.setTimeout(180_000);
+    await page.addInitScript(() => window.localStorage.setItem("plotwarden.settings", JSON.stringify({ motion: "follow", contrast: "high", paper: "A4" })));
+    const siteId = await openPractice(page, GARDEN);
+    const plot = plotIdOf(await storedEvents(page, siteId), "B02");
+    for (const size of sizesOf(page)) {
+      await page.setViewportSize(size);
+      for (const route of [`/#/r/${siteId}/map`, `/#/r/${siteId}/plot/${plot}`, `/#/r/${siteId}/offer`, `/#/r/${siteId}/payments`, `/#/r/${siteId}/exchange`, `/#/r/${siteId}/settings`, "/#/new"]) {
+        await page.goto(route);
+        await settle(page);
+        const label = `${route.replace(/[0-9a-f-]{36}/g, "id")} at ${size.width}`;
+        await expectNoSideways(page, label);
+        expect((await styleOf(page, "main h1", ["color"])).color, label).toBe("rgb(27, 49, 42)");
+        await check(page, `high contrast, ${label}`);
+      }
+    }
+  });
+});
+
 // Print the sizes the spec ran at, so a reader of the log can see both.
 test("runs at a known size", ({ page }) => {
   const size = page.viewportSize() as { width: number; height: number };

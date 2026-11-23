@@ -202,6 +202,161 @@ test.describe("the hub", () => {
     expect(requests.external).toEqual([]);
   });
 
+  test("is laid out as the start page of the new look: stripe, bar, title, two doors, the Desk card and the visitor sheets (spec 07, task 7.21)", async ({ page }) => {
+    const requests = trackRequests(page, SITE);
+    const own = page.viewportSize() as { width: number; height: number };
+    for (const size of [own, { width: 1440, height: 900 }]) {
+      await page.setViewportSize(size);
+      await page.goto("/");
+      await expect(page.getByRole("heading", { level: 1, name: "Plotwarden" })).toBeVisible();
+      const label = `at ${size.width}`;
+      const read = await page.evaluate(() => {
+        const style = (el: Element, pseudo?: string) => getComputedStyle(el, pseudo ?? null);
+        const rect = (el: Element) => {
+          const r = el.getBoundingClientRect();
+          return { x: r.x, y: r.y, w: r.width, h: r.height, right: r.right, bottom: r.bottom };
+        };
+        const q = <T extends Element>(selector: string, root: ParentNode = document) => root.querySelector(selector) as T;
+        const stripe = q(".stripe");
+        const bar = q("header.bar");
+        const brand = q(".brand");
+        const main = q("main");
+        const doors = [...document.querySelectorAll<HTMLElement>("li.door")];
+        const arts = doors.map((d) => q(".door-art", d));
+        const desk = q(".review-card");
+        const pics = [...document.querySelectorAll<HTMLElement>(".sheet-pic")];
+        return {
+          scroll: [document.documentElement.scrollWidth, document.documentElement.clientWidth],
+          stripe: { h: rect(stripe).h, bg: style(stripe).backgroundImage, y: rect(stripe).y, hidden: stripe.getAttribute("aria-hidden") },
+          bar: { h: rect(bar).h, y: rect(bar).y, line: style(bar).borderBottomWidth, text: bar.textContent },
+          brand: { image: style(brand, "::before").backgroundImage, w: style(brand, "::before").width, h: style(brand, "::before").height, content: style(brand, "::before").content },
+          main: { w: rect(main).w, max: style(main).maxWidth },
+          h1: { size: style(q("h1")).fontSize, family: style(q("h1")).fontFamily, weight: style(q("h1")).fontWeight },
+          job: { size: style(q(".job")).fontSize, weight: style(q(".job")).fontWeight, family: style(q(".job")).fontFamily },
+          lead: { size: style(q(".tagline")).fontSize },
+          doors: doors.map((d, i) => ({
+            kind: d.className,
+            box: rect(d),
+            bg: style(d).backgroundColor,
+            colour: style(d).color,
+            radius: style(d).borderTopLeftRadius,
+            art: { h: rect(arts[i] as Element).h, aria: (arts[i] as Element).getAttribute("aria-hidden"), text: (arts[i] as Element).textContent, images: style(arts[i] as Element).backgroundImage.match(/url\(/g)?.length ?? 0 },
+            h3: { size: style(q("h3", d)).fontSize, family: style(q("h3", d)).fontFamily, colour: style(q("h3", d)).color },
+            buttons: [...d.querySelectorAll<HTMLElement>("a.button")].map((a) => ({ text: a.textContent, h: rect(a).h, bg: style(a).backgroundColor, colour: style(a).color, border: style(a).borderTopWidth, borderColour: style(a).borderTopColor, radius: style(a).borderTopLeftRadius })),
+            map: rect(q(".practice-map", d)),
+            key: d.querySelectorAll(".map-key").length,
+          })),
+          desk: { border: style(desk).borderTopWidth, colour: style(desk).borderTopColor, radius: style(desk).borderTopLeftRadius, tag: desk.tagName, box: rect(desk), button: (() => { const b = q<HTMLElement>("a.button", desk); return { text: b.textContent, colour: style(b).color, border: style(b).borderTopColor, h: rect(b).h }; })() },
+          pics: pics.map((p) => {
+            const row = p.parentElement as HTMLElement;
+            const link = q<HTMLElement>("a", row);
+            return { aria: p.getAttribute("aria-hidden"), text: p.textContent, box: rect(p), link: rect(link), linkText: link.textContent, tag: p.tagName };
+          }),
+          images: document.querySelectorAll("img, image").length,
+          title: [q("h1")].map((h) => rect(h).y)[0],
+        };
+      });
+      expect(read.scroll[0], `${label}: no sideways scroll`).toBeLessThanOrEqual(read.scroll[1] as number);
+      expect(read.stripe.h, `${label}: the stripe is 6 px`).toBe(6);
+      expect(read.stripe.hidden).toBe("true");
+      expect(read.stripe.bg).toContain("rgb(35, 42, 92)");
+      expect(read.stripe.bg).toContain("rgb(47, 107, 79)");
+      expect(read.stripe.bg).toContain("rgb(43, 90, 95)");
+      expect(read.bar.h, `${label}: the bar is at least 60 px`).toBeGreaterThanOrEqual(60);
+      expect(read.bar.y, `${label}: the bar is under the stripe`).toBeCloseTo(6, 0);
+      expect(read.bar.line).toBe("1px");
+      expect(read.bar.text, `${label}: the bar holds the brand and About`).toBe("PlotwardenAbout");
+      expect(read.brand.image, `${label}: the mark is beside the brand`).toContain("mark");
+      expect([read.brand.w, read.brand.h]).toEqual(["28px", "28px"]);
+      expect(read.brand.content).toBe('""');
+      expect(read.main.w, `${label}: main is at most 105rem`).toBeLessThanOrEqual(1680);
+      const vw = size.width;
+      expect(read.h1.size, `${label}: the title`).toBe(`${Math.min(64, Math.max(40, 0.03 * vw + 22))}px`);
+      expect(read.h1.family).toContain("Gelasio");
+      expect(read.h1.weight).toBe("700");
+      expect(read.job.family).toContain("Gelasio");
+      expect(read.job.weight).toBe("600");
+      expect(parseFloat(read.job.size), `${label}: the line`).toBeCloseTo(Math.min(28, Math.max(21, 0.01 * vw + 15)), 1);
+      expect(read.lead.size).toBe("18px");
+      expect(read.doors.map((d) => d.kind)).toEqual(["door church", "door garden"]);
+      const [church, garden] = read.doors;
+      expect(church?.bg, `${label}: the churchyard door is the night`).toBe("rgb(35, 42, 92)");
+      expect(church?.colour).toBe("rgb(250, 245, 233)");
+      expect(church?.art.images, "the churchyard art band holds the lantern and the margin").toBe(2);
+      expect(garden?.art.images, "the allotment art band holds the margin").toBe(1);
+      expect(garden?.bg).toBe("rgb(255, 254, 246)");
+      expect(garden?.colour).toBe("rgb(27, 49, 42)");
+      expect(garden?.radius).toBe("14px");
+      for (const door of read.doors) {
+        expect(door.art.aria).toBe("true");
+        expect(door.art.text).toBe("");
+        expect(door.art.h, `${label}: the art band`).toBeCloseTo(Math.min(112, Math.max(84, 0.07 * vw)), 0);
+        expect(door.h3.size).toBe("26px");
+        expect(door.key, `${label}: the small map has no key`).toBe(0);
+        expect(door.buttons.map((b) => b.text)).toEqual(["Try the practice register", "Start your own"]);
+        for (const b of door.buttons) expect(b.h, `${label}: ${b.text} is 48 high`).toBeGreaterThanOrEqual(48);
+        expect(door.buttons[0]?.border).toBe("2px");
+        expect(door.buttons[1]?.border).toBe("2px");
+      }
+      expect(church?.buttons[0]?.bg, "the main action of the night door is lantern amber").toBe("rgb(242, 201, 107)");
+      expect(church?.buttons[0]?.colour).toBe("rgb(34, 37, 44)");
+      expect(church?.buttons[1]?.bg).toBe("rgba(0, 0, 0, 0)");
+      expect(church?.buttons[1]?.colour).toBe("rgb(250, 245, 233)");
+      expect(church?.buttons[1]?.borderColour).toBe("rgb(250, 245, 233)");
+      expect(garden?.buttons[0]?.bg, "the main action of the allotment door is leaf green").toBe("rgb(47, 107, 79)");
+      expect(garden?.buttons[0]?.colour).toBe("rgb(255, 255, 255)");
+      expect(garden?.buttons[1]?.bg).toBe("rgb(255, 254, 246)");
+      expect(garden?.buttons[0]?.radius).toBe("10px");
+      expect(church?.buttons[0]?.radius).toBe("2px");
+      expect(church?.h3.family).toContain("Gelasio");
+      expect(church?.h3.colour).toBe("rgb(250, 245, 233)");
+      expect(garden?.h3.colour).toBe("rgb(47, 107, 79)");
+      // The doors are side by side where there is room for two of 560, and one under the other where there is not.
+      const wide = (size.width - 80) >= 2 * 560 + 24;
+      if (wide) {
+        expect((garden?.box.x ?? 0), `${label}: side by side`).toBeGreaterThan((church?.box.right ?? 0) - 1);
+        expect(Math.abs((garden?.box.w ?? 0) - (church?.box.w ?? 0)), `${label}: equal width`).toBeLessThanOrEqual(1);
+        expect((garden?.box.x ?? 0) - (church?.box.right ?? 0), `${label}: 24 px apart`).toBeCloseTo(24, 0);
+      } else {
+        expect(garden?.box.y ?? 0, `${label}: one under the other`).toBeGreaterThan((church?.box.bottom ?? 0) - 1);
+      }
+      expect(read.desk.tag, "the Review Desk card is not an article").toBe("SECTION");
+      expect(read.desk.border).toBe("2px");
+      expect(read.desk.colour).toBe("rgb(43, 90, 95)");
+      expect(read.desk.radius).toBe("10px");
+      expect(read.desk.button.text).toBe("Open Review Desk preview");
+      expect(read.desk.button.colour).toBe("rgb(43, 90, 95)");
+      expect(read.desk.box.y, `${label}: the Desk card is under the doors`).toBeGreaterThan(Math.max(church?.box.bottom ?? 0, garden?.box.bottom ?? 0) - 1);
+      expect(read.pics.length).toBe(2);
+      for (const pic of read.pics) {
+        expect(pic.aria).toBe("true");
+        expect(pic.text, "a sheet picture has no text").toBe("");
+        expect([pic.box.w, pic.box.h]).toEqual([54, 70]);
+        expect(pic.box.right, "the picture is beside its button").toBeLessThanOrEqual(pic.link.x);
+        expect(pic.link.x - pic.box.right).toBeCloseTo(16, 0);
+        expect(Math.abs(pic.box.y + pic.box.h / 2 - (pic.link.y + pic.link.h / 2)), "centred on its button").toBeLessThanOrEqual(2);
+      }
+      expect(read.images, `${label}: no picture file in the markup`).toBe(0);
+      const violations = await measureLayout(page);
+      expect(violations, `${label}\n${JSON.stringify(violations, null, 1)}`).toEqual([]);
+    }
+    expect(requests.external).toEqual([]);
+  });
+
+  test("keeps the start page readable in high contrast: plain white doors with a black edge, and no art band", async ({ page }) => {
+    await page.emulateMedia({ contrast: "more" });
+    await page.goto("/");
+    await expect(page.getByRole("heading", { level: 1, name: "Plotwarden" })).toBeVisible();
+    const read = await page.evaluate(() => {
+      const door = document.querySelector(".door.church") as HTMLElement;
+      const art = door.querySelector(".door-art") as HTMLElement;
+      const style = getComputedStyle(door);
+      return { bg: style.backgroundColor, colour: style.color, art: getComputedStyle(art).display };
+    });
+    expect(read).toEqual({ bg: "rgb(255, 255, 255)", colour: "rgb(0, 0, 0)", art: "none" });
+    await expectLayout(page);
+  });
+
   test("About is a hash route that a refresh keeps, and Back and the link return to the start", async ({ page }) => {
     await page.goto("/");
     await page.getByRole("link", { name: "About", exact: true }).click();

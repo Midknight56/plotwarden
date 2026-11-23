@@ -2,7 +2,7 @@
 
 This spec covers a new look for every Plotwarden screen: one set of design values, two self hosted fonts, shared components, the map, the page layouts, the start page, the visitor files, print, the market example and the Review Desk. It changes how things look and where they sit. It changes no word, no record, no rule of the contracts in spec 00 and no behaviour except where a requirement below says so.
 
-The design was handed over as a folder of mockups (HTML references and pictures at 1440 wide), a token file and a README. That folder is a reference only. No file, markup, font link or support script of it is copied into this repository. Where the README and the mockups differ, the mockups were followed. Where the mockups name one value twice with two names, this spec says which name it uses (design L-D1).
+The design was handed over as a folder of mockups (HTML references and pictures at 1440 wide), a token file and a README. That folder is a reference only. No markup, font link or support script of it is copied into this repository. The one thing taken from it is four drawings (the three band drawings and the app mark), kept byte for byte on purpose, because they were drawn for this project and are checked here by the same rules as every other drawing (design L-D1). Where the README and the mockups differ, the mockups were followed. Where the mockups name one value twice with two names, this spec says which name it uses (design L-D1).
 
 The work is four slices. Each leaves the registers working and the checks passing.
 
@@ -96,6 +96,9 @@ Tests: `tests/unit/churchAssets.test.ts`, `tests/unit/gardenAssets.test.ts`, `te
 6. The churchyard page shall stand on the night ground, and each block of text on it shall stand on a sheet or be ivory text that reaches its floor on `#232A5C`. In high contrast the page shall drop the night ground.
 7. `main` shall be at most 105rem wide on the desks and the site map, and 90rem on forms and records.
 8. The start page shall show the title, the line, two doors, the Review Desk card and the visitor sheets, with the words that the copy catalog holds.
+9. The site map shall give the map `flex: 3 1 560px` and a side sheet `flex: 1 1 280px` that holds the date field, the plot select, the zoom line and buttons, and Print site map. Back to register shall be quiet and Open plot list the main action. The plot record shall stand its sheets in columns of at least 440 px, up to two, in the order of the page, with rows split by 1 px rule lines, no main action, and every button outlined.
+10. The start page shall draw a 6 px stripe in the three app colours, a 60 px bar with the mark (`assets/mark.svg`, a CSS picture with no word) and the brand, and two doors in a grid of `repeat(auto-fit, minmax(min(100%, 560px), 1fr))`. The churchyard door shall be the night with ivory text, the allotment door paper with a 14 px radius, each with an art band of `clamp(84px, 7vw, 112px)` and a small map with no key. Every text pair of the night door shall reach its floor. The two visitor sheet pictures shall be drawn in code, hidden from a screen reader, with no text.
+11. Record a burial, Make an offer, Season fees, Committee review, Settings and Start a register shall each stand its heading row on the ground and its parts on sheets: a form sheet at most 600 wide, the fields in a grid where they fit, one group for Kind of date and one main action on each screen. Season fees shall be one card at most 1040 wide in two halves. Committee review shall be two sheets, what you type with the slip under a double rule, and what leaves the device. The order of the page and the order of the tab stops shall be as before.
 
 ## L8 Motion (slices 1 to 4)
 
@@ -149,4 +152,4 @@ Tests: `scripts/check-public.mjs`, `scripts/check-release.mjs`, browser `layout.
 
 1. No stylesheet, script or markup shall load a font, a picture or a script from another origin.
 2. The browser specs shall record every request and find none to another origin.
-3. The repository shall hold no file from the design handoff, no support script of it and no font link of it.
+3. The repository shall hold no file from the design handoff except the four drawings that L7.3 and L7.10 name, no mockup, no markup of it, no support script of it and no font link of it. `assets/origins.md` says which files came from it and why.

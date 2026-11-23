@@ -1,6 +1,6 @@
 # 07 Look: tasks
 
-Each task writes its test first, sees it fail on the missing behaviour, then writes the smallest complete code. A task is ticked only when its test passes. Expected values are the floors of `requirements.md`, not the output of the code. The work is in four slices. Slices 1 and 2 are built, and slice 3 is built to task 7.19.
+Each task writes its test first, sees it fail on the missing behaviour, then writes the smallest complete code. A task is ticked only when its test passes. Expected values are the floors of `requirements.md`, not the output of the code. The work is in four slices. Slices 1, 2 and 3 are built.
 
 For each held back value, the line names the slice and task that turns it on (design L-D3).
 
@@ -42,9 +42,9 @@ Held back in slice 1 (design L-D3):
 - [x] 7.17 The index column (`.link-group` in its own wrapper) and the ring on the night ground. Files: `ChurchyardHome.tsx`, `AllotmentHome.tsx`, `register.css`, `apps/churchyard-register/src/theme.css`, `tests/browser/accessibility.spec.ts`. L7.4.
 - [x] 7.18 Three desk columns, `main` widths. Files: `register.css`, both `theme.css`, both `*Home.tsx`, `tests/unit/lookLayout.test.ts`, `layout.spec.ts`. L7.4, L7.5, L7.7. Left to tasks 7.20 to 7.22: the 90rem of forms and records, and the site map at 105rem.
 - [x] 7.19 The allotment desk card, the plan marking the next free plot, and the code boxes sized from the widths of their own characters. Files: `AllotmentHome.tsx`, `theme.css`, `template/src/map/{labels,sheet}.ts`, `template/src/ui/SiteMap.tsx`, `site/src/practiceMaps.ts`, `tests/unit/{lookLayout,lookMap}.test.ts`, `tests/browser/{layout,paper-map}.spec.ts`. L6.5, L7.4.
-- [ ] 7.20 Site map side panel and plot record columns. Files: `template/src/ui/{SiteMap,PlotDetails}.tsx`, `register.css`. L7.4, L7.5.
-- [ ] 7.21 The start page. Files: `site/src/{Home.tsx,site.css}`, `tests/unit/siteCopy.test.ts`. L7.8.
-- [ ] 7.22 Record a burial, make an offer, season fees, committee review and settings, one at a time, and the slice 3 proof pictures and log row. Files: the screens named, `docs/acceptance/layout/**`, `docs/kiro-log.md`. L7.5.
+- [x] 7.20 Site map side panel and plot record columns. Files: `template/src/ui/{SiteMap,PlotDetails,controls}.tsx`, `register.css`, `print.css`, both `theme.css`, `tests/unit/lookScreens.test.ts`, `tests/browser/layout.spec.ts`. L7.4, L7.7, L7.9.
+- [x] 7.21 The start page, and `assets/mark.svg` with its row in `assets/origins.md`. Files: `site/src/{Home.tsx,site.css}`, `assets/{mark.svg,origins.md}`, `tests/unit/{siteCopy,lookScreens,lookTokens,lookLayout}.test.ts`, `tests/browser/release.spec.ts`. L7.8, L7.10.
+- [x] 7.22 Record a burial, make an offer, season fees, committee review, settings and start a register, one at a time, the mends of the lead's review (the button tiers, the brand mark, the foot band, the state line, the phone state mark, the spec text and the address check of the browser helper), and the slice 3 proof pictures and log row. Files: `apps/churchyard-register/src/{Burial,ChurchyardHome}.tsx`, `apps/allotment-register/src/{Offer,Payments,AllotmentHome}.tsx`, `template/src/ui/{Exchange,Settings,Library}.tsx`, both `theme.css`, `register.css`, `tests/helpers/{addressWords,screens}.ts`, `tests/unit/{addressWords,lookScreens}.test.ts`, `tests/browser/layout.spec.ts`, `docs/acceptance/**`, `docs/kiro-log.md`. L7.5, L7.11, L14.3.
 
 ## Slice 4: visitor files, print, the market example and the Review Desk
 
@@ -57,6 +57,12 @@ Held back in slice 1 (design L-D3):
 - [ ] 7.29 Evidence rows, log row, release notes. Files: `docs/kiro-evidence.md`, `docs/kiro-log.md`.
 
 ## Not settled in spec 07
+
+- **The mark has no title and no `aria-hidden`.** The task asks for the file byte for byte and for the same art rules as the other files. The two cannot both hold for the title and `aria-hidden`, which the other three files carry and the handoff's mark does not. The file is byte for byte (SHA 256 `b119fa11…7924`). `lookScreens.test.ts` applies every rule but those two, and `origins.md` says why. The file is only a CSS background, which a screen reader never reads.
+- **The optional maps are not built.** Neither the map beside Record a burial nor the plan beside Make an offer.
+- **The foot band is on the churchyard screens that are built as sheets.** The desk and each `.page`. The library, the lists and the other forms have none.
+- **The proof pictures are at 360 and 1920 wide.** The checks at 1440 are measures and not pictures.
+- **The Review Desk preview and the visitor files are still the old look.** They are slice 4.
 
 - **The fonts are measured by file, not by glyph.** The `unicode-range` of each rule is the one the package declares, and the test checks that range. The browser spec checks that each family loads. No test opens the font files to list their glyphs.
 - **The size limit counts the files of the site.** The ten files are 148,228 bytes. The built site holds each of them once, in the `assets/` folder of the hub, and the styles of the two apps point at that copy. The standalone app builds in `dist/apps/` keep their own copies, so each of them works alone.

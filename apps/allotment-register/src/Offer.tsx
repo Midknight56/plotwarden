@@ -208,11 +208,15 @@ export function OfferScreen() {
   };
 
   return (
-    <section className="stack">
-      <h1>{t("makeOffer")}</h1>
-      <div className="actions">
-        <ButtonLink href={base}>{t("backToRegister")}</ButtonLink>
-        <ButtonLink href={`${base}/waiting`}>{t("waitingList")}</ButtonLink>
+    <section className="stack page">
+      <div className="page-head">
+        <h1>{t("makeOffer")}</h1>
+        <div className="actions">
+          <ButtonLink href={base} quiet>
+            {t("backToRegister")}
+          </ButtonLink>
+          <ButtonLink href={`${base}/waiting`}>{t("waitingList")}</ButtonLink>
+        </div>
       </div>
       {result === undefined ? null : (
         <Notice tone="good">
@@ -220,95 +224,99 @@ export function OfferScreen() {
         </Notice>
       )}
 
-      {free.length === 0 || queue.length === 0 ? (
-        <section className="stack card">
-          <p>{free.length === 0 ? t("noFreePlot") : t("noOneWaiting")}</p>
-          <p className="hint">{free.length === 0 ? t("noFreePlotHint") : t("noApplicantHint")}</p>
-        </section>
-      ) : (
-        <form ref={form} className="stack card" onSubmit={goReview} noValidate aria-labelledby="offer-heading">
-          <h2 id="offer-heading">{t("offerHeading")}</h2>
-          <SelectField
-            label={t("chooseFreePlot")}
-            value={plotId}
-            onChange={(v) => {
-              setPlotChoice(v);
-              setApplicantChoice("");
-              setReview(false);
-            }}
-            options={free.map((p) => ({ value: p.plotId, label: `${p.code} · ${sectionName(p.sectionId)}` }))}
-          />
-          {eligible.length === 0 ? (
-            <p>{t("noEligibleApplicant")}</p>
-          ) : (
-            <>
+      <div className="offer-layout">
+        {free.length === 0 || queue.length === 0 ? (
+          <section className="stack card offer-card">
+            <p>{free.length === 0 ? t("noFreePlot") : t("noOneWaiting")}</p>
+            <p className="hint">{free.length === 0 ? t("noFreePlotHint") : t("noApplicantHint")}</p>
+          </section>
+        ) : (
+          <form ref={form} className="stack card offer-card" onSubmit={goReview} noValidate aria-labelledby="offer-heading">
+            <h2 id="offer-heading">{t("offerHeading")}</h2>
+            <div className="field-grid">
               <SelectField
-                label={t("offerTo")}
-                value={applicationId}
+                label={t("chooseFreePlot")}
+                value={plotId}
                 onChange={(v) => {
-                  setApplicantChoice(v);
+                  setPlotChoice(v);
+                  setApplicantChoice("");
                   setReview(false);
                 }}
-                options={eligible.map((r) => ({ value: r.applicationId, label: `${t("positionLabel")} ${r.position} · ${r.name}` }))}
+                options={free.map((p) => ({ value: p.plotId, label: `${p.code} · ${sectionName(p.sectionId)}` }))}
               />
-              {chosen === undefined ? null : <p className="hint">{`${t("positionLabel")} ${chosen.position} · ${chosen.name} · ${t("joinedLabel")} ${chosen.joinedOn}`}</p>}
-            </>
-          )}
-          {plan === undefined || plan.skipped.length === 0 ? null : (
-            <div className="stack" role="group" aria-label={t("skippedNotice")}>
-              <p>{t("skippedNotice")}</p>
-              {plan.skipped.map((s) =>
-                s.kind === "exceptional" ? (
-                  <TextField
-                    key={s.applicationId}
-                    label={`${t("whySkip")} ${nameOf(s.applicationId)}`}
-                    value={reasons[s.applicationId] ?? ""}
-                    onChange={(v) => setReasons((r) => ({ ...r, [s.applicationId]: v }))}
-                    error={errors[`skipReason:${s.applicationId}`]}
-                    autoComplete="off"
+              {eligible.length === 0 ? (
+                <p>{t("noEligibleApplicant")}</p>
+              ) : (
+                <div className="field-pair">
+                  <SelectField
+                    label={t("offerTo")}
+                    value={applicationId}
+                    onChange={(v) => {
+                      setApplicantChoice(v);
+                      setReview(false);
+                    }}
+                    options={eligible.map((r) => ({ value: r.applicationId, label: `${t("positionLabel")} ${r.position} · ${r.name}` }))}
                   />
-                ) : (
-                  <p key={s.applicationId}>{s.kind === "pending" ? t("skipPending", { name: nameOf(s.applicationId) }) : t("skipPreference", { name: nameOf(s.applicationId) })}</p>
-                ),
+                  {chosen === undefined ? null : <p className="hint">{`${t("positionLabel")} ${chosen.position} · ${chosen.name} · ${t("joinedLabel")} ${chosen.joinedOn}`}</p>}
+                </div>
               )}
             </div>
-          )}
-          <TextField label={t("replyBy")} type="date" value={replyBy} onChange={setReplyBy} error={errors["replyBy"]} />
-          {review && plot !== undefined && chosen !== undefined ? (
-            <div className="stack review" role="region" aria-label={t("reviewOffer")}>
-              <p className="lead">{t("offerReserved", { plot: plot.code, name: chosen.name })}</p>
-              <p>{replyBy === "" ? t("offerNoReply", { date: today }) : t("offerDates", { date: today, reply: replyBy })}</p>
-              <p>{t("tellApplicant")}</p>
-              <Status status={intent.status} actions={{ tryAgain: () => intent.setStatus({ phase: "idle" }), openLatest: () => void open.reload() }} />
-              <div className="actions">
-                <Button primary onClick={() => void record()} disabled={intent.busy}>
-                  {t("recordOffer")}
-                </Button>
-                <Button onClick={() => setReview(false)}>{t("cancel")}</Button>
+            {plan === undefined || plan.skipped.length === 0 ? null : (
+              <div className="stack soft-panel" role="group" aria-label={t("skippedNotice")}>
+                <p>{t("skippedNotice")}</p>
+                {plan.skipped.map((s) =>
+                  s.kind === "exceptional" ? (
+                    <TextField
+                      key={s.applicationId}
+                      label={`${t("whySkip")} ${nameOf(s.applicationId)}`}
+                      value={reasons[s.applicationId] ?? ""}
+                      onChange={(v) => setReasons((r) => ({ ...r, [s.applicationId]: v }))}
+                      error={errors[`skipReason:${s.applicationId}`]}
+                      autoComplete="off"
+                    />
+                  ) : (
+                    <p key={s.applicationId}>{s.kind === "pending" ? t("skipPending", { name: nameOf(s.applicationId) }) : t("skipPreference", { name: nameOf(s.applicationId) })}</p>
+                  ),
+                )}
               </div>
-            </div>
-          ) : (
-            <>
-              <Status status={intent.status} actions={{ tryAgain: () => intent.setStatus({ phase: "idle" }), openLatest: () => void open.reload() }} />
-              <div className="actions">
-                <Button primary type="submit" disabled={plot === undefined || chosen === undefined}>
-                  {t("reviewOffer")}
-                </Button>
+            )}
+            <TextField label={t("replyBy")} type="date" value={replyBy} onChange={setReplyBy} error={errors["replyBy"]} />
+            {review && plot !== undefined && chosen !== undefined ? (
+              <div className="stack review" role="region" aria-label={t("reviewOffer")}>
+                <p className="lead">{t("offerReserved", { plot: plot.code, name: chosen.name })}</p>
+                <p>{replyBy === "" ? t("offerNoReply", { date: today }) : t("offerDates", { date: today, reply: replyBy })}</p>
+                <p>{t("tellApplicant")}</p>
+                <Status status={intent.status} actions={{ tryAgain: () => intent.setStatus({ phase: "idle" }), openLatest: () => void open.reload() }} />
+                <div className="actions">
+                  <Button primary onClick={() => void record()} disabled={intent.busy}>
+                    {t("recordOffer")}
+                  </Button>
+                  <Button onClick={() => setReview(false)}>{t("cancel")}</Button>
+                </div>
               </div>
-            </>
-          )}
-        </form>
-      )}
+            ) : (
+              <>
+                <Status status={intent.status} actions={{ tryAgain: () => intent.setStatus({ phase: "idle" }), openLatest: () => void open.reload() }} />
+                <div className="actions">
+                  <Button primary type="submit" disabled={plot === undefined || chosen === undefined}>
+                    {t("reviewOffer")}
+                  </Button>
+                </div>
+              </>
+            )}
+          </form>
+        )}
 
-      <section className="stack" aria-labelledby="open-offers-heading">
-        <h2 id="open-offers-heading">{t("openOffers")}</h2>
-        {openOffers.length === 0 ? <p>{t("noOpenOffers")}</p> : null}
-        <ul className="cards plain">
-          {openOffers.map((o) => (
-            <OfferCard key={o.offerId} offer={o} onDone={(message) => setResult(message)} />
-          ))}
-        </ul>
-      </section>
+        <section className="stack offer-list" aria-labelledby="open-offers-heading">
+          <h2 id="open-offers-heading">{t("openOffers")}</h2>
+          {openOffers.length === 0 ? <p>{t("noOpenOffers")}</p> : null}
+          <ul className="cards plain">
+            {openOffers.map((o) => (
+              <OfferCard key={o.offerId} offer={o} onDone={(message) => setResult(message)} />
+            ))}
+          </ul>
+        </section>
+      </div>
     </section>
   );
 }

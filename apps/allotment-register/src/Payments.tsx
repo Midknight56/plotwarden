@@ -4,7 +4,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { parseMoney } from "../../../template/src/money";
-import { Button, ButtonLink, Notice, TextField } from "../../../template/src/ui/controls";
+import { Button, ButtonLink, CODE_MARK, CodeTabbed, Notice, TextField } from "../../../template/src/ui/controls";
 import { useShell } from "../../../template/src/ui/shellContext";
 import { Status } from "../../../template/src/ui/Status";
 import { paymentMessage } from "./copy";
@@ -119,61 +119,72 @@ function ChargeCard({ summary, target }: { summary: ChargeSummary; target: boole
   };
 
   return (
-    <li ref={card} className="card" {...(target ? { "aria-current": "true" as const } : {})}>
-      <h3>{t("chargeLine", { season: season?.name ?? "", plot: code, name: holder })}</h3>
-      <p className={`badge ${summary.status === "overdue" ? "bad" : summary.status === "paid" ? "good" : ""}`}>{t(STATUS_KEYS[summary.status])}</p>
-      {charge.waiver === undefined ? null : <p>{`${t("waiveFee")}: ${charge.waiver}`}</p>}
-      <dl className="facts">
-        <div>
-          <dt>{t("amountCharged")}</dt>
-          <dd>{money(summary.charged)}</dd>
+    <li ref={card} className="card charge-card" {...(target ? { "aria-current": "true" as const } : {})}>
+      <div className="charge-halves">
+        <div className="charge-half">
+          <h3>
+            <CodeTabbed text={t("chargeLine", { season: season?.name ?? "", plot: CODE_MARK, name: holder })} code={code} />
+          </h3>
+          <p className={`badge ${summary.status === "overdue" ? "bad" : summary.status === "paid" ? "good" : ""}`}>{t(STATUS_KEYS[summary.status])}</p>
+          {charge.waiver === undefined ? null : <p>{`${t("waiveFee")}: ${charge.waiver}`}</p>}
+          <dl className="facts">
+            <div>
+              <dt>{t("amountCharged")}</dt>
+              <dd>{money(summary.charged)}</dd>
+            </div>
+            <div>
+              <dt>{t("amountReceived")}</dt>
+              <dd>{money(summary.received - summary.reversed)}</dd>
+            </div>
+            <div>
+              <dt>{t("stillDue")}</dt>
+              <dd>{money(summary.balance)}</dd>
+            </div>
+          </dl>
+          {summary.dueOn === undefined ? null : <p className="hint">{`${t("dueDate")}: ${summary.dueOn}`}</p>}
         </div>
-        <div>
-          <dt>{t("amountReceived")}</dt>
-          <dd>{money(summary.received - summary.reversed)}</dd>
-        </div>
-        <div>
-          <dt>{t("stillDue")}</dt>
-          <dd>{money(summary.balance)}</dd>
-        </div>
-      </dl>
-      {summary.dueOn === undefined ? null : <p className="hint">{`${t("dueDate")}: ${summary.dueOn}`}</p>}
 
-      {note === undefined ? null : <Notice tone="good">{note}</Notice>}
-      {ownedReceipts.length === 0 ? null : (
-        <section className="stack" aria-label={`${t("receiptsHeading")} ${code}`}>
-          <h4>{t("receiptsHeading")}</h4>
-          <ul className="plain stack">
-            {ownedReceipts.map(({ entry, reversed }) => (
-              <li key={entry.entryId} className="stack">
-                <span>{entry.ref === undefined ? t("receiptLine", { date: entry.on, amount: money(entry.minorUnits) }) : t("receiptLineRef", { date: entry.on, amount: money(entry.minorUnits), ref: entry.ref })}</span>
-                {reversed ? <span className="hint">{t("receiptReversedLine", { date: reversalDate(open.state.ledger, entry.entryId), reason: reversalReason(open.state.ledger, entry.entryId) })}</span> : <ReverseReceiptForm receipt={entry} code={code} onDone={setNote} />}
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
+        <div className="pay-half">
+          {note === undefined ? null : <Notice tone="good">{note}</Notice>}
+          {ownedReceipts.length === 0 ? null : (
+            <section className="stack" aria-label={`${t("receiptsHeading")} ${code}`}>
+              <h4>{t("receiptsHeading")}</h4>
+              <ul className="plain stack">
+                {ownedReceipts.map(({ entry, reversed }) => (
+                  <li key={entry.entryId} className="stack">
+                    <span>{entry.ref === undefined ? t("receiptLine", { date: entry.on, amount: money(entry.minorUnits) }) : t("receiptLineRef", { date: entry.on, amount: money(entry.minorUnits), ref: entry.ref })}</span>
+                    {reversed ? <span className="hint">{t("receiptReversedLine", { date: reversalDate(open.state.ledger, entry.entryId), reason: reversalReason(open.state.ledger, entry.entryId) })}</span> : <ReverseReceiptForm receipt={entry} code={code} onDone={setNote} />}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
 
-      {payable ? (
-        <form ref={form} className="stack" onSubmit={(e) => void submit(e)} noValidate aria-label={`${t("recordPayment")} ${code}`}>
-          <TextField label={t("amountReceived")} inputMode="decimal" value={amount} onChange={setAmount} error={errors["amount"]} hint={t("hint_amount")} autoComplete="off" />
-          <TextField label={t("paymentDate")} type="date" value={date} onChange={setDate} error={errors["paymentDate"]} />
-          <TextField label={t("receiptReference")} value={ref} onChange={setRef} error={errors["receiptRef"]} autoComplete="off" />
-          <Status status={intent.status} actions={{ tryAgain: () => intent.setStatus({ phase: "idle" }), openLatest: () => void open.reload() }} />
-          <div className="actions">
-            <Button primary type="submit" disabled={intent.busy}>
-              {t("recordPayment")}
-            </Button>
+          {payable ? (
+            <form ref={form} className="stack" onSubmit={(e) => void submit(e)} noValidate aria-label={`${t("recordPayment")} ${code}`}>
+              <TextField label={t("amountReceived")} inputMode="decimal" value={amount} onChange={setAmount} error={errors["amount"]} hint={t("hint_amount")} autoComplete="off" />
+              <div className="field-grid">
+                <TextField label={t("paymentDate")} type="date" value={date} onChange={setDate} error={errors["paymentDate"]} />
+                <TextField label={t("receiptReference")} value={ref} onChange={setRef} error={errors["receiptRef"]} autoComplete="off" />
+              </div>
+              <Status status={intent.status} actions={{ tryAgain: () => intent.setStatus({ phase: "idle" }), openLatest: () => void open.reload() }} />
+              <div className="actions">
+                <Button primary type="submit" disabled={intent.busy}>
+                  {t("recordPayment")}
+                </Button>
+              </div>
+            </form>
+          ) : (
+            <Status status={intent.status} actions={{ tryAgain: () => intent.setStatus({ phase: "idle" }) }} />
+          )}
+        </div>
+
+        {live && !anyLive && ownedReceipts.length === 0 ? (
+          <div className="actions charge-reverse">
+            <Button quiet onClick={() => void reverseCharge()} disabled={intent.busy}>{`${t("reverseCharge")}: ${code}`}</Button>
           </div>
-        </form>
-      ) : (
-        <Status status={intent.status} actions={{ tryAgain: () => intent.setStatus({ phase: "idle" }) }} />
-      )}
-      {live && !anyLive && ownedReceipts.length === 0 ? (
-        <div className="actions">
-          <Button onClick={() => void reverseCharge()} disabled={intent.busy}>{`${t("reverseCharge")}: ${code}`}</Button>
-        </div>
-      ) : null}
+        ) : null}
+      </div>
     </li>
   );
 }
@@ -198,14 +209,14 @@ export function PaymentsScreen({ arg }: { arg?: string }) {
   const natural = (a: string, b: string) => a.localeCompare(b, "en", { numeric: true });
 
   return (
-    <section className="stack">
-      <h1>{t("seasonFees")}</h1>
-      <div className="actions">
-        <ButtonLink href={base}>{t("backToRegister")}</ButtonLink>
-        <ButtonLink href={`${base}/season`} primary>
-          {t("newSeason")}
-        </ButtonLink>
-        <ButtonLink href={`${base}/report`}>{t("seasonReport")}</ButtonLink>
+    <section className="stack page">
+      <div className="page-head">
+        <h1>{t("seasonFees")}</h1>
+        <div className="actions">
+          <ButtonLink href={base}>{t("backToRegister")}</ButtonLink>
+          <ButtonLink href={`${base}/season`}>{t("newSeason")}</ButtonLink>
+          <ButtonLink href={`${base}/report`}>{t("seasonReport")}</ButtonLink>
+        </div>
       </div>
       {seasons.length === 0 ? <p>{t("noSeasons")}</p> : null}
       {shown.map((season) => {
@@ -218,7 +229,7 @@ export function PaymentsScreen({ arg }: { arg?: string }) {
           <section key={season.seasonId} className="stack" aria-labelledby={`season-${season.seasonId}`}>
             <h2 id={`season-${season.seasonId}`}>{`${season.name} · ${season.start} · ${season.endExclusive}`}</h2>
             {charges.length === 0 ? <p>{t("noChargesInSeason")}</p> : null}
-            <ul className="cards plain">
+            <ul className="cards charge-cards plain">
               {charges.map((s) => (
                 <ChargeCard key={s.charge.entryId} summary={s} target={s.charge.entryId === namedCharge} />
               ))}

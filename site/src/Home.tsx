@@ -26,93 +26,110 @@ export function hubTitleOf(route: HubRoute): string {
   return SITE_COPY.siteName;
 }
 
-/** The sky strip, the brand and the navigation, then the page. Shared by the hub and the visitor pages. */
+/**
+ * The stripe in the three app colours, the bar with the brand and the navigation, then the page. Shared by the hub and the
+ * visitor pages. The stripe holds nothing and is hidden from a screen reader. The mark beside the brand is drawn by the
+ * stylesheet, so it adds no word.
+ */
 export function Frame({ nav, children }: { nav?: ReactNode; children: ReactNode }) {
   return (
     <>
-      <header className="sky">
-        <div className="sky-row">
-          <span className="brand">{SITE_COPY.siteName}</span>
-          {nav === undefined ? null : <nav aria-label={SITE_COPY.mainNavigation}>{nav}</nav>}
-        </div>
+      <div className="stripe" aria-hidden="true"></div>
+      <header className="bar">
+        <span className="brand">{SITE_COPY.siteName}</span>
+        {nav === undefined ? null : <nav aria-label={SITE_COPY.mainNavigation}>{nav}</nav>}
       </header>
       <main>{children}</main>
     </>
   );
 }
 
-/** The Review Desk: one link, no drawing. */
-function DeskChoice({ name, line, href, open }: { name: string; line: string; href: string; open: string }) {
+/** The Review Desk: a card with one link and no drawing. It is not an article, so only the two doors are. */
+function DeskCard({ name, line, href, open }: { name: string; line: string; href: string; open: string }) {
   return (
-    <li className="choice desk wide">
-      <h3>{name}</h3>
+    <section className="review-card" aria-labelledby="desk-name">
+      <h3 id="desk-name">{name}</h3>
       <p>{line}</p>
       <a className="button secondary" href={href}>
         {open}
       </a>
-    </li>
+    </section>
   );
 }
 
 /**
- * A register: its name, one line, two buttons and a small drawing of its practice map. The drawing is inline SVG
- * text made by the shared sheet at build time (see `practiceMaps.ts`), so it needs no picture file and no request.
- * Each link keeps its own words as the start of its accessible name and adds the register, so two links with the
- * same words are told apart.
+ * A door to a register: an art band, its name, one line, two buttons and a small drawing of its practice map. The band is a
+ * picture of the stylesheet and holds no word. The drawing is inline SVG text made by the shared sheet at build time (see
+ * `practiceMaps.ts`), so it needs no picture file and no request. Each link keeps its own words as the start of its
+ * accessible name and adds the register, so two links with the same words are told apart.
  */
-function RegisterChoice({ tone, name, line, folder, map }: { tone: "church" | "garden"; name: string; line: string; folder: string; map: { markup: string } }) {
+function RegisterDoor({ tone, name, line, folder, map }: { tone: "church" | "garden"; name: string; line: string; folder: string; map: { markup: string } }) {
   const heading = `choice-${tone}`;
   return (
-    <li className={`choice ${tone}`}>
+    <li className={`door ${tone}`}>
       <article className="register-card" aria-labelledby={heading}>
-        <h3 id={heading}>{name}</h3>
-        <p>{line}</p>
-        <div className="actions">
-          <a className="button" href={`${folder}#/practice`} aria-label={`${SITE_COPY.tryPractice}, ${name}`}>
-            {SITE_COPY.tryPractice}
-          </a>
-          <a className="button secondary" href={`${folder}#/new`} aria-label={`${SITE_COPY.startOwn}, ${name}`}>
-            {SITE_COPY.startOwn}
-          </a>
+        <div className="door-art" aria-hidden="true"></div>
+        <div className="door-body">
+          <div className="door-text">
+            <h3 id={heading}>{name}</h3>
+            <p>{line}</p>
+            <div className="actions">
+              <a className="button" href={`${folder}#/practice`} aria-label={`${SITE_COPY.tryPractice}, ${name}`}>
+                {SITE_COPY.tryPractice}
+              </a>
+              <a className="button secondary" href={`${folder}#/new`} aria-label={`${SITE_COPY.startOwn}, ${name}`}>
+                {SITE_COPY.startOwn}
+              </a>
+            </div>
+          </div>
+          <div className="practice-map" dangerouslySetInnerHTML={{ __html: map.markup }} />
         </div>
-        <div className="practice-map" dangerouslySetInnerHTML={{ __html: map.markup }} />
       </article>
     </li>
+  );
+}
+
+/** A sheet for visitors: a small picture of the sheet, drawn by the stylesheet with no text, beside the button that opens it. */
+function SheetRow({ tone, href, words }: { tone: "church" | "garden"; href: string; words: string }) {
+  return (
+    <div className="sheet-row">
+      <span className={`sheet-pic ${tone}`} aria-hidden="true"></span>
+      <a className="button secondary" href={href}>
+        {words}
+      </a>
+    </div>
   );
 }
 
 function HomePage() {
   return (
     <>
-      <div className="stack">
-        <h1 tabIndex={-1}>{SITE_COPY.siteName}</h1>
+      <div className="stack intro">
+        <h1 tabIndex={-1} className="title">{SITE_COPY.siteName}</h1>
         <p className="job">{SITE_COPY.jobLine}</p>
         <p className="tagline">{SITE_COPY.tagline}</p>
       </div>
       <section className="stack" aria-labelledby="choose">
         <h2 id="choose">{SITE_COPY.chooseHeading}</h2>
-        <ul className="choices plain">
-          <RegisterChoice tone="church" name={SITE_COPY.churchyardName} line={SITE_COPY.churchyardLine} folder="churchyard/" map={{ markup: PRACTICE_MAPS.church }} />
-          <RegisterChoice tone="garden" name={SITE_COPY.allotmentName} line={SITE_COPY.allotmentLine} folder="allotments/" map={{ markup: PRACTICE_MAPS.garden }} />
-          <DeskChoice name={SITE_COPY.deskName} line={SITE_COPY.deskLine} href="review/" open={SITE_COPY.deskOpen} />
+        <ul className="doors plain">
+          <RegisterDoor tone="church" name={SITE_COPY.churchyardName} line={SITE_COPY.churchyardLine} folder="churchyard/" map={{ markup: PRACTICE_MAPS.church }} />
+          <RegisterDoor tone="garden" name={SITE_COPY.allotmentName} line={SITE_COPY.allotmentLine} folder="allotments/" map={{ markup: PRACTICE_MAPS.garden }} />
         </ul>
       </section>
-      <section className="stack" aria-labelledby="visitors">
-        <h2 id="visitors">{SITE_COPY.visitorHeading}</h2>
-        <p>{SITE_COPY.visitorLine}</p>
-        <div className="actions">
-          <a className="button secondary" href="visitor/family/">
-            {SITE_COPY.hubFamily}
-          </a>
-          <a className="button secondary" href="visitor/seeker/">
-            {SITE_COPY.hubSeeker}
-          </a>
-        </div>
-      </section>
+      <div className="below">
+        <DeskCard name={SITE_COPY.deskName} line={SITE_COPY.deskLine} href="review/" open={SITE_COPY.deskOpen} />
+        <section className="stack visitors" aria-labelledby="visitors">
+          <h2 id="visitors">{SITE_COPY.visitorHeading}</h2>
+          <p>{SITE_COPY.visitorLine}</p>
+          <div className="sheet-rows">
+            <SheetRow tone="church" href="visitor/family/" words={SITE_COPY.hubFamily} />
+            <SheetRow tone="garden" href="visitor/seeker/" words={SITE_COPY.hubSeeker} />
+          </div>
+        </section>
+      </div>
     </>
   );
-}
-function AboutPage() {
+}function AboutPage() {
   return (
     <div className="stack">
       <h1 tabIndex={-1}>{SITE_COPY.aboutTitle}</h1>

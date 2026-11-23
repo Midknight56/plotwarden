@@ -275,6 +275,37 @@ const SITE_PAIRS: readonly Pair[] = [
   ["focus ring on field", "--focus", "--field", 3],
   ["leaf edge on field", "--leaf", "--field", 3],
   ["sky edge on field", "--sky", "--field", 3],
+  // The night door (7.21): ivory on the night, the amber main action, the ivory outlined button, and the amber ring.
+  ["night door, ivory text on the night", "--sky-ink", "--sky", 4.5],
+  ["night door, main action text on amber", "--ink", "--amber", 4.5],
+  ["night door, main action text on amber hover", "--ink", "--amber-hover", 4.5],
+  ["night door, main action text on amber pressed", "--ink", "--amber-pressed", 4.5],
+  ["night door, main action edge on amber", "--ink", "--amber", 3],
+  ["night door, amber fill on the night", "--amber", "--sky", 3],
+  ["night door, outlined edge on the night", "--sky-ink", "--sky", 3],
+  ["night door, ring on the night", "--ring-night", "--sky", 3],
+  // The allotment door: ink on paper, the leaf main action in white, the outlined button, and the blue ring.
+  ["garden door, ink on its paper", "--garden-ink", "--garden-paper", 4.5],
+  ["garden door, leaf heading on its paper", "--leaf", "--garden-paper", 4.5],
+  ["garden door, white on leaf", "#ffffff", "--leaf", 4.5],
+  ["garden door, white on leaf hover", "#ffffff", "--leaf-hover", 4.5],
+  ["garden door, white on leaf pressed", "#ffffff", "--leaf-pressed", 4.5],
+  ["garden door, ink on soft hover", "--garden-ink", "--garden-soft", 4.5],
+  ["garden door, ink on pressed", "--garden-ink", "--garden-pressed", 4.5],
+  ["garden door, outlined edge on its paper", "--garden-ink", "--garden-paper", 3],
+  ["garden door, ring on its paper", "--focus", "--garden-paper", 3],
+  // The Review Desk card: teal on its cream sheet, and its tints.
+  ["desk card, ink on its sheet", "--ink", "--desk-paper", 4.5],
+  ["desk card, teal text on its sheet", "--teal", "--desk-paper", 4.5],
+  ["desk card, teal edge on its sheet", "--teal", "--desk-paper", 3],
+  ["desk card, teal text on hover", "--teal", "--teal-soft", 4.5],
+  ["desk card, teal text on pressed", "--teal", "--teal-pressed", 4.5],
+  ["desk card, ring on its sheet", "--focus", "--desk-paper", 3],
+  // The visitor sheets: the buttons of the two looks.
+  ["sheet button, ink on field", "--ink", "--field", 4.5],
+  ["sheet button, ink on hover", "--ink", "--soft", 4.5],
+  ["sheet button, ink on pressed", "--ink", "--gravel", 4.5],
+  ["sheet button, ring on its hover fill", "--focus", "--soft", 3],
 ];
 
 function measure(scope: Scope, high: boolean, pairs: readonly Pair[]): string[] {
@@ -318,6 +349,27 @@ describe("the contrast of the allotment values", () => {
 describe("the contrast of the start page values (site.css)", () => {
   it("meets 4.5 to 1 for text and 3 to 1 for edges and rings", () => {
     expect(measure("site", false, SITE_PAIRS)).toEqual([]);
+  });
+
+  it("keeps the ivory text of the night door at 4.5 to 1 while the outlined button is hovered or pressed", () => {
+    const night = colour("site", false, "--sky");
+    const ivory = colour("site", false, "--sky-ink");
+    const mixed = (veil: number): string => {
+      const channel = (hex: string, i: number): number => parseInt(hex.slice(1 + i * 2, 3 + i * 2), 16);
+      return `#${[0, 1, 2].map((i) => Math.round(channel(night, i) + (channel(ivory, i) - channel(night, i)) * veil).toString(16).padStart(2, "0")).join("")}`;
+    };
+    expect(contrast(ivory, mixed(0.14))).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(ivory, mixed(0.24))).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it("names each colour of the doors once, as a custom property, so the pairs above are the pairs the page draws", () => {
+    for (const name of ["--sky-ink", "--amber", "--amber-hover", "--amber-pressed", "--ring-night", "--leaf-hover", "--leaf-pressed", "--garden-ink", "--garden-paper", "--garden-soft", "--garden-pressed", "--teal", "--teal-soft", "--teal-pressed", "--desk-paper", "--soft", "--gravel"]) {
+      expect(colour("site", false, name), name).toMatch(/^#[0-9a-f]{6}$/);
+    }
+    expect(colour("site", false, "--amber")).toBe("#f2c96b");
+    expect(colour("site", false, "--garden-ink")).toBe("#1b312a");
+    expect(colour("site", false, "--garden-paper")).toBe("#fffef6");
+    expect(colour("site", false, "--desk-paper")).toBe("#fffdf8");
   });
 });
 

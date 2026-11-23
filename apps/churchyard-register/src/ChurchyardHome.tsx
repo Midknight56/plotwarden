@@ -5,7 +5,7 @@ import type { FormEvent } from "react";
 import { buildSheet } from "../../../template/src/map/sheet";
 import { search } from "../../../template/src/search";
 import type { SearchEntry, SearchName } from "../../../template/src/search";
-import { Button, ButtonLink, LinkGroup, TextField, keepSearch } from "../../../template/src/ui/controls";
+import { Button, ButtonLink, CODE_MARK, CodeTabbed, LinkGroup, TextField, keepSearch } from "../../../template/src/ui/controls";
 import { formatPartialDate } from "../../../template/src/ui/copy";
 import { plotRows } from "../../../template/src/ui/plotView";
 import { useShell } from "../../../template/src/ui/shellContext";
@@ -19,6 +19,24 @@ import { LANTERN_EXAMPLE } from "./walkthrough";
 
 /** A stand in plot ID for burials that have no plot. It is never shown. */
 const UNPLACED = "unplaced";
+
+/** The mark of a plot state: a small arch with the mark of its state in it. It holds no words and is hidden from a screen reader. */
+function StateMark({ state, small }: { state: string | undefined; small?: boolean }) {
+  if (state === undefined) return null;
+  return (
+    <svg className={small === true ? "mark-swatch small" : "mark-swatch"} viewBox="0 0 28 28" width="28" height="28" aria-hidden="true">
+      <path className={`plot ${state}`} d="M5 25V13a9 9 0 0 1 18 0V25Z" />
+      {state === "reserved" ? <line className="mark" x1="8" y1="22" x2="20" y2="10" /> : null}
+      {state === "taken" ? <circle className="mark solid" cx="14" cy="17" r="4.5" /> : null}
+      {state === "unusable" ? (
+        <g className="mark">
+          <line x1="9" y1="12" x2="19" y2="22" />
+          <line x1="9" y1="22" x2="19" y2="12" />
+        </g>
+      ) : null}
+    </svg>
+  );
+}
 
 export function ChurchyardHome() {
   const { t, route, navigate } = useShell();
@@ -99,19 +117,7 @@ export function ChurchyardHome() {
           <p className="lead">{t("deskLead")}</p>
         ) : (
           <p className="summary-line" aria-live="polite">
-            {stateKey === undefined ? null : (
-              <svg className="mark-swatch" width="28" height="28" aria-hidden="true">
-                <path className={`plot ${stateKey}`} d="M5 25V13a9 9 0 0 1 18 0V25Z" />
-                {stateKey === "reserved" ? <line className="mark" x1="8" y1="22" x2="20" y2="10" /> : null}
-                {stateKey === "taken" ? <circle className="mark solid" cx="14" cy="17" r="4.5" /> : null}
-                {stateKey === "unusable" ? (
-                  <g className="mark">
-                    <line x1="9" y1="12" x2="19" y2="22" />
-                    <line x1="9" y1="22" x2="19" y2="12" />
-                  </g>
-                ) : null}
-              </svg>
-            )}
+            <StateMark state={stateKey} />
             <span>{t("summaryLine", { code: selected.plot.code, section: selected.sectionName ?? t("noSection"), state: selected.stateText })}</span>
           </p>
         )}
@@ -141,7 +147,11 @@ export function ChurchyardHome() {
                 {t("search")}
               </Button>
               {query === "" ? null : <Button onClick={clear}>{t("clearSearch")}</Button>}
-              {practice ? <Button onClick={() => tryExample()}>{t("tryExample", { example: LANTERN_EXAMPLE })}</Button> : null}
+              {practice ? (
+                <Button quiet onClick={() => tryExample()}>
+                  {t("tryExample", { example: LANTERN_EXAMPLE })}
+                </Button>
+              ) : null}
             </div>
           </form>
           <p>{t("searchScope", { site: open.site.title })}</p>
@@ -167,7 +177,14 @@ export function ChurchyardHome() {
                       <p>
                         <strong>{hit.display === undefined ? t("plotTitle", { code: hit.code }) : t("burialAt", { name: hit.display, code: nowhere ? t("locationToConfirm") : hit.code, section: row?.sectionName ?? t("noSection") })}</strong>
                       </p>
-                      {nowhere ? <p>{t("locationToConfirm")}</p> : <p>{row?.line}</p>}
+                      {nowhere ? (
+                        <p>{t("locationToConfirm")}</p>
+                      ) : (
+                        <p className="state-line">
+                          <StateMark state={row?.summary.primary} small />
+                          <span>{row?.line}</span>
+                        </p>
+                      )}
                       {hit.via === "priorCode" ? <p>{t("wasCode", { code: hit.matchedText })}</p> : null}
                       {hit.via === "sourceRef" ? <p>{t("sourceOf", { ref: hit.matchedText })}</p> : null}
                       {hit.via === "name" && (hit.source !== undefined || hit.date !== undefined) ? <p>{[hit.source === undefined ? "" : t("sourceOf", { ref: hit.source }), hit.date ?? ""].filter((s) => s !== "").join(" · ")}</p> : null}
@@ -208,12 +225,20 @@ export function ChurchyardHome() {
               <p className="ground-note">{t("noPlotSelected")}</p>
             ) : (
               <div className="card stack">
-                <p>{selected.line}</p>
+                <p className="state-line">
+                  <StateMark state={stateKey} small />
+                  <span>
+                    <CodeTabbed text={t("summaryLine", { code: CODE_MARK, section: selected.sectionName ?? t("noSection"), state: selected.stateText })} code={selected.plot.code} />
+                  </span>
+                </p>
                 {burialsHere.length === 0 ? null : (
                   <ul className="plain stack">
                     {burialsHere.map((b) => (
                       <li key={b.burialId} className="stack">
-                        <span>{[nameOf(b), formatPartialDate(b.date)].join(" · ")}</span>
+                        <span>
+                          <span className="burial-name">{nameOf(b)}</span>
+                          {` · ${formatPartialDate(b.date)}`}
+                        </span>
                         <div className="actions">
                           <ButtonLink href={`${base}/burial/${b.burialId}`}>{t("openBurial")}</ButtonLink>
                         </div>
@@ -300,7 +325,10 @@ export function ChurchPlotExtras({ plotId }: { plotId: string }) {
       <ul className="plain stack">
         {burials.map((b) => (
           <li key={b.burialId} className="stack">
-            <span>{[b.nameUnknown ? t("nameUnknown") : b.recordedName, formatPartialDate(b.date), t("sourceOf", { ref: b.sourceRef })].join(" · ")}</span>
+            <span>
+              <span className="burial-name">{b.nameUnknown ? t("nameUnknown") : (b.recordedName ?? "")}</span>
+              {` · ${[formatPartialDate(b.date), t("sourceOf", { ref: b.sourceRef })].join(" · ")}`}
+            </span>
             <div className="actions">
               <ButtonLink href={`${base}/burial/${b.burialId}`}>{t("openBurial")}</ButtonLink>
             </div>

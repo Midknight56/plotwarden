@@ -240,12 +240,13 @@ html[data-motion="reduce"] *::after {
 }
 
 .card {
+  --card-pad: 16px; /* the padding of a card, which a theme strip along its top reaches back over */
   display: flex;
   flex-direction: column;
   gap: 12px;
   min-width: 0;
   margin: 0;
-  padding: 16px;
+  padding: var(--card-pad);
   border: 2px solid var(--ink);
   border-radius: var(--radius-card);
   background: var(--soft);
@@ -1169,4 +1170,230 @@ svg.grid-drawing {
     align-items: flex-start;
     gap: 12px 16px;
   }
+}
+
+/* ---- Screens with sheets of their own (spec 07, tasks 7.20 and 7.22) ---------------------------------------------------
+   A screen that is `.page` has a heading row that stands on the ground and a sheet for each part. Forms and records are
+   at most 90rem wide, and the site map is at most 105rem. The words and the order of the page are the same as before. */
+
+main:has(.page) {
+  max-width: 90rem;
+}
+
+main:has(.map-layout) {
+  max-width: 105rem;
+}
+
+.page-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 24px;
+  min-width: 0;
+}
+
+.page-head > * {
+  min-width: 0;
+}
+
+.page-head > p {
+  flex: 1 1 300px;
+  margin: 0;
+  font-weight: 600;
+}
+
+/* The site map: the map takes the room, and a side sheet holds the date, the plot, the zoom and the print button. */
+.map-layout {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: clamp(20px, 2.2vw, 32px);
+}
+
+.map-layout > * {
+  min-width: 0;
+}
+
+.map-main {
+  flex: 3 1 560px;
+}
+
+.map-side {
+  flex: 1 1 280px;
+}
+
+/* The card of the chosen plot, inside the side sheet, is a plain box and not a second sheet. */
+.map-side .card {
+  padding: 12px;
+  border: 1px solid var(--soft-line);
+  border-radius: var(--radius-control);
+  background: var(--paper);
+}
+
+/* The plot record: the sheets in columns of at least 440 px, up to two, in the order of the page. A sheet is never split. */
+.sheet-columns {
+  columns: 440px 2;
+  column-gap: clamp(24px, 2.2vw, 32px);
+}
+
+.sheet-columns > .card {
+  break-inside: avoid;
+  margin: 0 0 20px;
+}
+
+.sheet-columns > :not(.card) {
+  column-span: all;
+}
+
+.sheet-columns > :not(.card):not(dialog) {
+  margin-bottom: 20px;
+}
+
+/* The rows of a sheet are split by hairlines, with none under the last. A row that holds a button keeps room for two
+   buttons 12 px apart. */
+.sheet-columns .card ul.plain.stack {
+  gap: 0;
+}
+
+.sheet-columns .card ul.plain > li {
+  padding: 7px 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+.sheet-columns .card ul.plain > li:last-child {
+  border-bottom: 0;
+}
+
+.sheet-columns .card ul.plain > li.stack {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 12px;
+  min-height: 58px;
+}
+
+/* A form sheet is at most 600 wide. Its fields stand in a grid where they fit, and one group of choices has its options in a grid. */
+.form-sheet {
+  --card-pad: clamp(16px, 1.6vw, 22px);
+  max-width: 600px;
+}
+
+.form-sheet .actions .button {
+  min-height: var(--field-h);
+}
+
+.field-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
+  gap: 14px 16px;
+  align-items: start;
+  min-width: 0;
+}
+
+.field-grid > * {
+  min-width: 0;
+}
+
+/* The group of section, plot and space is a list of fields that join the grid of the form. */
+.field-grid > .stack {
+  display: contents;
+}
+
+.choice-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 170px), 1fr));
+  gap: 12px;
+}
+
+.choice-columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
+  gap: 16px;
+}
+
+.page .choice {
+  padding: 6px 14px 10px;
+  border: 1px solid var(--ink);
+  border-radius: var(--radius-control);
+}
+
+.page .choice legend {
+  font-size: 14px;
+}
+
+/* Settings: This device and Remove, side by side where there is room. */
+.settings-layout {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: clamp(20px, 2.2vw, 32px);
+}
+
+.settings-layout > * {
+  min-width: 0;
+}
+
+.settings-device {
+  flex: 3 1 420px;
+}
+
+.settings-device:only-child {
+  max-width: 60rem;
+}
+
+.settings-remove {
+  flex: 2 1 320px;
+}
+
+/* Committee review: what you type, and what leaves the device. One column on a phone, two sheets from 60rem. The return
+   slip belongs to what you type, so it stands under it in the first column although it follows the preview in the page. */
+.review-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--gap);
+  align-items: start;
+}
+
+.review-layout > * {
+  min-width: 0;
+}
+
+.review-preview .cards {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+}
+
+@media (min-width: 60rem) {
+  .review-layout {
+    grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+    column-gap: clamp(20px, 2.2vw, 32px);
+  }
+
+  .review-input {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .review-slip {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  .review-preview {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+  }
+}
+
+/* The code of a plot in its tab, inside a line of words. */
+.code-tab {
+  display: inline-block;
+  margin-right: 2px;
+  padding: 0 7px;
+  border: 2px solid var(--ink);
+  background: var(--tab);
+  color: var(--ink);
+  font-weight: 700;
+  line-height: 1.4;
 }

@@ -35,6 +35,15 @@
     border: 0;
   }
 
+  /* The map and its key are one column on paper. The side sheet is left out with the other controls. */
+  .map-layout {
+    display: block;
+  }
+
+  .map-main {
+    flex: none;
+  }
+
   svg.sheet {
     max-width: 100%;
     height: auto;

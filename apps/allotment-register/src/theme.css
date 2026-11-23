@@ -138,11 +138,25 @@ header.app .brand {
   grid-column: 1;
   display: flex;
   align-items: center;
+  gap: 10px;
   min-height: 56px;
   padding: 0 0 0 clamp(16px, 2.8vw, 40px);
   color: var(--leaf);
   font-size: 22px;
   font-weight: 700;
+}
+
+/* The mark of the register beside its name: a bed with a strip of hatching along its top. It is drawn here, has no text, and a
+   screen reader hears nothing of it. */
+header.app .brand::before {
+  content: "";
+  flex: none;
+  box-sizing: border-box;
+  width: 22px;
+  height: 17px;
+  border: 2.5px solid var(--leaf);
+  border-radius: 4px;
+  background: repeating-linear-gradient(-45deg, transparent 0 2px, var(--leaf) 2px 3.2px) top / 100% 5px no-repeat;
 }
 
 header.app nav {
@@ -178,7 +192,7 @@ header.app nav .button:active:not(:disabled) {
   content: "";
   flex: none;
   height: 8px;
-  margin: -16px -16px 0;
+  margin: calc(var(--card-pad) * -1) calc(var(--card-pad) * -1) 0;
   border-bottom: 1.5px solid rgba(27, 49, 42, 0.5);
   border-radius: 12px 12px 0 0;
   background:
@@ -200,6 +214,126 @@ html[data-contrast="high"] .card::before {
 dialog,
 .notice {
   border-radius: 10px;
+}
+
+/* The chosen plot card inside the side sheet of the map is a plain box, with no strip of its own. */
+.map-side .card::before {
+  display: none;
+}
+
+/* The code of a plot in its tab, as on the bed swatch: the tab colour, square corners of 4 px. */
+.code-tab {
+  border-radius: 4px;
+}
+
+/* Make an offer: the card Plot and applicant, and the open offers beside it. */
+.offer-layout {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: clamp(24px, 2.2vw, 32px);
+}
+
+.offer-layout > * {
+  min-width: 0;
+}
+
+.offer-card {
+  flex: 3 1 400px;
+}
+
+/* The choice of applicant and the line about its position stand together in one place of the field grid. */
+.field-pair {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.offer-list {
+  flex: 2 1 320px;
+}
+
+.offer-list .cards {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+/* The applicants who are passed over, in a tinted panel. */
+.soft-panel {
+  padding: 12px 14px;
+  border: 1px solid var(--soft-line);
+  border-radius: var(--radius-control);
+  background: var(--soft);
+}
+
+/* Season fees: one card for a charge, at most 1040 wide, in two halves. The charge is the left half and the payment is the
+   right half. Reverse this charge stands under the charge although it follows the payment in the page. */
+.cards.charge-cards {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.charge-card {
+  max-width: 1040px;
+}
+
+.charge-halves {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 20px;
+}
+
+.charge-half,
+.pay-half {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.charge-reverse {
+  min-width: 0;
+}
+
+@media (min-width: 56rem) {
+  .charge-halves {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: auto 1fr;
+    column-gap: clamp(24px, 3vw, 44px);
+    row-gap: 0;
+  }
+
+  .charge-half {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .pay-half {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+  }
+
+  .charge-reverse {
+    grid-column: 1;
+    grid-row: 2;
+    align-self: start;
+    padding-top: 8px;
+  }
+}
+
+.charge-card .facts {
+  grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr));
+}
+
+.charge-card .facts > div {
+  border: 1px solid var(--soft-line);
+  border-radius: var(--radius-control);
+}
+
+/* Still due is the amount that matters: the tab colour and a 2 px edge. */
+.charge-card .facts > div:last-child {
+  padding: 7px 11px;
+  border: 2px solid var(--ink);
+  background: var(--tab);
 }
 
 /* The plan sheet: pale soil, grass walks, beds. */
@@ -421,12 +555,25 @@ html[data-contrast="high"] .bed-swatch::before {
   display: inline-block;
   align-self: flex-start;
   margin: 0;
-  padding: 2px 12px;
+  padding: 2px 14px 2px 10px;
   border: 2px solid var(--ink);
   border-radius: 999px;
   background: var(--soft);
   font-size: 14px;
   font-weight: 700;
+}
+
+/* A ring before the words of a chip. It is drawn here and has no text. */
+.badge::before {
+  content: "";
+  display: inline-block;
+  box-sizing: border-box;
+  width: 12px;
+  height: 12px;
+  margin-right: 8px;
+  border: 2px solid var(--ink);
+  border-radius: 50%;
+  vertical-align: -1px;
 }
 
 .badge.bad {

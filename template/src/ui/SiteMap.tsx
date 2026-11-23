@@ -353,66 +353,71 @@ export function SiteMap() {
   };
 
   return (
-    <section className="stack">
-      <h1>{t("siteMap")}</h1>
-      <div className="actions no-print">
-        <ButtonLink href={base}>{t("backToRegister")}</ButtonLink>
-        <ButtonLink href={`${base}/list${queryOf({ plot: selected, asAt })}`} primary>
-          {t("openPlotList")}
-        </ButtonLink>
-        <ButtonLink href={`${base}/map/edit`}>{t("editMap")}</ButtonLink>
+    <section className="stack page">
+      <div className="page-head on-ground">
+        <h1>{t("siteMap")}</h1>
+        <div className="actions no-print">
+          <ButtonLink href={base} quiet>
+            {t("backToRegister")}
+          </ButtonLink>
+          <ButtonLink href={`${base}/list${queryOf({ plot: selected, asAt })}`} primary>
+            {t("openPlotList")}
+          </ButtonLink>
+          <ButtonLink href={`${base}/map/edit`}>{t("editMap")}</ButtonLink>
+        </div>
       </div>
 
       <AsAtHeading date={viewDate} today={open.today} />
 
       {sheet.empty ? <p>{t("noMapYet")}</p> : null}
-      <div ref={holder} className="sheet-scroll" role="region" aria-label={t("siteMap")} tabIndex={0}>
-        <SheetSvg model={sheet} label={t("mapDescription")} />
-      </div>
-      <MapKey />
+      <div className="map-layout">
+        <div className="stack map-main">
+          <div ref={holder} className="sheet-scroll" role="region" aria-label={t("siteMap")} tabIndex={0}>
+            <SheetSvg model={sheet} label={t("mapDescription")} />
+          </div>
+          <MapKey />
+        </div>
 
-      <AsAtField
-        withHeading={false}
-        date={viewDate}
-        today={open.today}
-        onChange={(date) => navigate(`/r/${open.site.id}/map${queryOf({ plot: selected, asAt: date === open.today ? undefined : date })}`, { search: route.search })}
-      />
-
-      <div className="no-print stack">
-        <SelectField
-          label={t("choosePlot")}
-          value={selected}
-          onChange={(value) => navigate(`/r/${open.site.id}/map${queryOf({ plot: value, asAt })}`, { replace: true, search: route.search })}
-          options={[{ value: "", label: t("noPlotChosen") }, ...rows.map((r) => ({ value: r.plot.plotId, label: r.line }))]}
-        />
-        {chosen === undefined ? null : (
-          <section className="card stack" aria-label={t("selectedPlot")}>
-            <p>{chosen.line}</p>
-            <div className="actions">
-              <ButtonLink href={`${base}/plot/${chosen.plot.plotId}`}>{t("openPlot")}</ButtonLink>
-            </div>
-          </section>
-        )}
-        <p>{t("zoomLevel", { percent: Math.round(zoom * 100) })}</p>
-        <div className="actions">
-          <Button onClick={() => setZoom((z) => Math.min(4, z + 0.5))} disabled={zoom >= 4}>
-            {t("zoomIn")}
-          </Button>
-          <Button onClick={() => setZoom((z) => Math.max(1, z - 0.5))} disabled={zoom <= 1}>
-            {t("zoomOut")}
-          </Button>
-          <Button onClick={() => setZoom(1)} disabled={zoom === 1}>
-            {t("fitSite")}
-          </Button>
+        <div className="card stack map-side no-print">
+          <AsAtField
+            withHeading={false}
+            date={viewDate}
+            today={open.today}
+            onChange={(date) => navigate(`/r/${open.site.id}/map${queryOf({ plot: selected, asAt: date === open.today ? undefined : date })}`, { search: route.search })}
+          />
+          <SelectField
+            label={t("choosePlot")}
+            value={selected}
+            onChange={(value) => navigate(`/r/${open.site.id}/map${queryOf({ plot: value, asAt })}`, { replace: true, search: route.search })}
+            options={[{ value: "", label: t("noPlotChosen") }, ...rows.map((r) => ({ value: r.plot.plotId, label: r.line }))]}
+          />
+          {chosen === undefined ? null : (
+            <section className="card stack" aria-label={t("selectedPlot")}>
+              <p>{chosen.line}</p>
+              <div className="actions">
+                <ButtonLink href={`${base}/plot/${chosen.plot.plotId}`}>{t("openPlot")}</ButtonLink>
+              </div>
+            </section>
+          )}
+          <p>{t("zoomLevel", { percent: Math.round(zoom * 100) })}</p>
+          <div className="actions">
+            <Button onClick={() => setZoom((z) => Math.min(4, z + 0.5))} disabled={zoom >= 4}>
+              {t("zoomIn")}
+            </Button>
+            <Button onClick={() => setZoom((z) => Math.max(1, z - 0.5))} disabled={zoom <= 1}>
+              {t("zoomOut")}
+            </Button>
+            <Button onClick={() => setZoom(1)} disabled={zoom === 1}>
+              {t("fitSite")}
+            </Button>
+          </div>
+          <div className="actions">
+            <Button onClick={print}>{t("printSiteMap")}</Button>
+          </div>
+          {printStatus === "preparing" ? <Notice>{t("preparingPrint")}</Notice> : null}
+          {printStatus === "ready" ? <Notice tone="good">{t("printPreviewReady")}</Notice> : null}
         </div>
       </div>
-
-      <div className="actions no-print">
-        <Button onClick={print}>{t("printSiteMap")}</Button>
-      </div>
-      {printStatus === "preparing" ? <Notice>{t("preparingPrint")}</Notice> : null}
-      {printStatus === "ready" ? <Notice tone="good">{t("printPreviewReady")}</Notice> : null}
-
       <section className="print-only stack" aria-hidden="false">
         <h2>{t("plotCodesHeading")}</h2>
         <p>{t("asAt", { date: viewDate })}</p>
