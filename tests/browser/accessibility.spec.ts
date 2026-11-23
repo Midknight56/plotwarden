@@ -6,7 +6,8 @@ import { expect, test } from "@playwright/test";
 import type { Page } from "@playwright/test";
 import { axeFindings, blocking, noted } from "../helpers/axe";
 import { focusRingContrast, trackRequests } from "../helpers/measureLayout";
-import { APPS, CHURCH, GARDEN, LIBRARY_ROUTES, focusedName, openPractice, routesOf, settle, tabTo } from "../helpers/routes";
+import { APPS, CHURCH, GARDEN, LIBRARY_ROUTES, focusedName, openPractice, plotIdOf, routesOf, settle, siteIdOf, storedEvents, tabTo } from "../helpers/routes";
+import { SITE, tryPracticeFromHub } from "../helpers/siteOrigin";
 
 /** Run axe, keep every finding in the test's notes, and fail on the serious and critical ones. */
 async function axe(page: Page, label: string): Promise<void> {
@@ -303,6 +304,76 @@ for (const app of APPS) {
     });
   });
 }
+
+// ---- The heading that script focuses shows no ring (spec 07, L3) -----------------------------------------------
+
+/** The outline of the focused element, as the browser computes it. */
+async function focusedOutline(page: Page): Promise<{ tag: string; id: string; style: string; width: number; focusVisible: boolean }> {
+  return page.evaluate(() => {
+    const el = document.activeElement as HTMLElement;
+    const css = getComputedStyle(el);
+    return { tag: el.tagName.toLowerCase(), id: el.id, style: css.outlineStyle, width: parseFloat(css.outlineWidth), focusVisible: el.matches(":focus-visible") };
+  });
+}
+
+/** Press Tab until a button, a link or a field of the page body has focus, and return how it is outlined. */
+async function tabToControl(page: Page): Promise<{ tag: string; id: string; style: string; width: number; focusVisible: boolean }> {
+  for (let i = 0; i < 40; i++) {
+    await page.keyboard.press("Tab");
+    const inMain = await page.evaluate(() => document.activeElement?.closest("main") !== null && document.activeElement?.matches("button, a[href], input, select, textarea") === true);
+    if (inMain) return focusedOutline(page);
+  }
+  throw new Error("Tab did not reach a control in the page body in 40 presses");
+}
+
+test.describe("the page heading that script focuses shows no ring, and a control keeps its ring", () => {
+  test.use({ baseURL: SITE });
+
+  for (const app of APPS) {
+    test(`${app.title}: opened from the start page with the mouse, the heading has focus and no outline, and a button reached with Tab has its ring`, async ({ page }) => {
+      await tryPracticeFromHub(page, app.key === "churchyard" ? "churchyard" : "allotment");
+      const heading = page.getByRole("heading", { level: 1, name: app.practice });
+      await expect(heading).toBeVisible();
+      await expect(heading).toBeFocused();
+      await expect(heading).toHaveAttribute("tabindex", "-1");
+      const onHeading = await focusedOutline(page);
+      expect(onHeading.tag).toBe("h1");
+      expect(onHeading.style, "the heading's outline style").toBe("none");
+
+      // A control reached with the keyboard still shows the 3 px ring, and the ring reaches 3 to 1.
+      const onControl = await tabToControl(page);
+      expect(onControl.focusVisible, `${onControl.tag} matches :focus-visible after Tab`).toBe(true);
+      expect(onControl.style, `${onControl.tag}'s outline style`).toBe("solid");
+      expect(onControl.width, `${onControl.tag}'s outline width`).toBe(3);
+      expect(await focusRingContrast(page, ":focus")).toBeGreaterThanOrEqual(3);
+    });
+  }
+
+  test("Churchyard Register: the Selected plot heading takes focus from a plot link and shows no outline", async ({ page }) => {
+    await tryPracticeFromHub(page, "churchyard");
+    await expect(page.getByRole("heading", { level: 1, name: CHURCH.practice })).toBeFocused();
+    const siteId = siteIdOf(page);
+    const plot = plotIdOf(await storedEvents(page, siteId), "Y07");
+    await page.evaluate(([id, plotId]) => { window.location.hash = `#/r/${id}?plot=${plotId}`; }, [siteId, plot] as const);
+    const selected = page.getByRole("heading", { level: 2, name: "Selected plot" });
+    await expect(selected).toBeFocused();
+    await expect(selected).toHaveAttribute("tabindex", "-1");
+    expect((await focusedOutline(page)).style, "the Selected plot heading's outline style").toBe("none");
+  });
+
+  test("the start page: a heading that script focuses after a link shows no outline, and a link keeps its ring", async ({ page }) => {
+    await page.goto("/");
+    await page.getByRole("link", { name: "About", exact: true }).click();
+    const heading = page.getByRole("heading", { level: 1, name: "About Plotwarden" });
+    await expect(heading).toBeFocused();
+    expect((await focusedOutline(page)).style, "the About heading's outline style").toBe("none");
+    await page.keyboard.press("Tab");
+    const link = await focusedOutline(page);
+    expect(link.tag).toBe("a");
+    expect(link.style).toBe("solid");
+    expect(link.width).toBe(3);
+  });
+});
 
 test("what this spec checks", () => {
   // Written so a reader of the list sees what was and was not tried.

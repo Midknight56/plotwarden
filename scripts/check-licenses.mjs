@@ -1,6 +1,8 @@
 // Every package that ships has its licence in THIRD_PARTY_NOTICES.md, with its version and the licence its own
 // package.json states. Shipped means: in the lockfile and not development only (so the packages inside the
-// two apps), and every package that the pinned Desk preview bundles (from release/desk-preview.lock.json).
+// two apps), every package that the pinned Desk preview bundles (from release/desk-preview.lock.json), and the two
+// font packages. The fonts are development packages, but their woff2 files are copied into fonts/ and ship in every
+// build, so they count as shipped when that folder exists, and the notices must hold the text of their licence.
 //
 //   node scripts/check-licenses.mjs [--root <repo>]
 //
@@ -13,6 +15,11 @@ import { LOCK_PATH } from "./lib/desk.mjs";
 import { Refusal, finish, parseArgs } from "./lib/files.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
+
+/** The packages whose files are copied into fonts/. */
+const FONT_PACKAGES = ["@fontsource/atkinson-hyperlegible-next", "@fontsource/gelasio"];
+/** The first line of the licence that the font packages state. The notices hold its full text. */
+const FONT_LICENCE_TITLE = "SIL OPEN FONT LICENSE Version 1.1";
 
 /** The rows of every table in the notices: package name, first word of the version cell, licence cell. */
 function noticeRows(text) {
@@ -57,6 +64,28 @@ finish(() => {
     shipped.push({ name, version: entry.version, license, where: "the apps" });
   }
 
+  let fonts = 0;
+  if (existsSync(join(root, "fonts"))) {
+    for (const name of FONT_PACKAGES) {
+      const manifest = join(root, "node_modules", name, "package.json");
+      if (!existsSync(manifest)) {
+        problems.push(`${name}: its files are in fonts/, but it is not installed in node_modules, so its licence cannot be read`);
+        continue;
+      }
+      const json = JSON.parse(readFileSync(manifest, "utf8"));
+      const license = licenseOf(json);
+      if (license === undefined) {
+        problems.push(`${name} ${json.version}: no licence stated in its package.json`);
+        continue;
+      }
+      shipped.push({ name, version: json.version, license, where: "the fonts folder" });
+      fonts += 1;
+    }
+    if (!readFileSync(noticesFile, "utf8").includes(FONT_LICENCE_TITLE)) {
+      problems.push("fonts/ holds font files, but THIRD_PARTY_NOTICES.md does not hold the text of the SIL Open Font License 1.1");
+    }
+  }
+
   const deskLock = join(root, LOCK_PATH);
   if (existsSync(deskLock)) {
     const desk = JSON.parse(readFileSync(deskLock, "utf8"));
@@ -76,6 +105,6 @@ finish(() => {
     console.log(`check-licenses: ${problems.length} problem${problems.length === 1 ? "" : "s"}`);
     return 1;
   }
-  console.log(`check-licenses: ok, ${shipped.length} shipped packages, each with its row`);
+  console.log(`check-licenses: ok, ${shipped.length} shipped packages${fonts > 0 ? `, including ${fonts} font packages,` : ""} each with its row`);
   return 0;
 });

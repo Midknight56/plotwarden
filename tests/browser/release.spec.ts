@@ -9,7 +9,9 @@
 // service worker caches the static shell and nothing else, serves it with the network off, and says when a new
 // version waits. Layout is measured on every page of the hub and of the visitor pages, and a proof picture of each
 // is saved in docs/acceptance/layout/site.
-import { readFileSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { expect, test } from "@playwright/test";
 import type { Page } from "@playwright/test";
@@ -430,6 +432,84 @@ test.describe("the registers and the Desk, from the hub", () => {
   });
 });
 
+// The fonts of the new look (spec 07, L2). Two families, ten woff2 files, from the site's own origin.
+const SITE_DIR = fileURLToPath(new URL("../../dist/site", import.meta.url));
+
+function fontFilesOf(dir: string, out: string[] = []): string[] {
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const path = join(dir, entry.name);
+    if (entry.isDirectory()) fontFilesOf(path, out);
+    else if (entry.name.endsWith(".woff2")) out.push(path);
+  }
+  return out;
+}
+
+test.describe("the fonts of the built site", () => {
+  test("every font file is in the built site and in the offline list, and the distinct files are under 150,000 bytes", async ({ page }) => {
+    const files = fontFilesOf(SITE_DIR);
+    expect(files.length).toBeGreaterThanOrEqual(10);
+    const distinct = new Map<string, number>();
+    for (const file of files) distinct.set(createHash("sha256").update(readFileSync(file)).digest("hex"), statSync(file).size);
+    expect(distinct.size, "ten distinct font files").toBe(10);
+    const total = [...distinct.values()].reduce((a, b) => a + b, 0);
+    expect(total, `the distinct font files together, ${total} bytes`).toBeLessThan(150_000);
+    // Each app folder, and the hub, holds its own copies. Each of them is under the limit too.
+    for (const folder of ["", "churchyard", "allotments"]) {
+      const own = fontFilesOf(join(SITE_DIR, folder)).filter((f) => folder !== "" || !/[\\/](churchyard|allotments|review)[\\/]/.test(f));
+      const bytes = own.reduce((sum, f) => sum + statSync(f).size, 0);
+      expect(bytes, `${folder === "" ? "hub" : folder} fonts, ${bytes} bytes`).toBeLessThan(150_000);
+    }
+    const shell = await shellOf(page, SITE);
+    for (const file of files) {
+      const path = `/${file.slice(SITE_DIR.length + 1).replace(/\\/g, "/")}`;
+      expect(shell.files, path).toContain(path);
+    }
+    const licence = await page.request.get(`${SITE}font-licences.txt`);
+    expect(licence.status()).toBe(200);
+    expect(await licence.text()).toContain("SIL OPEN FONT LICENSE Version 1.1");
+    expect(shell.files).toContain("/font-licences.txt");
+  });
+
+  const PAGES = [
+    { path: "", families: ["Atkinson Hyperlegible Next", "Gelasio"] },
+    { path: "churchyard/", families: ["Atkinson Hyperlegible Next", "Gelasio"] },
+    { path: "allotments/", families: ["Atkinson Hyperlegible Next"] },
+  ] as const;
+  for (const entry of PAGES) {
+    test(`/${entry.path} loads its fonts from its own origin, and no other host is asked`, async ({ page }) => {
+      const requests = trackRequests(page, SITE);
+      const fontRequests: string[] = [];
+      page.on("request", (request) => {
+        if (request.resourceType() === "font") fontRequests.push(request.url());
+      });
+      await page.goto(`/${entry.path}`);
+      await expect(page.locator("h1").first()).toBeVisible();
+      await page.evaluate(() => document.fonts.ready.then(() => undefined));
+      const loaded = await page.evaluate(() => [...document.fonts].filter((f) => f.status === "loaded").map((f) => f.family.replace(/"/g, "")));
+      for (const family of entry.families) expect(loaded, `${family} on /${entry.path}`).toContain(family);
+      if (!entry.families.includes("Gelasio" as never)) expect(loaded).not.toContain("Gelasio");
+      expect(fontRequests.length).toBeGreaterThan(0);
+      for (const url of fontRequests) expect(url.startsWith(SITE), url).toBe(true);
+      expect(requests.external).toEqual([]);
+    });
+  }
+
+  test("a page of the site names no font host in its styles", async ({ page }) => {
+    for (const path of ["", "churchyard/", "allotments/", "visitor/family/"]) {
+      await page.goto(`/${path}`);
+      const sheets = await page.evaluate(async () => {
+        const hrefs = [...document.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"]')].map((l) => l.href);
+        return Promise.all(hrefs.map(async (href) => ({ href, text: await (await fetch(href)).text() })));
+      });
+      expect(sheets.length, path).toBeGreaterThan(0);
+      for (const sheet of sheets) {
+        expect(sheet.text, sheet.href).not.toMatch(/fonts\.googleapis|fonts\.gstatic/);
+        expect(sheet.text, sheet.href).not.toMatch(/url\(\s*["']?https?:/);
+        expect(sheet.text, sheet.href).not.toMatch(/@font-face[^}]*url\([^)]*\.(woff|ttf|otf)\b(?!2)/);
+      }
+    }
+  });
+});
 /** The shell version, as the worker's own file says it, and the files that it lists. */
 async function shellOf(page: Page, origin: string): Promise<{ version: string; files: string[] }> {
   const text = await (await page.request.get(`${origin}sw.js`)).text();

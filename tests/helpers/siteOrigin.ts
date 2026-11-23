@@ -76,7 +76,23 @@ export async function expectLayout(page: Page): Promise<void> {
   expect(violations, JSON.stringify(violations, null, 1)).toEqual([]);
 }
 
+/**
+ * Wait until no animation or transition that has an end is still running. An animation that never ends (the band mist)
+ * is left out, because it would hold the wait for ever. The Review Desk fades its screens in, and a picture taken during
+ * the fade shows it washed out. Two frames first, so an animation that starts on the next frame is seen.
+ */
+export async function settleMotion(page: Page): Promise<void> {
+  await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
+  await page.waitForFunction(() =>
+    document.getAnimations().every((a) => {
+      const timing = a.effect?.getComputedTiming();
+      return timing === undefined || timing.iterations === Infinity || a.playState === "finished" || a.playState === "idle";
+    }),
+  );
+}
+
 /** Save one small picture of a whole page, as proof of how it looked. Phone and desktop are both kept. */
 export async function saveProof(page: Page, name: string): Promise<void> {
+  await settleMotion(page);
   await page.screenshot({ path: `docs/acceptance/layout/site/${name}-${sizeOf(page)}.jpg`, type: "jpeg", quality: 60, fullPage: true });
 }

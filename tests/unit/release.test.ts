@@ -1163,6 +1163,61 @@ describe("T36 check:licenses", () => {
   });
 });
 
+// The two font packages are development packages, but their files are copied into `fonts/` and ship in every build,
+// so they need their rows and the licence text too (spec 07, L2.6).
+describe("T36 check:licenses, fonts", () => {
+  const OFL = "SIL OPEN FONT LICENSE Version 1.1 - 26 February 2007";
+  const ROWS = "| @fontsource/atkinson-hyperlegible-next | 5.3.0 | OFL-1.1 | Text font |\n| @fontsource/gelasio | 5.3.0 | OFL-1.1 | Heading font |\n";
+  const notices = (rows = ROWS, licence = OFL): string => `# Third party notices\n\n## Fonts\n\n| Package | Version | Licence | Use |\n|---|---|---|---|\n${rows}\n\`\`\`\n${licence}\n\`\`\`\n`;
+
+  function tree(options: { notices?: string; skipInstall?: string; license?: string } = {}): string {
+    const root = fresh("fonts-licenses");
+    put(root, "package.json", JSON.stringify({ devDependencies: {} }));
+    put(root, "package-lock.json", JSON.stringify({ lockfileVersion: 3, packages: { "": { name: "x" } } }));
+    put(root, "fonts/atkinson.css", "/* fonts */\n");
+    for (const name of ["@fontsource/atkinson-hyperlegible-next", "@fontsource/gelasio"]) {
+      if (name !== options.skipInstall) put(root, `node_modules/${name}/package.json`, JSON.stringify({ name, version: "5.3.0", license: options.license ?? "OFL-1.1" }));
+    }
+    put(root, "THIRD_PARTY_NOTICES.md", options.notices ?? notices());
+    return root;
+  }
+  const check = (root: string): Ran => run("check-licenses.mjs", ["--root", root]);
+
+  it("passes when both font packages have their rows and the licence text is there", () => {
+    const result = check(tree());
+    expect(result.err).toBe("");
+    expect(result.code).toBe(0);
+    expect(result.out).toContain("2 font packages");
+  });
+
+  it("fails a font package that has no row, and names it", () => {
+    const result = check(tree({ notices: notices("| @fontsource/gelasio | 5.3.0 | OFL-1.1 | Heading font |\n") }));
+    expect(result.code).toBe(1);
+    expect(result.err).toContain("@fontsource/atkinson-hyperlegible-next");
+  });
+
+  it("fails a row with another version or another licence than the package states", () => {
+    const version = check(tree({ notices: notices(ROWS.replace("| 5.3.0 |", "| 5.2.0 |")) }));
+    expect(version.code).toBe(1);
+    expect(version.err).toContain("5.3.0");
+    const licence = check(tree({ license: "MIT" }));
+    expect(licence.code).toBe(1);
+    expect(licence.err).toContain("OFL-1.1");
+  });
+
+  it("fails a font package that is not installed, so a licence is never guessed", () => {
+    const result = check(tree({ skipInstall: "@fontsource/gelasio" }));
+    expect(result.code).toBe(1);
+    expect(result.err).toContain("@fontsource/gelasio");
+  });
+
+  it("fails when the text of the Open Font License is not in the notices", () => {
+    const result = check(tree({ notices: notices(ROWS, "no licence text here") }));
+    expect(result.code).toBe(1);
+    expect(result.err).toContain("SIL Open Font License");
+  });
+});
+
 // ---- links ---------------------------------------------------------------------------------------------------------
 
 describe("T36 check:links", () => {

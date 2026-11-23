@@ -1,5 +1,9 @@
 /* The look of the shared screens. Paper and ink, plain edges, large targets.
-   Edge inset 16 px, gap 12 px, target 44 by 44 px, text at least 12 px. */
+   Edge inset 16 px, gap 12 px, target 44 by 44 px, text at least 12 px. The values are custom properties, so an
+   app sets its own in its theme file. A name that a theme leaves out keeps the default here, which is the look of
+   an app with no theme. */
+
+@import "../../../fonts/atkinson.css";
 
 :root {
   --ink: #22252c;
@@ -13,6 +17,25 @@
   --bad: #f6e3e0;
   --tab: #e4d9be;
   --gap: 16px;
+
+  /* Added with the new look. Each default gives the look of an app with no theme. */
+  --ok: #1f5b36; /* the saved notice border and mark */
+  --focus-on-dark: #ffd27a; /* the ring on a dark ground */
+  --rule: #d8cdb4; /* hairlines */
+  --ground: var(--paper); /* what the page stands on */
+  --on-ground: var(--ink);
+  --action: var(--ink); /* the one filled button of a view */
+  --action-ink: var(--paper);
+  --action-hover: var(--ink);
+  --action-pressed: var(--ink);
+  --action-edge: var(--ink);
+  --radius-control: 0;
+  --radius-card: 0;
+  --font-text: "Atkinson Hyperlegible Next", system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-heading: var(--font-text);
+  --control-h: 44px; /* a button */
+  --field-h: 44px; /* a field */
+  --motion: 120ms ease-out; /* background and border colour only */
 }
 
 html[data-contrast="high"] {
@@ -26,6 +49,8 @@ html[data-contrast="high"] {
   --good: #ffffff;
   --bad: #ffffff;
   --tab: #ffffff;
+  --ok: #000000;
+  --rule: #000000;
 }
 
 * {
@@ -33,9 +58,9 @@ html[data-contrast="high"] {
 }
 
 html {
-  background: var(--paper);
+  background: var(--ground);
   color: var(--ink);
-  font-family: system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-family: var(--font-text);
   font-size: 16px;
   line-height: 1.5;
   -webkit-text-size-adjust: 100%;
@@ -43,8 +68,8 @@ html {
 
 body {
   margin: 0;
-  background: var(--paper);
-  color: var(--ink);
+  background: var(--ground);
+  color: var(--on-ground);
 }
 
 h1,
@@ -54,8 +79,16 @@ h3 {
   line-height: 1.25;
 }
 
+h1,
+h2,
+h3,
+header.app .brand {
+  font-family: var(--font-heading);
+}
+
 h1 {
-  font-size: 28px;
+  font-size: clamp(28px, 1.1vw + 20px, 36px);
+  line-height: 1.15;
 }
 
 h2 {
@@ -176,7 +209,7 @@ html[data-motion="reduce"] *::after {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 14px;
+  gap: 12px;
   min-width: 0;
 }
 
@@ -200,7 +233,9 @@ html[data-motion="reduce"] *::after {
   margin: 0;
   padding: 16px;
   border: 2px solid var(--ink);
+  border-radius: var(--radius-card);
   background: var(--soft);
+  color: var(--ink);
 }
 
 fieldset {
@@ -261,10 +296,12 @@ legend {
 }
 
 .notice.good {
+  border-color: var(--ok);
   background: var(--good);
 }
 
 .notice.error {
+  border-color: var(--error);
   background: var(--bad);
   color: var(--error);
 }
@@ -314,10 +351,10 @@ select,
 textarea {
   width: 100%;
   min-width: 0;
-  min-height: 44px;
+  min-height: var(--field-h);
   padding: 8px 12px;
   border: 2px solid var(--ink);
-  border-radius: 0;
+  border-radius: var(--radius-control);
   background: var(--field);
   font-size: 16px;
 }
@@ -384,9 +421,10 @@ a.button {
   justify-content: center;
   max-width: 100%;
   min-width: 44px;
+  min-height: var(--control-h);
   padding: 8px 16px;
   border: 2px solid var(--ink);
-  border-radius: 0;
+  border-radius: var(--radius-control);
   background: var(--paper);
   color: var(--ink);
   font-size: 16px;
@@ -398,8 +436,10 @@ a.button {
 }
 
 .button.primary {
-  background: var(--ink);
-  color: var(--paper);
+  border-color: var(--action-edge);
+  background: var(--action);
+  color: var(--action-ink);
+  font-weight: 700;
 }
 
 .button:disabled,
@@ -413,6 +453,13 @@ button:disabled {
 :focus-visible {
   outline: 3px solid var(--focus);
   outline-offset: 2px;
+}
+
+/* A page heading that script focuses (tabindex -1) is not a control. Focus still moves to it, so the page change is
+   announced, and it shows no ring. Every control keeps the ring above. */
+h1[tabindex="-1"]:focus-visible,
+h2[tabindex="-1"]:focus-visible {
+  outline: none;
 }
 
 /* Dialog */
@@ -609,6 +656,7 @@ svg.sheet text {
 
 /* A plain action: no box, an underline. For a choice that is there but is not the main one. */
 .button.quiet {
+  min-height: 44px;
   padding-right: 0;
   padding-left: 0;
   border-color: transparent;

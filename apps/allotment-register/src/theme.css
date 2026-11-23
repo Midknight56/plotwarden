@@ -1,22 +1,47 @@
 /* The look of the Allotment Register: a daylight garden plan. Garden ink #1B312A on pale paper #F7F5E8, a
    daylight band at the top, pale soil under the plan, grass walks, and beds with a strip of hatching and a square
    peg that holds the plot code. The furrows and the shed live in the band, in the margin, in a row of their own
-   above the title, so no word and no control ever sits on a picture. */
+   above the title, so no word and no control ever sits on a picture.
+
+   The values follow the design of spec 07. Held back until the markup and the art for them exist (slice 3): the band
+   heights (--band). Held back until the map drawing has the classes for them (slice 2): what uses --row-ground and
+   --crop. The headings use the text font, which the shared screens set. */
 
 :root {
-  --sky: #cfe7df;
-  --leaf: #2f6b4f;
-  --soil: #efe6cc;
-  --grass: #cfe0b8;
-  --bedfill: #e3edcb;
-  --stone: #fffef6;
-  --band: 80px;
+  --paper: #f7f5e8;
+  --ink: #1b312a;
   --muted: #3e5a4e;
+  --stone: #fffef6;
   --field: #fffef6;
-  --soft: #efe6cc;
+  --soft: #e7eeda;
   --good: #dcebd3;
   --bad: #f6e3dc;
-  --tab: #f3e3a3;
+  --tab: #bfe0ea; /* the next plot, the chosen bed, the amount still due */
+  --sky: #cfe7df;
+  --leaf: #2f6b4f;
+  --leaf-hover: #1f4f38;
+  --leaf-pressed: #173b2a;
+  --soil: #efe6cc;
+  --grass: #cfe0b8;
+  --bedfill: #e6d6b4;
+  --band: 80px;
+  --soft-line: #6f8576; /* the outline of an index row */
+
+  /* The one filled button of a view, in leaf green with white text. */
+  --action: var(--leaf);
+  --action-ink: #ffffff;
+  --action-hover: var(--leaf-hover);
+  --action-pressed: var(--leaf-pressed);
+  --action-edge: var(--leaf);
+
+  --radius-control: 10px;
+  --radius-card: 14px;
+  --control-h: 46px;
+  --field-h: 48px;
+
+  /* The map: grass inside a section, and the crops on a taken bed. */
+  --row-ground: #dce8c4;
+  --crop: #a6c580;
 }
 
 html[data-contrast="high"] {
@@ -27,17 +52,18 @@ html[data-contrast="high"] {
   --stone: #ffffff;
   --sky: #ffffff;
   --muted: #000000;
-}
-
-html {
-  font-family: "Trebuchet MS", "Gill Sans", "Segoe UI", system-ui, sans-serif;
+  --action: #000000;
+  --action-ink: #ffffff;
+  --action-hover: #000000;
+  --action-pressed: #000000;
+  --action-edge: #000000;
+  --row-ground: none;
 }
 
 h1,
 h2,
 h3,
 header.app .brand {
-  font-family: "Trebuchet MS", "Gill Sans", "Segoe UI", system-ui, sans-serif;
   letter-spacing: 0;
 }
 
@@ -102,7 +128,7 @@ header.app .brand {
   padding: 12px 16px 0;
   color: var(--leaf);
   font-size: 24px;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 header.app nav {
@@ -113,7 +139,6 @@ header.app nav {
 /* Seed packets: a green top edge and soft corners. */
 .card {
   border-top: 10px solid var(--leaf);
-  border-radius: 12px;
   background: var(--stone);
 }
 
@@ -124,29 +149,6 @@ html[data-contrast="high"] .card {
 /* The charge a committee check names. An inner frame, so it also shows in high contrast and never leaves the card. */
 .card[aria-current="true"] {
   box-shadow: inset 0 0 0 3px var(--focus);
-}
-
-.button,
-button.button,
-a.button {
-  border-radius: 10px;
-}
-
-.button.primary {
-  background: var(--leaf);
-  border-color: var(--leaf);
-  color: var(--paper);
-}
-
-html[data-contrast="high"] .button.primary {
-  background: #000000;
-  border-color: #000000;
-}
-
-input:not([type="checkbox"]):not([type="radio"]),
-select,
-textarea {
-  border-radius: 8px;
 }
 
 dialog,
@@ -266,7 +268,7 @@ html[data-contrast="high"] .hero-card h2 {
 .big {
   margin: 0;
   font-size: 30px;
-  font-weight: 800;
+  font-weight: 700;
   line-height: 1.15;
 }
 

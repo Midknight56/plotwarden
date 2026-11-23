@@ -1,25 +1,62 @@
 /* The look of the Churchyard Register: a warm ivory field sheet in charcoal ink, under a dark indigo sky strip.
    Ink #22252C on ivory #FAF5E9. The lantern and the mist live in the strip, in the margin, in a row of their
-   own above the title, so no word and no control ever sits on a picture. */
+   own above the title, so no word and no control ever sits on a picture.
+
+   The values follow the design of spec 07. Held back until the markup for them exists (slice 3): the night ground
+   (--ground and --on-ground stay the paper and the ink), the band heights (--band) and the header rows. Held back
+   until the map drawing has the classes for them (slice 2): what uses --row-ground, --turf, --stone-base and --kerb. */
+
+@import "../../../fonts/gelasio.css";
 
 :root {
   --sky: #232a5c;
   --sky-ink: #faf5e9;
+  --sky-muted: #c9cee6;
+  --sky-line: #8e96c4;
   --gravel: #d9cdb0;
   --band: 72px;
   --stone: #fffef8;
+  --tab: #f2c96b; /* the chosen plot and its code tab */
+  --soft-line: #6b6557; /* dashed outlines, double rules */
+
+  /* The one filled button of a view, in lantern amber. Ink on amber reaches 4.5 to 1 in every state. */
+  --action: #f2c96b;
+  --action-ink: var(--ink);
+  --action-hover: #f6d68f;
+  --action-pressed: #e3b24f;
+  --action-edge: var(--ink);
+
+  --radius-control: 2px;
+  --radius-card: 16px 16px 2px 2px;
+  --control-h: 46px;
+  --field-h: 48px;
+  --font-heading: "Gelasio", Georgia, "Times New Roman", serif;
+
+  /* The map: lawn inside a section, turf under a plot, the base under a taken plot, the edge of a walk. */
+  --row-ground: #e3e9d3;
+  --turf: #cdd9b3;
+  --stone-base: #e2ddd0;
+  --kerb: #a99c7a;
 }
 
 html[data-contrast="high"] {
   --gravel: #bbbbbb;
   --stone: #ffffff;
+  --action: #000000;
+  --action-ink: #ffffff;
+  --action-hover: #000000;
+  --action-pressed: #000000;
+  --action-edge: #000000;
+  --row-ground: none;
+  --turf: none;
+  --stone-base: #ffffff;
+  --kerb: none;
 }
 
 h1,
 h2,
 h3,
 header.app .brand {
-  font-family: Georgia, "Times New Roman", serif;
   letter-spacing: 0.01em;
 }
 
