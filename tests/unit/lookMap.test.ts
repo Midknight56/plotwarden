@@ -5,7 +5,9 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { buildSheet, CHAR_WIDTH, LABEL_SIZE } from "../../template/src/map/sheet";
+import { emptyMap } from "../../template/src/map/edit";
+import { CODE_EM, codeWidth } from "../../template/src/map/labels";
+import { buildSheet, LABEL_SIZE } from "../../template/src/map/sheet";
 import type { SheetModel } from "../../template/src/map/sheet";
 import { plotSummaryAt } from "../../template/src/status";
 import { ShellContext } from "../../template/src/ui/shellContext";
@@ -113,6 +115,27 @@ describe("turf and a base under each arch (L6.3)", () => {
     });
   });
 
+  it("keeps a base off the base of the plot beside it, when the plots stand edge to edge", () => {
+    // Three plots in a row with no gap, as a generated grid has. Each is 90 px wide, so a base that is 5 percent wider on
+    // each side would run 4.5 px into the next one. The base stands out only as far as half the gap to its neighbour.
+    const map = { ...emptyMap(), shapes: Object.fromEntries(["A", "B", "C"].map((id, i) => [id, [[i * 100, 0], [i * 100 + 100, 0], [i * 100 + 100, 100], [i * 100, 100]]])) as Record<string, [number, number][]> };
+    const plots = ["A", "B", "C"].map((id) => ({ plotId: id, code: `W0${id === "A" ? 1 : id === "B" ? 2 : 3}`, mark: { needsChecking: false } }));
+    const abutting = buildSheet({ map, plots }, { width: 348, bounds: { minEast: 0, minNorth: 0, maxEast: 300, maxNorth: 100 } });
+    const found = tagsOf(draw("arch", abutting), "rect").filter((t) => classes(t).includes("base"));
+    expect(found.length).toBe(3);
+    for (let i = 0; i + 1 < found.length; i += 1) {
+      const a = found[i] as Record<string, string>;
+      const b = found[i + 1] as Record<string, string>;
+      expect(num(a, "x") + num(a, "width"), `base ${i} ends before base ${i + 1} starts`).toBeLessThanOrEqual(num(b, "x") + 0.01);
+    }
+    // No base is narrower than its plot, and none stands out on the side that has no neighbour by more than 5 percent.
+    for (const [i, base] of found.entries()) {
+      const plot = abutting.plots[i] as SheetModel["plots"][number];
+      expect(num(base, "width")).toBeGreaterThanOrEqual(plot.box.width - 0.01);
+      expect(num(base, "x")).toBeGreaterThanOrEqual(plot.box.x - plot.box.width * 0.05 - 0.01);
+    }
+  });
+
   it("marks the base of a taken plot that is not the chosen one, and no other", () => {
     const withCode = model.plots.filter((p) => p.label !== undefined);
     withCode.forEach((plot, i) => {
@@ -158,11 +181,12 @@ describe("crop and furrow patterns on a bed (L6.3)", () => {
     expect(tagsOf(html, "polygon").filter((t) => classes(t).includes("bed")).length).toBe(6);
   });
 
-  it("makes the peg wide enough for its 14 px code", () => {
+  it("makes the peg wide enough for its 14 px code, with room each side", () => {
     const pegs = tagsOf(html, "rect").filter((t) => classes(t).includes("peg"));
     expect(pegs.length).toBeGreaterThan(0);
     for (const peg of pegs) {
-      expect(num(peg, "width")).toBeGreaterThanOrEqual(3 * CHAR_WIDTH + 10);
+      // The narrowest code on the beds is B01, 1.742 em measured, 24.4 px.
+      expect(num(peg, "width")).toBeGreaterThanOrEqual(1.742 * LABEL_SIZE + 10);
       expect(num(peg, "height")).toBeGreaterThanOrEqual(LABEL_SIZE + 5);
     }
   });
@@ -214,10 +238,80 @@ describe("map labels are 14 px (task 7.13, L6.5)", () => {
     }
   });
 
-  it("measures a code at the width of the widest digit of the shipped font at bold, a little over", () => {
-    // Atkinson Hyperlegible Next 700, measured in headless Chromium: the widest digit is 0.659 em, 9.23 px at 14 px.
-    expect(CHAR_WIDTH).toBeGreaterThanOrEqual(0.659 * 14);
-    expect(CHAR_WIDTH).toBeLessThanOrEqual(0.7 * 14);
+});
+
+// ---- A code box is sized from its own characters (task 7.19, L6.5) ---------------------------------------------------
+// The widths below were measured in headless Chromium with the shipped font, Atkinson Hyperlegible Next at weight 700: the
+// computed text length of one string at 1000 px, divided by 1000. They are written here as the expectation. They are not
+// read from the code. One average width for every character made a code of wide capitals overflow its box.
+
+const MEASURED_EM: Record<string, number> = { "0": 0.659, "1": 0.44, "7": 0.537, Y: 0.65, B: 0.643, C: 0.658, G: 0.718, O: 0.746, Q: 0.756, M: 0.858, W: 0.886, I: 0.424 };
+const MEASURED_STRING_EM: Record<string, number> = { W01: 1.985, MW12: 2.763, QQGO: 2.976, QQGO1: 3.416, MMMM: 3.432, WWWW: 3.571, Y07: 1.846, B03: 1.902, C001: 2.416, "111": 1.32 };
+
+describe("a code box is sized from the widths of its own characters", () => {
+  it("holds each measured character, and no more than a hundredth of an em over it", () => {
+    for (const [ch, em] of Object.entries(MEASURED_EM)) {
+      expect(CODE_EM[ch], ch).toBeGreaterThanOrEqual(em);
+      expect(CODE_EM[ch], ch).toBeLessThanOrEqual(em + 0.01);
+    }
+  });
+
+  it("is wider for W and M than for a digit, which one average width could not be", () => {
+    expect(codeWidth("W", 14)).toBeGreaterThan(codeWidth("0", 14) + 3);
+    expect(codeWidth("M", 14)).toBeGreaterThan(codeWidth("0", 14) + 2.5);
+    expect(codeWidth("W", 14)).toBeGreaterThan(9.7);
+    expect(codeWidth("1", 14)).toBeLessThan(9.7 - 3);
+  });
+
+  it.each(Object.entries(MEASURED_STRING_EM))("holds the whole of %s at 14 px, and is not far over it", (code, em) => {
+    const drawn = em * LABEL_SIZE;
+    expect(codeWidth(code, LABEL_SIZE)).toBeGreaterThanOrEqual(drawn);
+    expect(codeWidth(code, LABEL_SIZE)).toBeLessThanOrEqual(drawn + 0.55 * code.length);
+  });
+
+  it("scales with the size, and an empty code takes no room", () => {
+    expect(codeWidth("W01", 28)).toBeCloseTo(codeWidth("W01", 14) * 2, 6);
+    expect(codeWidth("", 14)).toBe(0);
+  });
+
+  it("gives a character that is not in the table the widest width that is, so it never overflows", () => {
+    const widest = Math.max(...Object.values(CODE_EM));
+    expect(codeWidth("é", 14)).toBeCloseTo(widest * 14, 6);
+    expect(codeWidth("日本", 14)).toBeGreaterThanOrEqual(2 * widest * 14);
+  });
+
+  it("draws a code in its plot only when its box fits the plot, by its own width and not by an average", () => {
+    // A plot 44 px wide and 40 high: 88 by 80 site units at a scale of 0.5, in a sheet 448 wide over an 800 by 600 site.
+    // The code box is the code and 6 px each side, so a plot of 44 px has room for a code of 32 px.
+    const draws = (code: string, east: number): boolean => {
+      const map = { ...emptyMap(), shapes: { A: [[0, 0], [east, 0], [east, 80], [0, 80]] as [number, number][] } };
+      const model = buildSheet({ map, plots: [{ plotId: "A", code, mark: { needsChecking: false } }] }, { width: 448, bounds: { minEast: 0, minNorth: 0, maxEast: 800, maxNorth: 600 } });
+      return model.plots[0]?.label !== undefined;
+    };
+    expect(draws("1111", 88), "four narrow digits, 24.6 px").toBe(true);
+    expect(draws("W01", 88), "W01, 27.8 px").toBe(true);
+    expect(draws("MW12", 88), "MW12, 38.8 px").toBe(false);
+    expect(draws("WWWW", 88), "WWWW, 50 px").toBe(false);
+    expect(draws("QQGO", 88), "QQGO, 41.7 px").toBe(false);
+    // 112 site units make 56 px: room for a code of 44 px.
+    expect(draws("MW12", 112)).toBe(true);
+    expect(draws("QQGO", 112)).toBe(true);
+    expect(draws("WWWW", 112)).toBe(false);
+  });
+
+  it("makes the peg and the code tab wide enough for the code and its padding", () => {
+    for (const code of ["W01", "MW12", "QQGO", "QQGO1", "WWWW", "111"]) {
+      const map = { ...emptyMap(), shapes: { A: [[0, 0], [300, 0], [300, 200], [0, 200]] as [number, number][] } };
+      const plots = [{ plotId: "A", code, mark: { needsChecking: false } }];
+      const model = buildSheet({ map, plots, selectedPlotId: "A" }, { width: 448 });
+      const drawn = (MEASURED_STRING_EM[code] as number) * LABEL_SIZE;
+      expect(model.tab?.width, `${code}: tab`).toBeGreaterThanOrEqual(drawn + 12);
+      const unselected = buildSheet({ map, plots }, { width: 448 });
+      expect(unselected.plots[0]?.label?.text).toBe(code);
+      const peg = tagsOf(draw("bed", unselected), "rect").find((t) => classes(t).includes("peg"));
+      expect(num(peg as Record<string, string>, "width"), `${code}: peg`).toBeGreaterThanOrEqual(drawn + 10);
+      expect(num(peg as Record<string, string>, "width"), `${code}: peg is not wasteful`).toBeLessThanOrEqual(drawn + 16);
+    }
   });
 });
 

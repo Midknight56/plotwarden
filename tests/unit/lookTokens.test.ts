@@ -8,6 +8,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { lastDecl } from "../helpers/cssRules";
 
 const ROOT = join(__dirname, "..", "..");
 const read = (path: string): string => readFileSync(join(ROOT, path), "utf8");
@@ -149,9 +150,25 @@ const SHARED: readonly Pair[] = [
   ["main action text on its fill", "--action-ink", "--action", 4.5],
   ["main action edge on paper", "--action-edge", "--paper", 3],
   ["text on the page ground", "--on-ground", "--ground", 4.5],
+];
+
+// Text that stands on a light page ground with no sheet under it. An app whose page ground is light (no theme, the
+// allotment) sets its ink, its second ink and its error text straight on the ground. The churchyard ground is the
+// night, so only the ground's own text colours stand on it (CHURCH_GROUND), and these three never do.
+const ON_LIGHT_GROUND: readonly Pair[] = [
   ["ink on the page ground", "--ink", "--ground", 4.5],
   ["muted on the page ground", "--muted", "--ground", 4.5],
   ["error on the page ground", "--error", "--ground", 4.5],
+];
+
+// What may stand on the churchyard night ground with no sheet under it, and nothing else (L7.6): the ground's ivory
+// text, its second text, the main action fill and the index row edge as marks, and the ring that is drawn on it.
+const CHURCH_GROUND: readonly Pair[] = [
+  ["ground text on the night ground", "--on-ground", "--ground", 4.5],
+  ["second text on the night ground", "--sky-muted", "--ground", 4.5],
+  ["index row edge on the night ground", "--sky-line", "--ground", 3],
+  ["ring on the night ground", "--focus-on-dark", "--ground", 3],
+  ["outlined button edge on the night ground", "--on-ground", "--ground", 3],
 ];
 
 const CHURCH: readonly Pair[] = [
@@ -228,6 +245,7 @@ const HIGH: readonly Pair[] = [
   ["main action text on its fill", "--action-ink", "--action", 4.5],
   ["main action edge on paper", "--action-edge", "--paper", 3],
   ["text on the page ground", "--on-ground", "--ground", 4.5],
+  ["ink on the page ground", "--ink", "--ground", 4.5],
   ["ok mark on good", "--ok", "--good", 3],
 ];
 
@@ -272,7 +290,7 @@ function measure(scope: Scope, high: boolean, pairs: readonly Pair[]): string[] 
 
 describe("the contrast of the shared values (register.css, no theme)", () => {
   it("meets 4.5 to 1 for text and 3 to 1 for edges and rings", () => {
-    expect(measure("plain", false, SHARED)).toEqual([]);
+    expect(measure("plain", false, [...SHARED, ...ON_LIGHT_GROUND])).toEqual([]);
   });
   it("meets the same floors in high contrast", () => {
     expect(measure("plain", true, HIGH)).toEqual([]);
@@ -281,7 +299,7 @@ describe("the contrast of the shared values (register.css, no theme)", () => {
 
 describe("the contrast of the churchyard values", () => {
   it("meets 4.5 to 1 for text and 3 to 1 for edges and rings, on the night ground and on sheets", () => {
-    expect(measure("church", false, [...SHARED, ...CHURCH])).toEqual([]);
+    expect(measure("church", false, [...SHARED, ...CHURCH, ...CHURCH_GROUND])).toEqual([]);
   });
   it("meets the same floors in high contrast", () => {
     expect(measure("church", true, CHURCH_HIGH)).toEqual([]);
@@ -290,7 +308,7 @@ describe("the contrast of the churchyard values", () => {
 
 describe("the contrast of the allotment values", () => {
   it("meets 4.5 to 1 for text and 3 to 1 for edges and rings", () => {
-    expect(measure("garden", false, [...SHARED, ...GARDEN])).toEqual([]);
+    expect(measure("garden", false, [...SHARED, ...ON_LIGHT_GROUND, ...GARDEN])).toEqual([]);
   });
   it("meets the same floors in high contrast", () => {
     expect(measure("garden", true, GARDEN_HIGH)).toEqual([]);
@@ -372,19 +390,35 @@ describe("the defaults of an app with no theme", () => {
   });
 });
 
-describe("what stays held back until the markup for it exists", () => {
-  it("leaves the page ground light, so no text stands on the night with no sheet under it", () => {
-    // Slice 3 turns the night ground on, with the sheets that carry the text. Until then these are the paper.
-    expect(valueOf(SCOPES.church, false, "--ground").toLowerCase()).toBe("#faf5e9");
-    expect(valueOf(SCOPES.church, false, "--on-ground").toLowerCase()).toBe("#22252c");
+describe("what slice 3 turned on (task 7.15 and 7.16)", () => {
+  it("stands the churchyard page on the night, with ivory text, and keeps every other app on its paper", () => {
+    expect(valueOf(SCOPES.church, false, "--ground").toLowerCase()).toBe("#232a5c");
+    expect(valueOf(SCOPES.church, false, "--on-ground").toLowerCase()).toBe("#faf5e9");
+    expect(valueOf(SCOPES.plain, false, "--ground").toLowerCase()).toBe("#faf5e9");
+    expect(valueOf(SCOPES.garden, false, "--ground").toLowerCase()).toBe("#f7f5e8");
+    expect(valueOf(SCOPES.garden, false, "--on-ground").toLowerCase()).toBe("#1b312a");
   });
 
-  it("keeps the band heights of the art that is in the folder", () => {
-    expect(valueOf(SCOPES.church, false, "--band")).toBe("72px");
-    expect(valueOf(SCOPES.garden, false, "--band")).toBe("80px");
+  it("has no night ground in high contrast: the page is white and its text black", () => {
+    expect(valueOf(SCOPES.church, true, "--ground").toLowerCase()).toBe("#ffffff");
+    expect(valueOf(SCOPES.church, true, "--on-ground").toLowerCase()).toBe("#000000");
+  });
+
+  it("sets the band heights of the new art: 80 and 52 in the churchyard, 64 and 48 in the allotment", () => {
+    expect(valueOf(SCOPES.church, false, "--band")).toBe("80px");
+    expect(valueOf(SCOPES.garden, false, "--band")).toBe("64px");
+    const phone = (file: string): string | undefined => lastDecl([file], ":root", "--band", "@media (max-width: 37.4375rem)");
+    expect(phone(CHURCH_THEME)).toBe("52px");
+    expect(phone(GARDEN_THEME)).toBe("48px");
+  });
+
+  it("does not let ink, the second ink or the error text stand on the night ground", () => {
+    // Each of these fails 4.5 to 1 on the night. They may only stand on a sheet, so they are not in CHURCH_GROUND.
+    for (const ref of ["--ink", "--muted", "--error"]) {
+      expect(contrast(colour("church", false, ref), colour("church", false, "--ground")), ref).toBeLessThan(4.5);
+    }
   });
 });
-
 describe("no stylesheet names another host", () => {
   const FILES = [REGISTER, "template/src/ui/print.css", CHURCH_THEME, GARDEN_THEME, "examples/market/src/theme.css", SITE, "fonts/atkinson.css", "fonts/gelasio.css"];
   it.each(FILES)("%s has no remote url, import or font", (file) => {

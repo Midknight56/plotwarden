@@ -5,7 +5,7 @@ import { backdropMatrix, boundsOf, toScreen } from "./coordinates";
 import type { Bounds, Point, View } from "./coordinates";
 import type { MapState } from "./edit";
 import { centroid } from "./geometry";
-import { CAPTION_COST, SHEET_MARGIN, bestSpot, boxOf, distanceToLine, pointInBox, polylineCrossings, polylineLength, samplesNear, segmentHitsBox, spotsAlongLine, spotsAlongTop, spotsAround, textWidth } from "./labels";
+import { CAPTION_COST, SHEET_MARGIN, bestSpot, boxOf, codeWidth, distanceToLine, pointInBox, polylineCrossings, polylineLength, samplesNear, segmentHitsBox, spotsAlongLine, spotsAlongTop, spotsAround, textWidth } from "./labels";
 import type { Box, Pt, Scene, Spot } from "./labels";
 
 export interface PlotMark {
@@ -96,7 +96,7 @@ const DEFAULT_BOUNDS: Bounds = { minEast: 0, minNorth: 0, maxEast: 1000, maxNort
  * The size of a name and of a plot code on the sheet. 14 px. The text is Atkinson Hyperlegible Next at weight 700
  * (`.sheet .label` in register.css). A name is boxed at `LETTER_WIDTH` a letter (labels.ts), 0.617 em, which holds
  * every name that was measured in headless Chromium with the shipped font: names of 8 to 26 letters came to 0.49 to
- * 0.56 em a letter.
+ * 0.56 em a letter. A plot code is boxed from the width of each of its own characters (`codeWidth`, labels.ts).
  */
 export const LABEL_SIZE = 14;
 /** The band at the foot of a plot that its code stands in: the text, the cap height above its baseline and the room round it. */
@@ -107,6 +107,8 @@ const TAB_HEIGHT = 28;
 const TAB_LINE_CLEAR = 8;
 /** The least a plot may measure for its code to be drawn inside it. */
 const LABEL_MIN_BOX = 40;
+/** The room that a code box takes over the code itself: 6 px each side. The box of a code must fit inside its plot. */
+export const CODE_PAD = 12;
 /** A name with no clear place beside its feature stands outside the block, in rows under the drawing, 3 px apart (P19.8). */
 const OUTSIDE_ROW = LABEL_SIZE + 3 + 3;
 /** The gap between the drawing and the first row of outside names, and between the leader line and its name. */
@@ -117,15 +119,6 @@ const NAME_BOX_HEIGHT = LABEL_SIZE + 3;
 const OUTSIDE_COST = 1000;
 /** The farthest a name may stand from its feature, from the edge of its box, without a leader line (P19.8). A little under 24 px. */
 const NEAR_FEATURE = 22;
-/**
- * The most that one character of a plot code takes, in pixels at `LABEL_SIZE`. Measured, not guessed: in headless
- * Chromium, with the shipped Atkinson Hyperlegible Next at weight 700, the widest digit is 0 at 0.659 em (9.23 px at
- * 14 px), and the capitals are 0.42 to 0.76 em, except M at 0.86 and W at 0.90. 9.7 px (0.693 em) covers every digit
- * and the capitals up to 0.69 em, which are the letters that a code starts with in both registers (Y and B are 0.69 and
- * 0.64). A code that starts with one of M, N, O, G, Q or W is a little wider than its box.
- * tests/browser/paper-map.spec.ts reads the real width of every code on the maps.
- */
-export const CHAR_WIDTH = 9.7;
 /** How far a label keeps from the line of a path: half the 16 px edge of the walk and a margin. */
 const GATE_CLEAR = 9;
 /** How far a label keeps from the dashed outline of a section, and how much that matters next to a path. */
@@ -294,7 +287,7 @@ export function buildSheet(input: SheetInput, options: SheetOptions): SheetModel
   const plots: SheetPlot[] = drawable.map((p) => {
     const points = screen(map.shapes[p.plotId] ?? []);
     const box = boxOfPoints(points);
-    const labelled = box.width >= LABEL_MIN_BOX && box.height >= LABEL_MIN_BOX && p.code.length * CHAR_WIDTH <= box.width - 6;
+    const labelled = box.width >= LABEL_MIN_BOX && box.height >= LABEL_MIN_BOX && codeWidth(p.code, LABEL_SIZE) + CODE_PAD <= box.width;
     const c = centroid(points);
     const plot: SheetPlot = {
       plotId: p.plotId,
@@ -335,7 +328,7 @@ export function buildSheet(input: SheetInput, options: SheetOptions): SheetModel
   if (blockPoints.length === 0) Object.assign(drawBox, { x0: PAD, y0: PAD_TOP, x1: width - PAD, y1: height - PAD_BOTTOM });
   let tab: SheetModel["tab"];
   if (selected !== undefined) {
-    const tabWidth = Math.max(48, Math.round(selected.code.length * 9) + 16);
+    const tabWidth = Math.max(48, Math.ceil(codeWidth(selected.code, TAB_SIZE)) + 16);
     const chosen = plots.find((p) => p.plotId === selected.plotId);
     const gateBox: Box | undefined = gatePoint === undefined ? undefined : { x0: gatePoint[0] - 8, y0: gatePoint[1] - 8, x1: gatePoint[0] + 8, y1: gatePoint[1] + 8 };
     if (chosen === undefined) {

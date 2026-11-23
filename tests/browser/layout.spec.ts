@@ -6,7 +6,7 @@
 import { expect, test } from "@playwright/test";
 import type { Page } from "@playwright/test";
 import { findLabelCollisions, measureLayout, readSheetScene, trackRequests } from "../helpers/measureLayout";
-import { APPS, LIBRARY_ROUTES, openPractice, plotIdOf, proof, routeName, routesOf, settle, sizeOf, startOwn, storedEvents } from "../helpers/routes";
+import { APPS, CHURCH, GARDEN, LIBRARY_ROUTES, openPractice, plotIdOf, proof, routeName, routesOf, settle, sizeOf, startOwn, storedEvents, tabTo } from "../helpers/routes";
 import type { AppUnderTest } from "../helpers/routes";
 import { SITE, hubCard } from "../helpers/siteOrigin";
 
@@ -544,6 +544,369 @@ for (const app of APPS) {
   });
 }
 
+// ---- The desks (spec 07, tasks 7.17 to 7.19, L7.4 to L7.7) ----------------------------------------------------------
+// Three columns on both desks: the find and the job (flex 25 1 340px), the chosen plot with its map (40 1 520px) and the
+// index (16 1 220px). They wrap in order on a narrow screen. `main` is 105rem wide on a desk, with its side padding.
+// Sizes are read from the page, and the expected widths are worked from the flex rule, not copied from the output.
+
+const WIDTHS: { width: number; height: number }[] = [
+  { width: 360, height: 640 },
+  { width: 1440, height: 900 },
+  { width: 1920, height: 1080 },
+];
+
+interface DeskRects {
+  find: { x: number; y: number; width: number; bottom: number };
+  main: { x: number; y: number; width: number; bottom: number };
+  index: { x: number; y: number; width: number; bottom: number };
+  columns: { width: number; gap: number };
+  /** The document order of the three columns, from `compareDocumentPosition`. */
+  inOrder: boolean;
+  mainWidth: number;
+  mainPadding: number;
+  indexGroups: string[];
+  outsideIndex: string[];
+  scroll: { scroll: number; client: number };
+}
+
+async function readDesk(page: Page): Promise<DeskRects> {
+  return page.evaluate(() => {
+    const box = (sel: string) => {
+      const el = document.querySelector(sel) as HTMLElement;
+      const r = el.getBoundingClientRect();
+      return { x: r.left, y: r.top + window.scrollY, width: r.width, bottom: r.bottom + window.scrollY };
+    };
+    const desk = document.querySelector(".desk") as HTMLElement;
+    const find = document.querySelector(".desk-find") as HTMLElement;
+    const main = document.querySelector(".desk-main") as HTMLElement;
+    const index = document.querySelector(".desk-index") as HTMLElement;
+    const style = getComputedStyle(desk);
+    const mainEl = document.querySelector("main") as HTMLElement;
+    const mainStyle = getComputedStyle(mainEl);
+    const names = (root: Element) => [...root.querySelectorAll("nav.link-group")].map((n) => (document.getElementById(n.getAttribute("aria-labelledby") ?? "")?.textContent ?? "").trim());
+    return {
+      find: box(".desk-find"),
+      main: box(".desk-main"),
+      index: box(".desk-index"),
+      columns: { width: desk.getBoundingClientRect().width, gap: parseFloat(style.columnGap) },
+      inOrder: Boolean(find.compareDocumentPosition(main) & Node.DOCUMENT_POSITION_FOLLOWING) && Boolean(main.compareDocumentPosition(index) & Node.DOCUMENT_POSITION_FOLLOWING),
+      mainWidth: mainEl.getBoundingClientRect().width,
+      mainPadding: parseFloat(mainStyle.paddingLeft),
+      indexGroups: names(index),
+      outsideIndex: [...document.querySelectorAll("main nav.link-group")].filter((n) => !index.contains(n)).map((n) => n.id),
+      scroll: { scroll: document.documentElement.scrollWidth, client: document.documentElement.clientWidth },
+    };
+  });
+}
+
+/** What `flex: 25 1 340px`, `40 1 520px` and `16 1 220px` give three columns in a row, worked from the rule. */
+function expectedWidths(room: number, gap: number): [number, number, number] {
+  const free = room - 2 * gap - (340 + 520 + 220);
+  return [340 + (free * 25) / 81, 520 + (free * 40) / 81, 220 + (free * 16) / 81];
+}
+
+for (const app of APPS) {
+  test.describe(`${app.title}, the desk in three columns`, () => {
+    test.use({ baseURL: app.origin });
+
+    test("stands in three columns that wrap in order, with no sideways scroll, at 360, 1440 and 1920 wide", async ({ page }) => {
+      const siteId = await openPractice(page, app);
+      for (const size of WIDTHS) {
+        await page.setViewportSize(size);
+        await page.goto(`/#/r/${siteId}`);
+        await settle(page);
+        const d = await readDesk(page);
+        const label = `${app.key} at ${size.width}`;
+        expect(d.scroll.scroll, `${label}: no sideways scroll`).toBeLessThanOrEqual(d.scroll.client);
+        expect(d.inOrder, `${label}: the columns are in the order find, plot, index`).toBe(true);
+        expect(d.indexGroups, `${label}: the index holds Records, Share and Site, in one wrapper`).toEqual(["Records", "Share", "Site"]);
+        expect(d.outsideIndex, `${label}: no index group stands outside the wrapper`).toEqual([]);
+        // `main` is 105rem at most (1680 px) with its side padding: 16 px at 360, 2.8 percent of the width up to 40 px.
+        expect(d.mainWidth, `${label}: main`).toBeLessThanOrEqual(1680 + 0.5);
+        expect(d.mainWidth, `${label}: main`).toBeCloseTo(Math.min(size.width, 1680), 0);
+        expect(d.mainPadding, `${label}: side padding`).toBeCloseTo(Math.min(40, Math.max(16, size.width * 0.028)), 0);
+        if (size.width === 360) {
+          // Stacked: the same width, each under the one before.
+          expect(Math.round(d.find.width), label).toBe(360 - 32);
+          expect(Math.round(d.main.width), label).toBe(360 - 32);
+          expect(Math.round(d.index.width), label).toBe(360 - 32);
+          expect(d.main.y, `${label}: the plot column is under the find column`).toBeGreaterThanOrEqual(d.find.bottom - 1);
+          expect(d.index.y, `${label}: the index is under the plot column`).toBeGreaterThanOrEqual(d.main.bottom - 1);
+        } else {
+          // Three in a row, at one top, in that order, with the widths that the flex rule gives.
+          expect(Math.abs(d.find.y - d.main.y), label).toBeLessThanOrEqual(1);
+          expect(Math.abs(d.main.y - d.index.y), label).toBeLessThanOrEqual(1);
+          expect(d.find.x + d.find.width, label).toBeLessThanOrEqual(d.main.x + 0.5);
+          expect(d.main.x + d.main.width, label).toBeLessThanOrEqual(d.index.x + 0.5);
+          const [a, b, c] = expectedWidths(d.columns.width, d.columns.gap);
+          expect(d.find.width, `${label}: find`).toBeCloseTo(a, 0);
+          expect(d.main.width, `${label}: plot`).toBeCloseTo(b, 0);
+          expect(d.index.width, `${label}: index`).toBeCloseTo(c, 0);
+        }
+        await check(page, `${app.key} desk at ${size.width}`);
+      }
+    });
+
+    test("wraps in order at the widths between: the index drops under the first two columns", async ({ page }) => {
+      const siteId = await openPractice(page, app);
+      await page.setViewportSize({ width: 1024, height: 768 });
+      await page.goto(`/#/r/${siteId}`);
+      await settle(page);
+      const d = await readDesk(page);
+      expect(d.scroll.scroll).toBeLessThanOrEqual(d.scroll.client);
+      expect(Math.abs(d.find.y - d.main.y)).toBeLessThanOrEqual(1);
+      expect(d.find.x + d.find.width).toBeLessThanOrEqual(d.main.x + 0.5);
+      expect(d.index.y, "the index wraps under the plot column").toBeGreaterThanOrEqual(Math.max(d.find.bottom, d.main.bottom) - 1);
+      await check(page, `${app.key} desk at 1024`);
+    });
+
+    test("is read and tabbed in the order of the columns", async ({ page }) => {
+      const siteId = await openPractice(page, app);
+      const events = await storedEvents(page, siteId);
+      const plot = plotIdOf(events, app.key === "churchyard" ? "Y07" : "B02");
+      await page.goto(`/#/r/${siteId}?plot=${plot}`);
+      await settle(page);
+      // Start from the top of the page: a click on the empty band sets where Tab begins.
+      await page.mouse.click(2, 2);
+      // Each name is reached after the one before it, in the order of the columns. A wrong order does not reach it.
+      const order: (string | RegExp)[] =
+        app.key === "churchyard"
+          ? ["Change register", "Name or plot code", "Search", "Open plot", "Site map", "Record a burial", "Back up"]
+          : ["Change register", "Make an offer", "Name or plot code", "Search", /^Waiting list/, "Back up"];
+      for (const name of order) await tabTo(page, name, { max: 80 });
+      // The reading order is the same: the DOM order of the three columns.
+      expect((await readDesk(page)).inOrder).toBe(true);
+    });
+    test("puts Change register in the heading row, with the title", async ({ page }) => {
+      await openPractice(page, app);
+      await settle(page);
+      for (const size of [{ width: 1440, height: 900 }, { width: 360, height: 640 }]) {
+        await page.setViewportSize(size);
+        await settle(page);
+        const rows = await page.evaluate(() => {
+          const head = document.querySelector(".desk-head") as HTMLElement;
+          const h1 = head.querySelector("h1") as HTMLElement;
+          const link = head.querySelector("a.button") as HTMLElement;
+          const r = (el: Element) => el.getBoundingClientRect();
+          return { text: link.textContent, inside: head.contains(link), h1Mid: (r(h1).top + r(h1).bottom) / 2, linkTop: r(link).top, linkBottom: r(link).bottom, h1Top: r(h1).top, h1Bottom: r(h1).bottom, headBottom: r(head).bottom, deskTop: r(document.querySelector(".desk") as Element).top };
+        });
+        expect(rows.text).toBe("Change register");
+        expect(rows.inside).toBe(true);
+        expect(rows.headBottom, "the heading row is above the columns").toBeLessThanOrEqual(rows.deskTop + 1);
+        if (size.width > 600) expect(rows.h1Mid, "on one row with the title").toBeGreaterThanOrEqual(rows.linkTop - 1);
+        if (size.width > 600) expect(rows.h1Mid).toBeLessThanOrEqual(rows.linkBottom + 1);
+      }
+    });
+  });
+}
+
+test.describe("Churchyard Register, the chosen plot", () => {
+  test.use({ baseURL: CHURCH.origin });
+
+  test("has Open plot and Site map in the Selected plot heading row", async ({ page }) => {
+    const siteId = await openPractice(page, CHURCH);
+    const plot = plotIdOf(await storedEvents(page, siteId), "Y07");
+    for (const size of [{ width: 1440, height: 900 }, { width: 360, height: 640 }]) {
+      await page.setViewportSize(size);
+      await page.goto(`/#/r/${siteId}?plot=${plot}`);
+      await settle(page);
+      const row = await page.evaluate(() => {
+        const heading = document.getElementById("selected-heading") as HTMLElement;
+        const head = heading.parentElement as HTMLElement;
+        const links = [...head.querySelectorAll("a.button")] as HTMLElement[];
+        const r = (el: Element) => el.getBoundingClientRect();
+        return { links: links.map((l) => l.textContent), tops: links.map((l) => r(l).top), mid: (r(heading).top + r(heading).bottom) / 2, bottoms: links.map((l) => r(l).bottom), before: heading.compareDocumentPosition(links[0] as Node) & Node.DOCUMENT_POSITION_FOLLOWING, cardAfter: Boolean(head.nextElementSibling) };
+      });
+      expect(row.links).toEqual(["Open plot", "Site map"]);
+      expect(row.before).toBeTruthy();
+      if (size.width > 600) {
+        for (const [i] of row.links.entries()) {
+          expect(row.mid, "on one row with the heading").toBeGreaterThanOrEqual((row.tops[i] as number) - 1);
+          expect(row.mid).toBeLessThanOrEqual((row.bottoms[i] as number) + 1);
+        }
+      }
+      await check(page, `chosen plot at ${size.width}`);
+    }
+  });
+
+  test("at 1440 by 900 the map and its key end above the fold, with a plot chosen and with none", async ({ page }) => {
+    const siteId = await openPractice(page, CHURCH);
+    const plot = plotIdOf(await storedEvents(page, siteId), "Y07");
+    await page.setViewportSize({ width: 1440, height: 900 });
+    for (const route of [`/#/r/${siteId}`, `/#/r/${siteId}?plot=${plot}`]) {
+      await page.goto(route);
+      await settle(page);
+      await page.evaluate(() => window.scrollTo(0, 0));
+      const key = await page.getByRole("list", { name: "Map key" }).boundingBox();
+      const map = await page.getByRole("region", { name: "Site map" }).boundingBox();
+      expect(key, "the key is drawn").not.toBeNull();
+      expect((map?.y ?? 0) + (map?.height ?? 0), `${route}: the map ends above 900`).toBeLessThanOrEqual(900);
+      expect((key?.y ?? 0) + (key?.height ?? 0), `${route}: the key ends above 900`).toBeLessThanOrEqual(900);
+    }
+  });
+});
+
+// ---- The night ground (spec 07, task 7.16, L7.6) -----------------------------------------------------------------
+
+/** Every visible text and the colour of what stands behind it, read from the page. `night` is the page ground. */
+async function textOnGround(page: Page, root = "body"): Promise<{ text: string; colour: string; behind: string }[]> {
+  return page.evaluate((rootSelector) => {
+    const parse = (v: string): number[] | undefined => {
+      const m = /rgba?\(([^)]+)\)/.exec(v);
+      return m === null ? undefined : (m[1] as string).split(/[ ,/]+/).filter(Boolean).map(Number);
+    };
+    const hex = (c: number[]): string => `#${c.slice(0, 3).map((n) => n.toString(16).padStart(2, "0")).join("")}`;
+    const out: { text: string; colour: string; behind: string }[] = [];
+    const walker = document.createTreeWalker(document.querySelector(rootSelector) as Element, NodeFilter.SHOW_TEXT);
+    for (let n = walker.nextNode(); n !== null; n = walker.nextNode()) {
+      const el = n.parentElement;
+      const text = (n.textContent ?? "").trim();
+      if (el === null || text === "" || ["SCRIPT", "STYLE", "OPTION", "TITLE"].includes(el.tagName)) continue;
+      if (el.getBoundingClientRect().width === 0 || el.closest("[aria-hidden='true']") !== null) continue;
+      let behind = "#ffffff";
+      for (let p: Element | null = el; p !== null; p = p.parentElement) {
+        const c = parse(getComputedStyle(p).backgroundColor);
+        if (c !== undefined && (c[3] ?? 1) > 0.99) {
+          behind = hex(c);
+          break;
+        }
+      }
+      const colour = parse(el.namespaceURI === "http://www.w3.org/2000/svg" ? getComputedStyle(el).fill : getComputedStyle(el).color);
+      out.push({ text: text.slice(0, 30), colour: colour === undefined ? "?" : hex(colour), behind });
+    }
+    return out;
+  }, root);
+}
+
+test.describe("Churchyard Register, the night ground", () => {
+  test.use({ baseURL: CHURCH.origin });
+
+  test("stands the page on the night, and only the ground's two text colours stand on it", async ({ page }) => {
+    const siteId = await openPractice(page, CHURCH);
+    const plot = plotIdOf(await storedEvents(page, siteId), "Y07");
+    const routes = ["", `?plot=${plot}`, "/map", "/list", "/burial/new", "/family", "/report", "/settings", "/help", "/exchange", "/backup", "/reserve", "/unplaced", "/add"];
+    for (const route of routes) {
+      await page.goto(`/#/r/${siteId}${route}`);
+      await settle(page);
+      const ground = await page.evaluate(() => [getComputedStyle(document.documentElement).backgroundColor, getComputedStyle(document.body).backgroundColor]);
+      expect(ground, `${route}: the page ground`).toEqual(["rgb(35, 42, 92)", "rgb(35, 42, 92)"]);
+      const onNight = (await textOnGround(page)).filter((t) => t.behind === "#232a5c");
+      for (const t of onNight) expect(["#faf5e9", "#c9cee6"], `${route}: "${t.text}" stands on the night in ${t.colour}`).toContain(t.colour);
+      // Ink never stands on the night. Every ink text stands on a sheet.
+      const ink = (await textOnGround(page)).filter((t) => t.colour === "#22252c");
+      for (const t of ink) expect(t.behind, `${route}: "${t.text}" is ink on ${t.behind}`).not.toBe("#232a5c");
+      await check(page, `night ground, ${route === "" ? "home" : route}`);
+    }
+    // The desk has text on the ground itself: its heading and its state line.
+    await page.goto(`/#/r/${siteId}?plot=${plot}`);
+    await settle(page);
+    const deskNight = (await textOnGround(page)).filter((t) => t.behind === "#232a5c");
+    expect(deskNight.length, "the desk has text on the night").toBeGreaterThanOrEqual(4);
+    expect(deskNight.map((t) => t.text)).toContain("Lantern Fold");
+  });
+
+  test("has no night ground in high contrast: the page is white, the text black, and the sheets keep an edge", async ({ page }) => {
+    await page.addInitScript(() => window.localStorage.setItem("plotwarden.settings", JSON.stringify({ motion: "follow", contrast: "high", paper: "A4" })));
+    const siteId = await openPractice(page, CHURCH);
+    const plot = plotIdOf(await storedEvents(page, siteId), "Y07");
+    await page.goto(`/#/r/${siteId}?plot=${plot}`);
+    await settle(page);
+    const read = await page.evaluate(() => ({
+      html: getComputedStyle(document.documentElement).backgroundColor,
+      body: getComputedStyle(document.body).backgroundColor,
+      colour: getComputedStyle(document.body).color,
+      card: getComputedStyle(document.querySelector(".card") as Element).borderTopWidth,
+    }));
+    expect(read).toEqual({ html: "rgb(255, 255, 255)", body: "rgb(255, 255, 255)", colour: "rgb(0, 0, 0)", card: "2px" });
+    // The header keeps its sky in high contrast. The page under it has no night ground.
+    expect((await textOnGround(page, "main")).filter((t) => t.behind === "#232a5c")).toEqual([]);
+    await check(page, "high contrast desk");
+    await page.goto(`/#/r/${siteId}/settings`);
+    await settle(page);
+    await check(page, "high contrast settings");
+  });
+});
+
+// ---- The allotment desk card (spec 07, task 7.19, L7.4) ---------------------------------------------------------------
+
+test.describe("Allotment Register, the desk card", () => {
+  test.use({ baseURL: GARDEN.origin });
+
+  test("holds the next free plot, the next applicant, Make an offer and the tally in one card", async ({ page }) => {
+    const siteId = await openPractice(page, GARDEN);
+    for (const size of [{ width: 1440, height: 900 }, { width: 360, height: 640 }]) {
+      await page.setViewportSize(size);
+      await page.goto(`/#/r/${siteId}`);
+      await settle(page);
+      const read = await page.evaluate(() => {
+        const cards = document.querySelectorAll(".desk-card");
+        const card = cards[0] as HTMLElement;
+        const style = (el: Element) => getComputedStyle(el);
+        const swatch = card.querySelector(".bed-swatch") as HTMLElement;
+        const code = card.querySelector("p.big.code") as HTMLElement;
+        const name = card.querySelector("p.big:not(.code)") as HTMLElement;
+        const offer = [...card.querySelectorAll("a.button, button.button")].find((a) => a.textContent === "Make an offer") as HTMLElement;
+        const tally = card.querySelector(".tally") as HTMLElement;
+        const headings = [...card.querySelectorAll("h2")].map((h) => h.textContent);
+        const inner = card.clientWidth - parseFloat(style(card).paddingLeft) - parseFloat(style(card).paddingRight);
+        const search = [...document.querySelectorAll<HTMLElement>("main form[role='search'] .button")].find((b) => b.textContent === "Search") as HTMLElement;
+        return {
+          count: cards.length,
+          one: [swatch, code, name, offer, tally].every((el) => el.closest(".card") === card),
+          swatch: { w: swatch.offsetWidth, h: swatch.offsetHeight, bg: style(swatch).backgroundColor, hidden: swatch.getAttribute("aria-hidden"), text: swatch.textContent },
+          code: { size: style(code).fontSize, weight: style(code).fontWeight, text: code.textContent },
+          name: { size: style(name).fontSize, weight: style(name).fontWeight, text: name.textContent },
+          offer: { w: offer.getBoundingClientRect().width, h: offer.getBoundingClientRect().height, size: style(offer).fontSize, primary: offer.classList.contains("primary"), inner },
+          tally: tally.textContent,
+          headings,
+          primaries: [...document.querySelectorAll("main .button.primary")].map((b) => b.textContent),
+          search: { primary: search.classList.contains("primary"), border: style(search).borderTopWidth, fill: style(search).backgroundColor },
+          searchAfterCard: Boolean(card.compareDocumentPosition(search) & Node.DOCUMENT_POSITION_FOLLOWING),
+        };
+      });
+      const label = `at ${size.width}`;
+      expect(read.count, label).toBe(1);
+      expect(read.one, `${label}: the swatch, the code, the name, Make an offer and the tally are in one card`).toBe(true);
+      expect(read.headings, label).toEqual(["Next free plot", "Next applicant"]);
+      expect([read.swatch.w, read.swatch.h], `${label}: the bed swatch`).toEqual([46, 34]);
+      expect(read.swatch.bg, `${label}: the swatch is the tab colour`).toBe("rgb(191, 224, 234)");
+      expect(read.swatch.hidden).toBe("true");
+      expect(read.swatch.text).toBe("");
+      expect([read.code.size, read.code.weight], `${label}: the code`).toEqual(["34px", "700"]);
+      expect([read.name.size, read.name.weight], `${label}: the name`).toEqual(["24px", "700"]);
+      expect(read.code.text).toMatch(/^B\d\d$/);
+      expect((read.name.text ?? "").length).toBeGreaterThan(2);
+      expect(read.offer.primary).toBe(true);
+      expect(read.offer.h, `${label}: Make an offer is 52 high`).toBeCloseTo(52, 0);
+      expect(read.offer.w, `${label}: Make an offer fills the card`).toBeCloseTo(read.offer.inner, 0);
+      expect(read.offer.size).toBe("18px");
+      expect(read.tally).toMatch(/^\d+ free · \d+ reserved · \d+ taken · \d+ unusable$/);
+      expect(read.primaries, `${label}: Make an offer is the one main action`).toEqual(["Make an offer"]);
+      expect(read.search, `${label}: Search is an outlined button`).toEqual({ primary: false, border: "2px", fill: "rgb(255, 254, 246)" });
+      expect(read.searchAfterCard, `${label}: Search comes after the card`).toBe(true);
+      await check(page, `allotment desk card at ${size.width}`);
+    }
+  });
+
+  test("marks the next free plot on the plan as the chosen one, until the keeper chooses another", async ({ page }) => {
+    const siteId = await openPractice(page, GARDEN);
+    await page.goto(`/#/r/${siteId}`);
+    await settle(page);
+    const next = (await page.locator(".desk-card p.big.code").textContent()) as string;
+    const marked = async (): Promise<{ selected: number; tab: string | null }> =>
+      page.evaluate(() => ({ selected: document.querySelectorAll("svg.sheet .plot.selected").length, tab: document.querySelector("svg.sheet .tab-text")?.textContent ?? null }));
+    expect(await marked(), "the next free plot is chosen on the plan").toEqual({ selected: 1, tab: next });
+    // The offer link names the same plot that the plan marks.
+    const events = await storedEvents(page, siteId);
+    expect(await page.getByRole("link", { name: "Make an offer" }).getAttribute("href")).toContain(`plot=${plotIdOf(events, next)}`);
+    // The keeper's own choice wins.
+    const other = ["B01", "B02", "B04", "B05", "B06"].find((code) => code !== next) as string;
+    await page.goto(`/#/r/${siteId}?plot=${plotIdOf(events, other)}`);
+    await settle(page);
+    expect(await marked()).toEqual({ selected: 1, tab: other });
+    await check(page, "the plan with a chosen bed");
+  });
+});
 // Print the sizes the spec ran at, so a reader of the log can see both.
 test("runs at a known size", ({ page }) => {
   const size = page.viewportSize() as { width: number; height: number };

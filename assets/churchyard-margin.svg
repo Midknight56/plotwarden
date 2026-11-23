@@ -1,14 +1,20 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 48" width="1200" height="48" role="img" aria-hidden="true" focusable="false" preserveAspectRatio="none">
-  <title>Yew trees and a low line of mist</title>
-  <g fill="#171C45">
-    <path d="M96 48L120 12L144 48Z"/>
-    <path d="M104 48L120 22L136 48Z"/>
-    <path d="M388 48L410 8L432 48Z"/>
-    <path d="M680 48L700 16L720 48Z"/>
-    <path d="M990 48L1010 10L1030 48Z"/>
-    <path d="M1000 48L1010 24L1020 48Z"/>
-  </g>
-  <path d="M0 34Q150 18 300 34T600 34T900 34T1200 34V48H0Z" fill="#FAF5E9" fill-opacity="0.2"/>
-  <path d="M0 40Q150 26 300 40T600 40T900 40T1200 40V48H0Z" fill="#FAF5E9" fill-opacity="0.16"/>
-  <path d="M0 44Q150 36 300 44T600 44T900 44T1200 44V48H0Z" fill="#FAF5E9" fill-opacity="0.2"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 80" width="1200" height="80" aria-hidden="true" focusable="false">
+<title>Churchyard margin with yews, stones and railings</title>
+<defs>
+<path id="yew" d="M0 0C-13-18-8-40 0-53 8-40 13-18 0 0Z"/>
+<path id="stone" d="M0 0v-9a5.5 5.5 0 0 1 11 0v9z"/>
+<path id="tall" d="M-7 0v-15a7 7 0 0 1 14 0v15z"/>
+<path id="cross" d="M-2 0v-16h-6v-4h6v-6h4v6h6v4h-6v16z"/>
+<pattern id="rail" width="12" height="16" patternUnits="userSpaceOnUse"><path d="M6 0l2 4h-4zM5 4h2v12h-2z" fill="#0E1233"/></pattern>
+</defs>
+<g fill="#FAF5E9" opacity=".8"><circle cx="40" cy="12" r="1"/><circle cx="130" cy="26" r="1.2"/><circle cx="215" cy="8" r="1"/><circle cx="330" cy="20" r="1.2"/><circle cx="430" cy="10" r="1"/><circle cx="545" cy="30" r="1"/><circle cx="640" cy="14" r="1.2"/><circle cx="760" cy="24" r="1"/><circle cx="850" cy="8" r="1.2"/><circle cx="960" cy="18" r="1"/><circle cx="1070" cy="28" r="1"/><circle cx="1160" cy="10" r="1.2"/></g>
+<rect y="58" width="1200" height="22" fill="#1B2150"/>
+<ellipse cx="300" cy="59" rx="230" ry="9" fill="#1B2150"/>
+<ellipse cx="880" cy="59" rx="260" ry="11" fill="#1B2150"/>
+<g fill="#151A42"><use href="#yew" transform="translate(90 78)"/><use href="#yew" transform="translate(250 78) scale(.8)"/><use href="#yew" transform="translate(470 78) scale(1.05)"/><use href="#yew" transform="translate(640 78) scale(.9)"/><use href="#yew" transform="translate(830 78)"/><use href="#yew" transform="translate(1010 78) scale(.85)"/><use href="#yew" transform="translate(1130 78) scale(.7)"/></g>
+<g fill="#55609A"><use href="#stone" x="150" y="78"/><use href="#stone" x="172" y="78"/><use href="#stone" x="194" y="78"/><use href="#stone" x="330" y="78"/><use href="#stone" x="352" y="78"/><use href="#stone" x="540" y="78"/><use href="#stone" x="562" y="78"/><use href="#stone" x="584" y="78"/><use href="#stone" x="720" y="78"/><use href="#stone" x="742" y="78"/><use href="#stone" x="900" y="78"/><use href="#stone" x="922" y="78"/><use href="#stone" x="1060" y="78"/><use href="#stone" x="1082" y="78"/></g>
+<g fill="#6A76B5"><use href="#tall" x="120" y="78"/><use href="#cross" x="300" y="78"/><use href="#tall" x="400" y="78"/><use href="#tall" x="610" y="78"/><use href="#cross" x="690" y="78"/><use href="#tall" x="770" y="78"/><use href="#tall" x="950" y="78"/><use href="#cross" x="1040" y="78"/><use href="#tall" x="1100" y="78"/></g>
+<rect y="64" width="1200" height="16" fill="url(#rail)"/>
+<path d="M0 69H1200M0 77H1200" fill="none" stroke="#0E1233" stroke-width="2"/>
+<path d="M0 72Q150 64 300 72T600 72T900 72T1200 72V80H0Z" fill="#FAF5E9" opacity=".12"/>
 </svg>

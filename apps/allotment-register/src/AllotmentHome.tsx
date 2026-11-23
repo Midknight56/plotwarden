@@ -18,22 +18,6 @@ import { isOverdue, offerPlan, queueView } from "./rules";
 /** A stand in plot ID for applicants, who have no plot. It is never shown. */
 const WAITING = "waiting";
 
-/** One bed as a small picture: a footprint, a strip of hatching and a peg that holds the code. */
-function BedMark({ code }: { code: string }) {
-  const peg = Math.max(34, code.length * 8 + 12);
-  const width = Math.max(64, peg + 20);
-  return (
-    <svg className="bed-mark" width={width} height="52" viewBox={`0 0 ${width} 52`} aria-hidden="true" focusable="false">
-      <rect className="bed" x="2" y="2" width={width - 4} height="48" />
-      <path className="hatch" d={Array.from({ length: Math.floor((width - 14) / 6) }, (_, i) => `M${8 + i * 6} 13L${15 + i * 6} 6`).join("")} />
-      <rect className="peg" x={(width - peg) / 2} y="26" width={peg} height="20" />
-      <text x={width / 2} y="40.5" fontSize="12" textAnchor="middle">
-        {code}
-      </text>
-    </svg>
-  );
-}
-
 export function AllotmentHome() {
   const { t, route, navigate } = useShell();
   const open = useAllot();
@@ -72,6 +56,8 @@ export function AllotmentHome() {
   }, [query, records, rows, open.site.id]);
 
   const selectedId = plotParam;
+  // The plan marks the chosen bed. With none chosen, it marks the next free plot, the one that Make an offer names.
+  const markedId = selectedId !== "" ? selectedId : (nextPlot?.plotId ?? "");
   const selected = rows.find((r) => r.plot.plotId === selectedId);
   const sheet = useMemo(
     () =>
@@ -79,11 +65,11 @@ export function AllotmentHome() {
         {
           map: open.state.map,
           plots: rows.map((r) => ({ plotId: r.plot.plotId, code: r.plot.code, mark: { ...(r.summary.primary === undefined ? {} : { state: r.summary.primary }), needsChecking: r.summary.needsChecking } })),
-          ...(selectedId === "" ? {} : { selectedPlotId: selectedId }),
+          ...(markedId === "" ? {} : { selectedPlotId: markedId }),
         },
         { width, zoom: 1 },
       ),
-    [open.state.map, rows, selectedId, width],
+    [open.state.map, rows, markedId, width],
   );
 
   const go = (q: string, plot = "") => navigate(`/r/${open.site.id}${plot === "" ? "" : `?plot=${plot}`}`, q === "" ? undefined : { search: q });
@@ -99,9 +85,9 @@ export function AllotmentHome() {
 
   return (
     <section className="stack">
-      <h1>{open.site.title}</h1>
-      <p className="lead">{t("deskLead")}</p>
-      <div className="actions">
+      <div className="desk-head">
+        <h1>{open.site.title}</h1>
+        <p className="lead">{t("deskLead")}</p>
         <ButtonLink href="#/">{t("changeRegister")}</ButtonLink>
       </div>
       {route.query.get("restarted") === "1" ? <p className="notice good" role="status">{t("walkthroughRestarted")}</p> : null}
@@ -117,59 +103,6 @@ export function AllotmentHome() {
           </div>
         </section>
       ) : null}
-
-      <div className="hero">
-        <section className="card hero-card" aria-labelledby="next-plot-heading">
-          <h2 id="next-plot-heading">{t("nextFreePlot")}</h2>
-          {nextPlot === undefined ? (
-            <>
-              <p className="big">{t("noFreePlot")}</p>
-              <p className="hint">{t("noFreePlotHint")}</p>
-            </>
-          ) : (
-            <div className="hero-body">
-              <BedMark code={nextPlot.code} />
-              <p className="big">{nextPlot.code}</p>
-              <p>{t("summaryLine", { code: nextPlot.code, section: sectionOf(nextPlot.sectionId), state: t("stateFree") })}</p>
-            </div>
-          )}
-        </section>
-        <section className="card hero-card" aria-labelledby="next-applicant-heading">
-          <h2 id="next-applicant-heading">{t("nextApplicant")}</h2>
-          {nextRow === undefined ? (
-            <>
-              <p className="big">{t("noOneWaiting")}</p>
-              <p className="hint">{t("noApplicantHint")}</p>
-            </>
-          ) : (
-            <>
-              <p className="big">{nextRow.name}</p>
-              <p>{t("joinedOn", { date: nextRow.joinedOn })}</p>
-              {passedOver.length === 0 ? (
-                <p className="hint">{t("firstInOrder")}</p>
-              ) : (
-                <ul className="plain stack" aria-label={t("skippedNotice")}>
-                  {passedOver.map((r) => (
-                    <li key={r.applicationId}>{`${r.name} · ${reasonOf(r)}`}</li>
-                  ))}
-                </ul>
-              )}
-            </>
-          )}
-        </section>
-      </div>
-
-      <div className="actions main-action">
-        {ready ? (
-          <ButtonLink href={`${base}/offer?plot=${nextPlot.plotId}`} primary>
-            {t("makeOffer")}
-          </ButtonLink>
-        ) : (
-          <Button primary disabled>
-            {t("makeOffer")}
-          </Button>
-        )}
-      </div>
       {overdue.length === 0 ? null : (
         <p className="notice error" role="alert">
           {t("replyOverdue")} · {overdue.map((o) => open.state.core.plots[o.plotId]?.code).join(", ")}{" "}
@@ -177,16 +110,71 @@ export function AllotmentHome() {
         </p>
       )}
 
-      <div className="garden-desk">
-        <div className="stack">
-          <p className="tally">
-            {[
-              t("freeCount", { count: totals.plots.byPrimary.free }),
-              t("reservedCount", { count: totals.plots.byPrimary.reserved }),
-              t("takenCount", { count: totals.plots.byPrimary.taken }),
-              t("unusableCount", { count: totals.plots.byPrimary.unusable }),
-            ].join(" · ")}
-          </p>
+      <div className="desk">
+        <div className="stack desk-find">
+          <div className="card desk-card">
+            <div className="hero">
+              <section className="hero-part" aria-labelledby="next-plot-heading">
+                <h2 id="next-plot-heading">{t("nextFreePlot")}</h2>
+                {nextPlot === undefined ? (
+                  <>
+                    <p className="big">{t("noFreePlot")}</p>
+                    <p className="hint">{t("noFreePlotHint")}</p>
+                  </>
+                ) : (
+                  <>
+                    <div className="hero-body">
+                      <span className="bed-swatch" aria-hidden="true" />
+                      <p className="big code">{nextPlot.code}</p>
+                    </div>
+                    <p>{t("summaryLine", { code: nextPlot.code, section: sectionOf(nextPlot.sectionId), state: t("stateFree") })}</p>
+                  </>
+                )}
+              </section>
+              <section className="hero-part" aria-labelledby="next-applicant-heading">
+                <h2 id="next-applicant-heading">{t("nextApplicant")}</h2>
+                {nextRow === undefined ? (
+                  <>
+                    <p className="big">{t("noOneWaiting")}</p>
+                    <p className="hint">{t("noApplicantHint")}</p>
+                  </>
+                ) : (
+                  <>
+                    <p className="big">{nextRow.name}</p>
+                    <p>{t("joinedOn", { date: nextRow.joinedOn })}</p>
+                    {passedOver.length === 0 ? (
+                      <p className="hint">{t("firstInOrder")}</p>
+                    ) : (
+                      <ul className="plain stack" aria-label={t("skippedNotice")}>
+                        {passedOver.map((r) => (
+                          <li key={r.applicationId}>{`${r.name} · ${reasonOf(r)}`}</li>
+                        ))}
+                      </ul>
+                    )}
+                  </>
+                )}
+              </section>
+            </div>
+            <div className="actions main-action">
+              {ready ? (
+                <ButtonLink href={`${base}/offer?plot=${nextPlot.plotId}`} primary>
+                  {t("makeOffer")}
+                </ButtonLink>
+              ) : (
+                <Button primary disabled>
+                  {t("makeOffer")}
+                </Button>
+              )}
+            </div>
+            <p className="tally">
+              {[
+                t("freeCount", { count: totals.plots.byPrimary.free }),
+                t("reservedCount", { count: totals.plots.byPrimary.reserved }),
+                t("takenCount", { count: totals.plots.byPrimary.taken }),
+                t("unusableCount", { count: totals.plots.byPrimary.unusable }),
+              ].join(" · ")}
+            </p>
+          </div>
 
           <section className="stack" aria-labelledby="find-heading">
             <h2 id="find-heading">{t("searchHeading")}</h2>
@@ -253,7 +241,22 @@ export function AllotmentHome() {
               </div>
             )}
           </section>
+        </div>
 
+        <div className="stack desk-main">
+          <h2 id="plan-heading">{t("deskPlan")}</h2>
+          {selected === undefined ? null : (
+            <p className="summary-line" aria-live="polite">
+              {t("summaryLine", { code: selected.plot.code, section: selected.sectionName ?? t("noSection"), state: selected.stateText })}
+            </p>
+          )}
+          <div ref={holder} className="sheet-scroll" role="region" aria-label={t("siteMap")} tabIndex={0}>
+            {sheet.empty ? <p className="lead">{t("noMapYet")}</p> : <SheetSvg model={sheet} label={t("mapDescription")} />}
+          </div>
+          <MapKey />
+        </div>
+
+        <div className="desk-index on-ground">
           <LinkGroup id="group-records" title={t("groupRecords")}>
             <li>
               <ButtonLink href={`${base}/waiting`}>{queue.length === 0 ? t("waitingList") : `${t("waitingList")} · ${queue.length}`}</ButtonLink>
@@ -290,19 +293,6 @@ export function AllotmentHome() {
               <ButtonLink href={`${base}/backup`}>{t("backUp")}</ButtonLink>
             </li>
           </LinkGroup>
-        </div>
-
-        <div className="stack">
-          <h2 id="plan-heading">{t("deskPlan")}</h2>
-          {selected === undefined ? null : (
-            <p className="summary-line" aria-live="polite">
-              {t("summaryLine", { code: selected.plot.code, section: selected.sectionName ?? t("noSection"), state: selected.stateText })}
-            </p>
-          )}
-          <div ref={holder} className="sheet-scroll" role="region" aria-label={t("siteMap")} tabIndex={0}>
-            {sheet.empty ? <p className="lead">{t("noMapYet")}</p> : <SheetSvg model={sheet} label={t("mapDescription")} />}
-          </div>
-          <MapKey />
         </div>
       </div>
     </section>

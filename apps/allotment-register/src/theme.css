@@ -3,9 +3,8 @@
    peg that holds the plot code. The furrows and the shed live in the band, in the margin, in a row of their own
    above the title, so no word and no control ever sits on a picture.
 
-   The values follow the design of spec 07. Held back until the markup and the art for them exist (slice 3): the band
-   heights (--band). The map drawing has the grass of a section and the crop and furrow patterns of a bed, and this
-   file fills them. The headings use the text font, which the shared screens set. */
+   The values follow the design of spec 07. The map drawing has the grass of a section and the crop and furrow
+   patterns of a bed, and this file fills them. The headings use the text font, which the shared screens set. */
 
 :root {
   --paper: #f7f5e8;
@@ -24,7 +23,7 @@
   --soil: #efe6cc;
   --grass: #cfe0b8;
   --bedfill: #e6d6b4;
-  --band: 80px;
+  --band: 64px;
   --soft-line: #6f8576; /* the outline of an index row */
 
   /* The one filled button of a view, in leaf green with white text. */
@@ -73,41 +72,50 @@ h1 {
   color: var(--leaf);
 }
 
-/* The daylight band. Its first row holds the furrows and the shed and nothing else. */
+/* The daylight band. Its first row holds the furrows and the shed and nothing else. Row 2 holds the brand and the
+   menu, on the paper, with a 1 px ink line under it. */
 header.app {
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) auto;
   grid-template-rows: var(--band) auto auto;
-  gap: 0;
+  align-items: center;
+  gap: 0 24px;
   padding: 0;
-  border-bottom: 2px solid var(--ink);
+  border-bottom: 1px solid var(--ink);
   background: var(--paper);
+  color: var(--ink);
 }
 
+/* The margin tiled sideways on the sky, drawn for the height of the band. */
 header.app::before {
   content: "";
   grid-row: 1;
+  grid-column: 1 / -1;
+  align-self: stretch;
   height: var(--band);
-  border-bottom: 3px solid var(--ink);
-  background: var(--sky);
+  background: url("../../../assets/garden-margin.svg") repeat-x left bottom / auto 100%, var(--sky);
 }
 
+/* The mist is a pale haze that drifts very slowly along the band. It is a gradient and holds no drawing, so the clouds,
+   the shed and the furrows stand still under it. It stops for reduced motion and is hidden in high contrast. */
 header.app .mist {
   position: absolute;
   inset: 0 0 auto 0;
   z-index: 0;
   height: var(--band);
   pointer-events: none;
-  background: url("../../../assets/garden-margin.svg") repeat-x left bottom / 1200px 64px;
+  background:
+    radial-gradient(ellipse 240px 14px at 300px 55%, rgba(255, 255, 255, 0.35), rgba(255, 255, 255, 0)) 0 0 / 1200px 100% repeat-x,
+    radial-gradient(ellipse 300px 12px at 860px 40%, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0)) 0 0 / 1200px 100% repeat-x;
   animation: bed-drift 240s linear infinite;
 }
 
 @keyframes bed-drift {
   from {
-    background-position: 0 100%;
+    background-position: 0 0;
   }
   to {
-    background-position: -1200px 100%;
+    background-position: -1200px 0;
   }
 }
 
@@ -127,17 +135,39 @@ html[data-contrast="high"] header.app::before {
 
 header.app .brand {
   grid-row: 2;
-  padding: 12px 16px 0;
+  grid-column: 1;
+  display: flex;
+  align-items: center;
+  min-height: 56px;
+  padding: 0 0 0 clamp(16px, 2.8vw, 40px);
   color: var(--leaf);
-  font-size: 24px;
+  font-size: 22px;
   font-weight: 700;
 }
 
 header.app nav {
-  grid-row: 3;
-  padding: 8px 16px 16px;
+  grid-row: 2;
+  grid-column: 2;
+  padding: 0 clamp(16px, 2.8vw, 40px) 0 0;
 }
 
+/* The menu is underlined links on the paper, with no box. A fill shows only while a link is hovered or pressed. */
+header.app nav .button {
+  border-color: transparent;
+  background: transparent;
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 5px;
+}
+
+header.app nav .button:hover:not(:disabled) {
+  background: var(--soft);
+}
+
+header.app nav .button:active:not(:disabled) {
+  background: var(--outline-pressed);
+}
 /* Seed packets: soft corners and a strip of hatching along the top, as on a bed. */
 .card {
   border: 2px solid var(--ink);
@@ -238,16 +268,14 @@ html[data-contrast="high"] .sheet .plot.bed {
 }
 
 .sheet .hatch,
-.swatch .hatch,
-.bed-mark .hatch {
+.swatch .hatch {
   fill: none;
   stroke: var(--ink);
   stroke-width: 1.25;
   opacity: 0.55;
 }
 
-.sheet .peg,
-.bed-mark .peg {
+.sheet .peg {
   fill: var(--stone);
   stroke: var(--ink);
   stroke-width: 1.5;
@@ -294,78 +322,92 @@ html[data-contrast="high"] .sheet .section-outline {
   fill: var(--tab);
 }
 
-/* The desk: the two jobs side by side, then one main action, then the lists and the plan. */
+/* The desk card: the next free plot, the next applicant, the one main action and the tally, in one card. */
 .hero {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 16px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px 20px;
 }
 
-.hero > * {
+.hero-part {
+  flex: 1 1 140px;
   min-width: 0;
 }
 
-.hero-card h2 {
-  color: var(--leaf);
-  font-size: 18px;
+.hero-part + .hero-part {
+  flex-basis: 160px;
 }
 
-html[data-contrast="high"] .hero-card h2 {
+.hero-part h2 {
+  margin: 0 0 6px;
+  color: var(--leaf);
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+html[data-contrast="high"] .hero-part h2 {
   color: var(--ink);
+}
+
+.hero-part p {
+  margin: 6px 0 0;
 }
 
 .hero-body {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  gap: 16px;
+  gap: 12px;
+}
+
+/* The bed swatch: a bed in the colour of the next plot, a strip of hatching along its top. It has no words. */
+.bed-swatch {
+  position: relative;
+  flex: none;
+  width: 46px;
+  height: 34px;
+  margin: 2px;
+  overflow: hidden;
+  border: 2px solid var(--ink);
+  border-radius: 4px;
+  background: var(--tab);
+  box-shadow: 0 0 0 2px var(--ink);
+}
+
+.bed-swatch::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 6px;
+  background: repeating-linear-gradient(-45deg, transparent 0 3px, rgba(27, 49, 42, 0.45) 3px 4.5px);
+}
+
+html[data-contrast="high"] .bed-swatch::before {
+  background: none;
 }
 
 .big {
   margin: 0;
-  font-size: 30px;
+  font-size: 24px;
   font-weight: 700;
-  line-height: 1.15;
+  line-height: 1.2;
 }
 
-.bed-mark {
-  flex: none;
+.hero-part p.big {
+  margin: 0;
 }
 
-.bed-mark .bed {
-  fill: var(--bedfill);
-  stroke: var(--ink);
-  stroke-width: 2;
+.big.code {
+  font-size: 34px;
+  line-height: 1.1;
 }
 
+/* Make an offer fills the card, 52 high. A disabled one keeps the same size. */
 .main-action .button {
-  min-width: min(14rem, 100%);
+  width: 100%;
+  min-height: 52px;
+  padding: 0 22px;
   font-size: 18px;
 }
-
-.garden-desk {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 24px;
-}
-
-.garden-desk > * {
-  min-width: 0;
-}
-
-@media (min-width: 48rem) {
-  .hero {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-@media (min-width: 60rem) {
-  .garden-desk {
-    grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
-    align-items: start;
-  }
-}
-
 .summary-line {
   font-size: 18px;
   font-weight: 700;
@@ -464,22 +506,23 @@ table.report-table {
   font-size: 14px;
 }
 
+/* A phone: a lower band, and the menu drops under the brand, in row 3. */
 @media (max-width: 37.4375rem) {
   :root {
-    --band: 52px;
-  }
-
-  header.app .mist {
-    background-size: 1200px 52px;
+    --band: 48px;
   }
 
   header.app .brand {
-    padding-top: 8px;
-    font-size: 22px;
+    grid-column: 1 / -1;
+    min-height: 48px;
+    padding-left: 16px;
+    font-size: 20px;
   }
 
   header.app nav {
-    padding: 8px 16px 12px;
+    grid-row: 3;
+    grid-column: 1 / -1;
+    padding: 0 16px 8px;
   }
 }
 

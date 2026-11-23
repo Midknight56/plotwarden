@@ -297,8 +297,11 @@ describe("cards (L5.4)", () => {
     expect(declOf(high[0]?.body ?? "", "background")).toBe("none");
   });
 
-  it("keeps the churchyard card as it is until the sheets of slice 3 exist", () => {
-    expect(lastDecl([CHURCH], ".card", "border-left")).toBe("6px solid var(--sky)");
+  it("makes the churchyard card a sheet on the night: no left bar and no edge, the stone fill, and an edge again in high contrast", () => {
+    expect(lastDecl([CHURCH], ".card", "border-left")).toBeUndefined();
+    expect(lastDecl([CHURCH], ".card", "border")).toBe("0");
+    expect(lastDecl([CHURCH], ".card", "background")).toBe("var(--stone)");
+    expect(lastDecl([CHURCH], 'html[data-contrast="high"] .card', "border")).toBe("2px solid var(--ink)");
     expect(lastDecl([REGISTER, CHURCH], ":root", "--radius-card")).toBe("16px 16px 2px 2px");
     expect(lastDecl([REGISTER, GARDEN], ":root", "--radius-card")).toBe("14px");
   });

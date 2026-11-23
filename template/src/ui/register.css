@@ -128,7 +128,12 @@ main {
   display: block;
   max-width: 72rem;
   margin: 0 auto;
-  padding: 16px;
+  padding: 16px clamp(16px, 2.8vw, 40px) 32px;
+}
+
+/* A desk is three columns and needs the room: 105rem. The other screens keep 72rem until their own layout comes. */
+main:has(.desk) {
+  max-width: 105rem;
 }
 
 header.app {
@@ -274,6 +279,70 @@ legend {
 .tally {
   margin: 0;
   font-weight: 600;
+}
+
+/* The desk, on both registers: a heading row, then three columns that wrap in order on a narrow screen. The find and the
+   job, the chosen plot with its map, and the index. Their flex bases are 340, 520 and 220 px and their weights 25, 40 and
+   16. No column is wider than its room: min-width: 0 lets it shrink to a phone. */
+.desk-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 24px;
+  min-width: 0;
+}
+
+.desk-head > p {
+  flex: 1 1 300px;
+  min-width: 0;
+  margin: 0;
+}
+
+.desk {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: clamp(24px, 2.2vw, 32px);
+}
+
+.desk > * {
+  min-width: 0;
+}
+
+.desk-find {
+  flex: 25 1 340px;
+}
+
+.desk-main {
+  flex: 40 1 520px;
+}
+
+.desk-index {
+  display: flex;
+  flex: 16 1 220px;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* Results in the find column are one column of cards, whatever the width of the screen. */
+.desk-find .cards {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+/* The key under the map of a desk column keeps to one row where it can: a closer gap and side padding than a full page. */
+.desk-main .map-key {
+  column-gap: 16px;
+  padding-inline: 12px;
+}
+
+/* A row with a heading at the left and its actions at the right. It wraps when the room is narrow. */
+.desk-main-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+  min-height: 44px;
 }
 
 /* A named group of links on a desk. The heading names the group, and the links are index rows, 12 px apart. */
@@ -675,13 +744,15 @@ dialog::backdrop {
   min-width: 0;
 }
 
-/* The sheet: the one drawing for screen and print */
+/* The sheet: the one drawing for screen and print. It has its own paper, so it has its own ink: on a page ground that
+   is dark, the ground's text colour is not for it. */
 .sheet-scroll {
   max-width: 100%;
   min-height: 120px;
   overflow: auto;
   border: 2px solid var(--ink);
   background: var(--paper);
+  color: var(--ink);
 }
 
 /* The key joins the map as one frame: the map has no bottom edge and the key has the rest of the frame. */
@@ -839,6 +910,7 @@ svg.sheet text {
   border: 2px solid var(--ink);
   border-top-width: 1px;
   background: var(--field);
+  color: var(--ink);
 }
 
 /* The screens that hold the map space their parts by --gap. The key takes that gap back, so the two frames touch. */

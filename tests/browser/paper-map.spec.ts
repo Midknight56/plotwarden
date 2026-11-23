@@ -3,10 +3,10 @@
 // fix a crossing, pin a private plan, hide it, import a finished layout twice, reject a
 // conflicting import, rename a linked code and find the old code in the list and in print.
 import { expect, test } from "@playwright/test";
-import { CHAR_WIDTH, LABEL_SIZE } from "../../template/src/map/sheet";
-import { textWidth } from "../../template/src/map/labels";
+import { LABEL_SIZE } from "../../template/src/map/sheet";
+import { codeWidth, textWidth } from "../../template/src/map/labels";
 import { findLabelCollisions, focusRingContrast, measureLayout, readSheetScene, trackRequests } from "../helpers/measureLayout";
-import { APPS, openPractice, plotIdOf, settle, sizeOf, storedEvents } from "../helpers/routes";
+import { APPS, openPractice, plotIdOf, settle, siteIdOf, sizeOf, startOwn, storedEvents } from "../helpers/routes";
 import { BOOK_GRID, fillGrid, fixturePath, generateGrid, openMapEditor, readDownload, startRegister, upload } from "../helpers/screens";
 import { SITE } from "../helpers/siteOrigin";
 
@@ -567,8 +567,8 @@ test.describe("map setup shows the plots while the keeper types (P22)", () => {
 });
 
 // ---- Map labels in the shipped font (spec 07, task 7.13, L6.5) ------------------------------------------------------
-// Names and codes are 14 px, Atkinson Hyperlegible Next at weight 700. `LABEL_SIZE` and `CHAR_WIDTH` in map/sheet.ts come
-// from a measure of that font in a browser, and this is the check that holds them to it: every name is read at its real
+// Names and codes are 14 px, Atkinson Hyperlegible Next at weight 700. `LABEL_SIZE` in map/sheet.ts and the widths of `codeWidth`
+// in map/labels.ts come from a measure of that font in a browser, and this is the check that holds them to it: every name is read at its real
 // width and must fit the box that the sheet reserved for it, and no label overlaps another label, a plot, a path line,
 // the code tab, the north arrow, the gate mark, an outline or the frame. At 360 wide on the phone project and 1440 wide
 // on the desktop project, in both registers and on the two practice maps of the start page.
@@ -605,13 +605,107 @@ function expectFit(texts: readonly TextRead[], where: string): void {
     if (Math.abs(t.size - LABEL_SIZE) > 0.01) faults.push(`"${t.text}" is ${t.size} px, not ${LABEL_SIZE}`);
     if (t.weight !== "700") faults.push(`"${t.text}" has weight ${t.weight}, not 700`);
     if (!t.family.includes("Atkinson Hyperlegible Next")) faults.push(`"${t.text}" is set in ${t.family}`);
-    // The sheet boxes a code (in its plot and on its tab) at CHAR_WIDTH a character and a name at the width of a letter in labels.ts.
-    const reserved = t.kind === "plot" || t.kind === "tab" ? [...t.text].length * CHAR_WIDTH : textWidth(t.text, LABEL_SIZE);
+    // The sheet boxes a code (in its plot and on its tab) from the width of each of its own characters (`codeWidth`), and a
+    // name at the width of a letter in labels.ts.
+    const reserved = t.kind === "plot" || t.kind === "tab" ? codeWidth(t.text, LABEL_SIZE) : textWidth(t.text, LABEL_SIZE);
     if (t.width > reserved + 0.5) faults.push(`"${t.text}" is ${t.width.toFixed(1)} px wide and its box is ${reserved.toFixed(1)} px`);
   }
   expect(faults, `${where}\n${faults.join("\n")}`).toEqual([]);
 }
 
+interface CodeBox {
+  text: string;
+  textBox: { x0: number; y0: number; x1: number; y1: number };
+  /** The base of an arch or the peg of a bed, which holds the code. */
+  box: { x0: number; y0: number; x1: number; y1: number };
+  /** The shape of the plot that the code belongs to. */
+  plot: { x0: number; y0: number; x1: number; y1: number };
+  /** The other plots of the drawing. */
+  others: { x0: number; y0: number; x1: number; y1: number }[];
+  /** The dotted line of each path, in the drawing's own pixels. */
+  lines: [number, number][][];
+  frame: { width: number; height: number };
+  /** The tab of the chosen plot and the text on it. */
+  tab?: { box: { x0: number; y0: number; x1: number; y1: number }; text: string; textBox: { x0: number; y0: number; x1: number; y1: number } };
+}
+
+/** Every code on every sheet of the page, with the box that holds it and what is round it, read at its drawn size. */
+async function readCodeBoxes(page: import("@playwright/test").Page): Promise<CodeBox[]> {
+  return page.evaluate(() => {
+    const out: CodeBox[] = [];
+    for (const svg of document.querySelectorAll<SVGSVGElement>("svg.sheet")) {
+      const origin = svg.getBoundingClientRect();
+      if (origin.width === 0) continue;
+      const rel = (el: Element) => {
+        const r = el.getBoundingClientRect();
+        return { x0: r.left - origin.left, y0: r.top - origin.top, x1: r.right - origin.left, y1: r.bottom - origin.top };
+      };
+      const groups = [...svg.querySelectorAll(":scope > g")];
+      const plots = groups.map((g) => ({ g, shape: g.querySelector("path.plot, polygon.plot") })).filter((p): p is { g: Element; shape: Element } => p.shape !== null);
+      const lines = [...svg.querySelectorAll<SVGPolylineElement>("polyline.path-line")].map((line) =>
+        (line.getAttribute("points") ?? "").trim().split(/\s+/).map((pair) => pair.split(",").map(Number) as [number, number]).filter((p) => p.length === 2 && Number.isFinite(p[0]) && Number.isFinite(p[1])),
+      );
+      const tabRect = svg.querySelector("rect.tab");
+      const tabText = svg.querySelector("text.tab-text");
+      for (const { g, shape } of plots) {
+        const text = g.querySelector(':scope > text[data-kind="plot"]');
+        const box = g.querySelector("rect.base, rect.peg");
+        if (text === null || box === null) continue;
+        out.push({
+          text: (text.textContent ?? "").trim(),
+          textBox: rel(text),
+          box: rel(box),
+          plot: rel(shape),
+          others: plots.filter((p) => p.shape !== shape).map((p) => rel(p.shape)),
+          lines,
+          frame: { width: origin.width, height: origin.height },
+          ...(tabRect === null || tabText === null ? {} : { tab: { box: rel(tabRect), text: (tabText.textContent ?? "").trim(), textBox: rel(tabText) } }),
+        });
+      }
+    }
+    return out;
+  });
+}
+
+// The drawing rounds each coordinate to a tenth of a pixel, so two boxes that touch may overlap by up to 0.3 px.
+const overlapsBox = (a: CodeBox["box"], b: CodeBox["box"]): boolean => a.x0 < b.x1 - 0.3 && b.x0 < a.x1 - 0.3 && a.y0 < b.y1 - 0.3 && b.y0 < a.y1 - 0.3;
+
+/**
+ * Each code fits its box with padding, and its box overlaps no other code box, no other plot, no path line and not the
+ * frame. `strictPlots` also holds the box off every other plot. Plots that stand edge to edge (a generated grid) have a
+ * base that is 5 percent wider than the arch by design, so that check is for the maps with a gap between their plots.
+ */
+function expectCodeBoxes(boxes: readonly CodeBox[], where: string, options: { strictPlots: boolean }): void {
+  const faults: string[] = [];
+  for (const [i, b] of boxes.entries()) {
+    const room = (b.textBox.x0 - b.box.x0).toFixed(1);
+    if (b.textBox.x0 - b.box.x0 < 3 - 0.01 || b.box.x1 - b.textBox.x1 < 3 - 0.01) faults.push(`"${b.text}" has ${room} px of padding in its box, needs 3`);
+    if (b.box.x0 < -0.01 || b.box.y0 < -0.01 || b.box.x1 > b.frame.width + 0.01 || b.box.y1 > b.frame.height + 0.01) faults.push(`the box of "${b.text}" leaves the frame`);
+    for (const other of boxes.slice(i + 1)) if (overlapsBox(b.box, other.box)) faults.push(`the box of "${b.text}" overlaps the box of "${other.text}"`);
+    if (options.strictPlots) for (const plot of b.others) if (overlapsBox(b.box, plot)) faults.push(`the box of "${b.text}" overlaps another plot`);
+    for (const line of b.lines) {
+      for (let k = 0; k + 1 < line.length; k += 1) {
+        const [ax, ay] = line[k] as [number, number];
+        const [bx, by] = line[k + 1] as [number, number];
+        const steps = Math.max(1, Math.ceil(Math.hypot(bx - ax, by - ay)));
+        for (let s = 0; s <= steps; s += 1) {
+          const x = ax + ((bx - ax) * s) / steps;
+          const y = ay + ((by - ay) * s) / steps;
+          if (x > b.box.x0 && x < b.box.x1 && y > b.box.y0 && y < b.box.y1) {
+            faults.push(`a path line crosses the box of "${b.text}"`);
+            s = steps;
+            k = line.length;
+          }
+        }
+      }
+    }
+    if (b.tab !== undefined) {
+      const t = b.tab;
+      if (t.textBox.x0 - t.box.x0 < 3 - 0.01 || t.box.x1 - t.textBox.x1 < 3 - 0.01) faults.push(`the tab text "${t.text}" has no 3 px of padding`);
+    }
+  }
+  expect(faults, `${where}\n${faults.join("\n")}`).toEqual([]);
+}
 for (const app of APPS) {
   test.describe(`${app.title}, map labels in the shipped font`, () => {
     test.use({ baseURL: app.origin });
@@ -633,6 +727,7 @@ for (const app of APPS) {
         await settle(page);
         expect(await page.evaluate(() => document.fonts.check('700 14px "Atkinson Hyperlegible Next"')), `${view.what}: the shipped font is loaded`).toBe(true);
         expectFit(await readTexts(page), view.what);
+        expectCodeBoxes(await readCodeBoxes(page), view.what, { strictPlots: true });
         const found = findLabelCollisions(await page.evaluate(readSheetScene));
         expect(found, `${view.what} at ${page.viewportSize()?.width}\n${JSON.stringify(found, null, 1)}`).toEqual([]);
       }
@@ -651,7 +746,66 @@ test.describe("the practice maps of the start page, in the shipped font", () => 
     const scenes = await page.evaluate(readSheetScene);
     expect(scenes.length, "both practice maps").toBe(2);
     expectFit(await readTexts(page), "start page");
+    expectCodeBoxes(await readCodeBoxes(page), "start page", { strictPlots: true });
     const found = findLabelCollisions(scenes);
     expect(found, `start page at ${page.viewportSize()?.width}\n${JSON.stringify(found, null, 1)}`).toEqual([]);
   });
 });
+
+// ---- Codes of wide capitals (spec 07, task 7.19, L6.5) -------------------------------------------------------------------
+// A code box is sized from the widths of its own characters, so W, M, Q and G fit as the digits do. Three rows of three plots
+// each, with the codes W01 to W03, MW12 to MW14 and QQGO1 to QQGO3, in a register of the keeper's own, in both registers.
+// The code of each plot is read at its drawn width and must fit its box with padding. No code box overlaps another, leaves
+// the frame or crosses a path line, and no label overlaps another label, a plot, an outline or the frame. At 360 and 1440 wide.
+
+const WIDE_GRIDS = [
+  { section: "Wide", prefix: "W", first: "1", digits: "2", rows: "1", columns: "3", width: "100", height: "70", east: "100", north: "100" },
+  { section: "Mixed", prefix: "MW", first: "12", digits: "2", rows: "1", columns: "3", width: "100", height: "70", east: "100", north: "200" },
+  { section: "Quads", prefix: "QQGO", first: "1", digits: "1", rows: "1", columns: "3", width: "100", height: "70", east: "100", north: "300" },
+] as const;
+
+for (const app of APPS) {
+  test.describe(`${app.title}, codes of wide capitals`, () => {
+    test.use({ baseURL: app.origin });
+
+    test("W01, MW12 and QQGO1 fit their boxes with padding, and touch nothing", async ({ page }) => {
+      test.setTimeout(180_000);
+      await page.setViewportSize(widthOf(page));
+      const requests = trackRequests(page, app.origin);
+      const siteId = await startOwn(page, app, "Wide Codes");
+      for (const grid of WIDE_GRIDS) {
+        await page.goto(`/#/r/${siteId}/map/edit`);
+        await expect(page.getByRole("heading", { level: 1, name: "Map setup" })).toBeVisible();
+        await fillGrid(page, grid);
+        await page.getByRole("button", { name: "Preview plots" }).click();
+        await page.getByRole("button", { name: "Apply layout" }).click();
+        await expect(page.getByText("Map saved.")).toBeVisible();
+      }
+      expect(siteIdOf(page)).toBe(siteId);
+      const events = await storedEvents(page, siteId);
+      const wanted = ["W01", "MW12", "QQGO1"];
+      const views = [
+        { route: `/#/r/${siteId}/map`, what: "map, nothing chosen" },
+        { route: `/#/r/${siteId}`, what: "home" },
+        ...wanted.map((code) => ({ route: `/#/r/${siteId}/map?plot=${plotIdOf(events, code)}`, what: `map, ${code} chosen` })),
+      ];
+      for (const view of views) {
+        await page.goto(view.route);
+        await settle(page);
+        expect(await page.evaluate(() => document.fonts.check('700 14px "Atkinson Hyperlegible Next"')), `${view.what}: the shipped font is loaded`).toBe(true);
+        const texts = await readTexts(page);
+        expectFit(texts, view.what);
+        const boxes = await readCodeBoxes(page);
+        // Every plot is wide enough for its code at these sizes, so every code of the three grids is drawn in its box.
+        const drawn = boxes.map((b) => b.text);
+        const chosen = view.what.match(/map, (\S+) chosen/)?.[1];
+        for (const code of wanted) if (code !== chosen) expect(drawn, `${view.what}: ${code} is drawn in its plot`).toContain(code);
+        expectCodeBoxes(boxes, view.what, { strictPlots: false });
+        const found = findLabelCollisions(await page.evaluate(readSheetScene));
+        expect(found, `${view.what} at ${page.viewportSize()?.width}\n${JSON.stringify(found, null, 1)}`).toEqual([]);
+        expect((await measureLayout(page, { skipHitTest: true })).filter((v) => v.rule.startsWith("label_")), view.what).toEqual([]);
+      }
+      expect(requests.external).toEqual([]);
+    });
+  });
+}

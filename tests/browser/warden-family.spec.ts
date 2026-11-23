@@ -78,7 +78,8 @@ test.describe("the first view", () => {
         mistEvents: getComputedStyle(mist).pointerEvents,
         sky: getComputedStyle(header, "::before").backgroundColor,
         ink: getComputedStyle(document.documentElement).color,
-        paper: getComputedStyle(document.body).backgroundColor,
+        ground: getComputedStyle(document.body).backgroundColor,
+        sheet: getComputedStyle(document.querySelector("main") as HTMLElement).backgroundColor,
       };
     });
     if (sizeOf(page) === "phone") {
@@ -94,7 +95,9 @@ test.describe("the first view", () => {
     expect(strip.mistEvents).toBe("none");
     expect(strip.sky).toBe("rgb(35, 42, 92)");
     expect(strip.ink).toBe("rgb(34, 37, 44)");
-    expect(strip.paper).toBe("rgb(250, 245, 233)");
+    // The page stands on the night, and the library lies on one stone sheet (spec 07, L7.6).
+    expect(strip.ground).toBe("rgb(35, 42, 92)");
+    expect(strip.sheet).toBe("rgb(255, 254, 248)");
     await check(page, "library");
     expect(requests.external).toEqual([]);
   });

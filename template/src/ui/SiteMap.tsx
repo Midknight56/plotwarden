@@ -2,7 +2,8 @@
 // The overview has no button per plot. A plot is chosen from the list, which holds the same plots.
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode, RefObject } from "react";
-import { CHAR_WIDTH, LABEL_BAND, LABEL_SIZE, buildSheet } from "../map/sheet";
+import { codeWidth } from "../map/labels";
+import { CODE_PAD, LABEL_BAND, LABEL_SIZE, buildSheet } from "../map/sheet";
 import type { KeyState, SheetModel, SheetPlot } from "../map/sheet";
 import { AsAtField, AsAtHeading } from "./AsAtField";
 import { Button, ButtonLink, Notice, SelectField } from "./controls";
@@ -86,13 +87,30 @@ function Turf({ box }: { box: SheetPlot["box"] }) {
   return <ellipse className="turf" cx={round1(box.x + box.width / 2)} cy={round1(box.y + box.height + 3 - ry)} rx={round1(rx)} ry={round1(ry)} />;
 }
 
-/** The base at the foot of an arch, behind its code: 5 percent wider on each side, 27 percent of the arch high and never under the code band. A taken plot that is not the chosen one has a stone base. */
-function Base({ plot }: { plot: SheetPlot }) {
+/**
+ * The base at the foot of an arch, behind its code: up to 5 percent wider on each side, 27 percent of the arch high and
+ * never under the code band. It stands out on a side only as far as half the gap to a plot beside it, so the bases of
+ * plots that stand edge to edge touch and never overlap. A taken plot that is not the chosen one has a stone base.
+ */
+function Base({ plot, plots }: { plot: SheetPlot; plots: readonly SheetPlot[] }) {
   const { box } = plot;
   const w = Math.max(6, box.width);
   const height = Math.max(LABEL_BAND, box.height * 0.27);
+  const top = box.y + box.height - height;
+  const bottom = box.y + box.height;
+  let room = w * 0.05;
+  for (const other of plots) {
+    if (other.plotId === plot.plotId) continue;
+    // Only a plot that stands beside this base, at the height of the base, limits it.
+    if (other.box.y + other.box.height <= top || other.box.y >= bottom) continue;
+    const right = other.box.x - (box.x + box.width);
+    const left = box.x - (other.box.x + other.box.width);
+    if (right >= -0.01) room = Math.min(room, right / 2);
+    if (left >= -0.01) room = Math.min(room, left / 2);
+  }
+  room = Math.max(0, room);
   const stone = plot.mark.state === "taken" && !plot.selected;
-  return <rect className={stone ? "base taken" : "base"} x={round1(box.x + box.width / 2 - w * 0.55)} y={round1(box.y + box.height - height)} width={round1(w * 1.1)} height={round1(height)} />;
+  return <rect className={stone ? "base taken" : "base"} x={round1(box.x + box.width / 2 - w / 2 - room)} y={round1(top)} width={round1(w + room * 2)} height={round1(height)} />;
 }
 
 /** The two patterns of a bed, drawn once in a sheet. A taken bed is planted and any other bed is bare soil. Their colours come from the theme. */
@@ -199,7 +217,7 @@ export function SheetSvg({
               {plot.selected ? <path className="plot-selected-outer" d={archPath(plot.box, 3)} /> : null}
               <path className={plotClass(plot, false)} d={archPath(plot.box)} />
               {plot.box.width >= 22 ? <path className="arch-inner" d={archPath({ x: plot.box.x + 3, y: plot.box.y + 3, width: plot.box.width - 6, height: plot.box.height - 4 })} /> : null}
-              {plot.label === undefined ? null : <Base plot={plot} />}
+              {plot.label === undefined ? null : <Base plot={plot} plots={model.plots} />}
               {plot.selected ? <path className="plot-selected-inner" d={archPath(plot.box, 1)} /> : null}
             </>
           ) : (
@@ -208,7 +226,7 @@ export function SheetSvg({
               <polygon className={plotClass(plot, bedded)} points={pointsOf(plot.points)} />
               {bedded && isRectangle(plot.points) && plot.box.width >= 24 && plot.box.height >= 24 ? <path className="hatch" d={hatchPath(plot.box)} /> : null}
               {bedded && plot.label !== undefined && !(plot.selected && model.tab !== undefined) ? (
-                <rect className="peg" x={round1(plot.label.x - (plot.label.text.length * CHAR_WIDTH + 12) / 2)} y={round1(plot.label.y - LABEL_SIZE - 1)} width={round1(plot.label.text.length * CHAR_WIDTH + 12)} height={LABEL_SIZE + 5} />
+                <rect className="peg" x={round1(plot.label.x - (codeWidth(plot.label.text, LABEL_SIZE) + CODE_PAD) / 2)} y={round1(plot.label.y - LABEL_SIZE - 1)} width={round1(codeWidth(plot.label.text, LABEL_SIZE) + CODE_PAD)} height={LABEL_SIZE + 5} />
               ) : null}
               {plot.selected ? <polygon className="plot-selected-inner" points={pointsOf(plot.points)} /> : null}
             </>

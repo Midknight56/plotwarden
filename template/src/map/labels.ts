@@ -50,6 +50,53 @@ export const PLOT_COST = 600;
 
 /** The width of a letter at 12 px, a little wide so the check is the stricter one. */
 export const LETTER_WIDTH = 7.4;
+
+/**
+ * The advance of each character of a plot code, in em, at weight 700 of the shipped text font (Atkinson Hyperlegible Next).
+ * Measured in headless Chromium as the computed text length of one character at 1000 px, then raised to the next
+ * 0.005 em, so a box built from it is never narrower than the drawn text. Basic Latin from space to `~`. The font
+ * tightens most pairs and opens a few, so `codeWidth` adds the room for that (below). tests/browser/paper-map.spec.ts
+ * reads the real width of every code on the maps and holds it to this table. One average width for every character was
+ * too narrow for W (0.886 em) and M (0.858 em), and too wide for 1 (0.44 em).
+ */
+export const CODE_EM: Readonly<Record<string, number>> = {
+  "0": 0.66, "1": 0.44, "2": 0.58, "3": 0.6, "4": 0.625, "5": 0.61, "6": 0.63, "7": 0.54, "8": 0.625, "9": 0.575,
+  "!": 0.305, '"': 0.39, "#": 0.765, "$": 0.61, "%": 0.97, "&": 0.725, "'": 0.21, "(": 0.335, ")": 0.335, "*": 0.485, "+": 0.595, ",": 0.275, "-": 0.375, ".": 0.275, "/": 0.44, ":": 0.275, ";": 0.275, "<": 0.57, "=": 0.615, ">": 0.57, "?": 0.55, "@": 0.785,
+  A: 0.68, B: 0.645, C: 0.66, D: 0.69, E: 0.6, F: 0.57, G: 0.72, H: 0.705, I: 0.425, J: 0.565, K: 0.665, L: 0.555, M: 0.86, N: 0.72, O: 0.75, P: 0.63, Q: 0.76, R: 0.65, S: 0.61, T: 0.61, U: 0.69, V: 0.645, W: 0.89, X: 0.685, Y: 0.65, Z: 0.62,
+  "[": 0.34, "\\": 0.44, "]": 0.345, "^": 0.585, _: 0.4, "`": 0.29,
+  a: 0.555, b: 0.6, c: 0.51, d: 0.6, e: 0.565, f: 0.365, g: 0.595, h: 0.575, i: 0.3, j: 0.26, k: 0.555, l: 0.32, m: 0.885, n: 0.575, o: 0.58, p: 0.6, q: 0.6, r: 0.38, s: 0.51, t: 0.38, u: 0.57, v: 0.53, w: 0.74, x: 0.54, y: 0.525, z: 0.505,
+  "{": 0.385, "|": 0.255, "}": 0.385, "~": 0.54,
+  " ": 0.315,
+};
+
+const WIDEST_EM = Math.max(...Object.values(CODE_EM));
+
+/**
+ * What the font adds between two characters, over the sum of their own widths, at the most. Most pairs are tightened
+ * (A and V by 0.048 em), but a few are opened. Measured over every pair in headless Chromium: among capitals and digits
+ * the most is 0.038 em (Y and Y), and over all of Basic Latin it is 0.154 em (q and j). A pair of capitals or digits is
+ * given the first, any other pair the second, so a code is never narrower than it is drawn.
+ */
+const PAIR_CAPITALS_EM = 0.04;
+const PAIR_ANY_EM = 0.16;
+const CAPITAL_OR_DIGIT = /^[A-Z0-9]$/;
+
+/**
+ * The width that a plot code takes at `size` px, summed from the width of each of its own characters and the room that
+ * the font may add between them. A character that is not in the table takes the widest width that is, so a code never
+ * overflows its box.
+ */
+export function codeWidth(text: string, size: number): number {
+  let em = 0;
+  let before: string | undefined;
+  for (const ch of text) {
+    em += CODE_EM[ch] ?? WIDEST_EM;
+    if (before !== undefined) em += CAPITAL_OR_DIGIT.test(before) && CAPITAL_OR_DIGIT.test(ch) ? PAIR_CAPITALS_EM : PAIR_ANY_EM;
+    before = ch;
+  }
+  return em * size;
+}
+
 /** How far from the edge of the sheet a label stays. */
 export const SHEET_MARGIN = 8;
 

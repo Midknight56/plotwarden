@@ -1,10 +1,12 @@
-/* The look of the Churchyard Register: a warm ivory field sheet in charcoal ink, under a dark indigo sky strip.
-   Ink #22252C on ivory #FAF5E9. The lantern and the mist live in the strip, in the margin, in a row of their
-   own above the title, so no word and no control ever sits on a picture.
+/* The look of the Churchyard Register: a calm night. The page stands on the indigo sky #232A5C, every block of text
+   lies on an ivory sheet, and the headings that stand on the night are ivory #FAF5E9. Ink #22252C is for text on a
+   sheet. Lantern amber marks two things only: the one main action and the chosen plot. The lantern and the yews live
+   in the first row of the header, in a row of their own above the title, so no word and no control ever sits on a
+   picture.
 
-   The values follow the design of spec 07. Held back until the markup for them exists (slice 3): the night ground
-   (--ground and --on-ground stay the paper and the ink), the band heights (--band) and the header rows. The map
-   drawing has the classes for the lawn, the turf, the base and the edge of a walk, and this file fills them. */
+   The values follow the design of spec 07. High contrast has no night ground: the page is white and the sheets are
+   white with an ink edge. The map drawing has the classes for the lawn, the turf, the base and the edge of a walk,
+   and this file fills them. */
 
 @import "../../../fonts/gelasio.css";
 
@@ -14,10 +16,14 @@
   --sky-muted: #c9cee6;
   --sky-line: #8e96c4;
   --gravel: #d9cdb0;
-  --band: 72px;
+  --band: 80px;
   --stone: #fffef8;
   --tab: #f2c96b; /* the chosen plot and its code tab */
   --soft-line: #6b6557; /* dashed outlines, double rules */
+
+  /* The page stands on the night. Text that stands on it with no sheet under it is the ground's ivory. */
+  --ground: var(--sky);
+  --on-ground: var(--sky-ink);
 
   /* The one filled button of a view, in lantern amber. Ink on amber reaches 4.5 to 1 in every state. */
   --action: #f2c96b;
@@ -43,6 +49,8 @@
 html[data-contrast="high"] {
   --gravel: #bbbbbb;
   --stone: #ffffff;
+  --ground: var(--paper);
+  --on-ground: var(--ink);
   --action: #000000;
   --action-ink: #ffffff;
   --action-hover: #000000;
@@ -61,32 +69,40 @@ header.app .brand {
   letter-spacing: 0.01em;
 }
 
-/* The sky strip. Its first row holds the lantern and the mist and nothing else. */
+/* The header. Row 1 is the art and nothing else. Row 2 holds the brand and the menu, on the plain sky. */
 header.app {
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) auto;
   grid-template-rows: var(--band) auto auto;
-  gap: 0;
+  align-items: center;
+  gap: 0 24px;
   padding: 0;
-  border-bottom: 2px solid var(--ink);
-  background: var(--paper);
+  border-bottom: 0;
+  background: var(--sky);
+  color: var(--sky-ink);
 }
 
+/* The lantern once at the right, the margin tiled sideways, on the sky. Both are drawn for the height of the band. */
 header.app::before {
   content: "";
   grid-row: 1;
+  grid-column: 1 / -1;
+  align-self: stretch;
   height: var(--band);
-  border-bottom: 3px solid var(--ink);
-  background: url("../../../assets/gate-lantern.svg") no-repeat right 16px top 0 / auto 100%, var(--sky);
+  background: url("../../../assets/gate-lantern.svg") no-repeat right 16px bottom / auto 100%, url("../../../assets/churchyard-margin.svg") repeat-x left bottom / auto 100%, var(--sky);
 }
 
+/* The mist is a soft haze that drifts along the foot of the band. It is a gradient and holds no drawing, so the yews,
+   the stones and the railings stand still under it. It stops for reduced motion and is hidden in high contrast. */
 header.app .mist {
   position: absolute;
   inset: 0 0 auto 0;
   z-index: 0;
   height: var(--band);
   pointer-events: none;
-  background: url("../../../assets/churchyard-margin.svg") repeat-x left bottom / 1200px 48px;
+  background:
+    radial-gradient(ellipse 260px 22px at 330px 100%, rgba(250, 245, 233, 0.16), rgba(250, 245, 233, 0)) 0 100% / 1200px 100% repeat-x,
+    radial-gradient(ellipse 300px 26px at 880px 100%, rgba(250, 245, 233, 0.12), rgba(250, 245, 233, 0)) 0 100% / 1200px 100% repeat-x;
   animation: fold-drift 160s linear infinite;
 }
 
@@ -111,23 +127,154 @@ html[data-motion="reduce"] header.app .mist {
 
 header.app .brand {
   grid-row: 2;
-  padding: 12px 16px 0;
+  grid-column: 1;
+  display: flex;
+  align-items: center;
+  min-height: 52px;
+  padding: 4px 0 0 clamp(16px, 2.8vw, 40px);
   font-size: 22px;
 }
 
 header.app nav {
-  grid-row: 3;
-  padding: 8px 16px 16px;
+  grid-row: 2;
+  grid-column: 2;
+  padding: 4px clamp(16px, 2.8vw, 40px) 0 0;
 }
 
-/* Cards read as small paper labels. */
-.card {
+/* The menu is underlined links on the sky, with no box. A fill shows only while a link is hovered or pressed. */
+header.app nav .button {
+  border-color: transparent;
+  background: transparent;
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 5px;
+}
+
+header.app nav .button:hover:not(:disabled) {
+  background: rgba(250, 245, 233, 0.16);
+}
+
+header.app nav .button:active:not(:disabled) {
+  background: rgba(250, 245, 233, 0.24);
+}
+
+/* A control that stands on the night, on the sky or on the ground, takes the amber ring. A control on a sheet keeps the
+   blue ring of the shared rules. */
+header.app :focus-visible,
+html:not([data-contrast="high"]) .on-ground :focus-visible {
+  outline-color: var(--focus-on-dark);
+}
+
+/* Regions that stand on the night ground, with no sheet under them. Their text is the ground's own ivory, their
+   second text is #C9CEE6, and an outlined button there is ivory on the night: the same two pairs as the header. */
+html:not([data-contrast="high"]) .on-ground .button:not(.primary):not(.quiet) {
+  border-color: var(--on-ground);
+  background: transparent;
+  color: var(--on-ground);
+}
+
+html:not([data-contrast="high"]) .on-ground .button:not(.primary):not(.quiet):hover:not(:disabled) {
+  background: rgba(250, 245, 233, 0.14);
+}
+
+html:not([data-contrast="high"]) .on-ground .button:not(.primary):not(.quiet):active:not(:disabled) {
+  background: rgba(250, 245, 233, 0.24);
+}
+
+/* The page stands on the night. A screen that is not the desk is one ivory sheet, until each of its parts is a sheet of
+   its own. Headings on the ground are ivory by inheritance, and a sheet sets its own ink. */
+html:not([data-contrast="high"]) main:not(:has(.desk)) {
+  margin-block: 20px 32px;
+  padding-block: 20px 28px;
+  border-radius: var(--radius-card);
   background: var(--stone);
-  border-left: 6px solid var(--sky);
+  color: var(--ink);
+}
+
+html:not([data-contrast="high"]) .ground-note,
+html:not([data-contrast="high"]) .desk-head .lead {
+  color: var(--sky-muted);
+}
+
+.desk-head .lead {
+  font-size: 16px;
+}
+
+.desk-head .summary-line {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+/* The index on the night: its headings are capitals in the second text, and its rows are a faint ivory veil with a
+   lighter edge. A row on a light ground keeps the shared rules. */
+html:not([data-contrast="high"]) .on-ground .group-heading {
+  color: var(--sky-muted);
+  font-size: 14px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+html:not([data-contrast="high"]) .on-ground .link-group li > .button:not(.primary):not(.quiet) {
+  border-color: var(--sky-line);
+  background: rgba(250, 245, 233, 0.06);
+  color: var(--sky-ink);
+}
+
+html:not([data-contrast="high"]) .on-ground .link-group li > .button:not(.primary):not(.quiet):hover:not(:disabled) {
+  border-color: var(--sky-ink);
+  background: rgba(250, 245, 233, 0.16);
+}
+
+html:not([data-contrast="high"]) .on-ground .link-group li > .button:not(.primary):not(.quiet):active:not(:disabled) {
+  background: rgba(250, 245, 233, 0.24);
+}
+
+/* The state mark beside the chosen plot, on the night. It is an ivory arch with the dark mark in it. */
+html:not([data-contrast="high"]) .on-ground .mark-swatch .plot {
+  fill: var(--stone);
+  stroke: var(--sky-ink);
+}
+
+/* Sheets lie on the night with no edge. Their corners are the card corners. High contrast draws the edge. */
+.card {
+  border: 0;
+  background: var(--stone);
 }
 
 html[data-contrast="high"] .card {
-  border-left-color: var(--ink);
+  border: 2px solid var(--ink);
+}
+
+.desk-find {
+  padding: 18px 18px 20px;
+}
+
+/* The results sit inside the find sheet, under a double rule, as paper labels with a 1 px edge. */
+.desk-find .results {
+  padding-top: 12px;
+  border-top: 3px double var(--soft-line);
+}
+
+.desk-find .card {
+  border: 1px solid var(--ink);
+  border-radius: 0;
+  background: var(--paper);
+}
+
+/* The burials of the chosen plot, one row each, split by a hairline and no gap. */
+.desk-main .card ul {
+  gap: 0;
+}
+
+.desk-main .card ul > li {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+  min-height: 58px; /* a 46 px button and 6 px each side keeps two rows' buttons 12 px apart */
+  border-top: 1px solid var(--rule);
 }
 
 /* The field sheet: a ruled frame round the ivory map. */
@@ -186,24 +333,6 @@ svg.sheet .path-line {
 
 .sheet .gate {
   fill: var(--ink);
-}
-
-/* The desk: the job and the search on one side, the selected plot and the map on the other. */
-.desk {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 24px;
-}
-
-.desk > * {
-  min-width: 0;
-}
-
-@media (min-width: 60rem) {
-  .desk {
-    grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
-    align-items: start;
-  }
 }
 
 .summary-line {
@@ -268,22 +397,28 @@ svg.sheet .path-line {
   }
 }
 
+/* A phone: a lower band, and the menu drops under the brand, in row 3. */
 @media (max-width: 37.4375rem) {
   :root {
-    --band: 44px;
-  }
-
-  header.app .mist {
-    background-size: 1200px 44px;
+    --band: 52px;
   }
 
   header.app .brand {
-    padding-top: 8px;
+    grid-column: 1 / -1;
+    min-height: 48px;
+    padding-left: 16px;
     font-size: 20px;
   }
 
   header.app nav {
-    padding: 8px 16px 12px;
+    grid-row: 3;
+    grid-column: 1 / -1;
+    padding: 0 16px 8px;
+  }
+
+  html:not([data-contrast="high"]) main:not(:has(.desk)) {
+    margin-block: 12px 24px;
+    padding-block: 16px 24px;
   }
 }
 
@@ -291,5 +426,12 @@ svg.sheet .path-line {
   header.app::before,
   header.app .mist {
     display: none;
+  }
+
+  html:not([data-contrast="high"]) main:not(:has(.desk)) {
+    margin: 0;
+    padding: 0;
+    border-radius: 0;
+    background: transparent;
   }
 }

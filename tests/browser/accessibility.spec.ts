@@ -375,6 +375,82 @@ test.describe("the page heading that script focuses shows no ring, and a control
   });
 });
 
+// ---- The ring on the night (spec 07, task 7.17, L3.2, L7.6) ------------------------------------------------------------
+// A control that stands on the night ground or on the churchyard sky takes the amber ring #FFD27A, which is 3 to 1 or
+// more on #232A5C. A control on a sheet keeps the blue ring. The allotment has no dark ground, so it keeps the blue ring
+// everywhere. In high contrast there is no night, so the ring is the dark blue of that mode everywhere on the desk.
+
+const AMBER = "rgb(255, 210, 122)";
+const BLUE = "rgb(11, 79, 175)";
+const HIGH_BLUE = "rgb(0, 0, 204)";
+
+/** Tab to a control by its name, and read the ring that it has when the keyboard puts it there. */
+async function ringAt(page: Page, name: string | RegExp): Promise<{ colour: string; style: string; width: string; ratio: number }> {
+  await tabTo(page, name, { max: 90 });
+  const read = await page.evaluate(() => {
+    const el = document.activeElement as Element;
+    const s = getComputedStyle(el);
+    return { colour: s.outlineColor, style: s.outlineStyle, width: s.outlineWidth, visible: el.matches(":focus-visible") };
+  });
+  expect(read.visible, `${String(name)} matches :focus-visible after Tab`).toBe(true);
+  return { colour: read.colour, style: read.style, width: read.width, ratio: await focusRingContrast(page, ":focus") };
+}
+
+test.describe("the focus ring on the night ground and on the sheets", () => {
+  test.describe("Churchyard Register", () => {
+    test.use({ baseURL: CHURCH.origin });
+
+    test("is amber on the sky and the night, and blue on a sheet, and reaches 3 to 1 on each ground", async ({ page }) => {
+      const siteId = await openPractice(page, CHURCH);
+      const plot = plotIdOf(await storedEvents(page, siteId), "Y07");
+      await page.goto(`/#/r/${siteId}?plot=${plot}`);
+      await settle(page);
+      await page.mouse.click(2, 2);
+      const onDark = ["Registers", "Change register", "Open plot", "Site map", "Record a burial", "Back up"];
+      const onSheet = ["Name or plot code", "Search"];
+      // The order of the page: the header, the heading row, the find sheet, the plot heading row, the index.
+      const order = ["Registers", "Change register", "Name or plot code", "Search", "Open plot", "Site map", "Record a burial", "Back up"];
+      for (const name of order) {
+        const ring = await ringAt(page, name);
+        expect(ring.style, `${name}: style`).toBe("solid");
+        expect(ring.width, `${name}: width`).toBe("3px");
+        if (onDark.includes(name)) expect(ring.colour, `${name} stands on the night`).toBe(AMBER);
+        if (onSheet.includes(name)) expect(ring.colour, `${name} stands on a sheet`).toBe(BLUE);
+        expect(ring.ratio, `${name}: the ring on its ground`).toBeGreaterThanOrEqual(3);
+      }
+    });
+
+    test("is the dark blue of high contrast on the desk, with no night ground", async ({ page }) => {
+      await page.addInitScript(() => window.localStorage.setItem("plotwarden.settings", JSON.stringify({ motion: "follow", contrast: "high", paper: "A4" })));
+      const siteId = await openPractice(page, CHURCH);
+      const plot = plotIdOf(await storedEvents(page, siteId), "Y07");
+      await page.goto(`/#/r/${siteId}?plot=${plot}`);
+      await settle(page);
+      await page.mouse.click(2, 2);
+      for (const name of ["Change register", "Name or plot code", "Open plot", "Record a burial"]) {
+        const ring = await ringAt(page, name);
+        expect(ring.colour, `${name} in high contrast`).toBe(HIGH_BLUE);
+        expect(ring.ratio, `${name} in high contrast`).toBeGreaterThanOrEqual(3);
+      }
+    });
+  });
+
+  test.describe("Allotment Register", () => {
+    test.use({ baseURL: GARDEN.origin });
+
+    test("keeps the blue ring everywhere, because its ground is light", async ({ page }) => {
+      const siteId = await openPractice(page, GARDEN);
+      await page.goto(`/#/r/${siteId}`);
+      await settle(page);
+      await page.mouse.click(2, 2);
+      for (const name of ["Registers", "Change register", "Make an offer", "Name or plot code", /^Waiting list/, "Back up"]) {
+        const ring = await ringAt(page, name);
+        expect(ring.colour, String(name)).toBe(BLUE);
+        expect(ring.ratio, String(name)).toBeGreaterThanOrEqual(3);
+      }
+    });
+  });
+});
 test("what this spec checks", () => {
   // Written so a reader of the list sees what was and was not tried.
   expect(APPS.map((a) => a.key)).toEqual(["churchyard", "allotment"]);

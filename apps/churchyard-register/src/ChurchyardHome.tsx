@@ -59,7 +59,8 @@ export function ChurchyardHome() {
           plots: rows.map((r) => ({ plotId: r.plot.plotId, code: r.plot.code, mark: { ...(r.summary.primary === undefined ? {} : { state: r.summary.primary }), needsChecking: r.summary.needsChecking } })),
           ...(selectedId === "" ? {} : { selectedPlotId: selectedId }),
         },
-        { width, zoom: 1 },
+        // In a column of a desk the map is no taller than 320 px, so it and its key end above the fold of a laptop.
+        { width, zoom: 1, ...(width >= 520 ? { maxHeight: 320 } : {}) },
       ),
     [open.state.map, rows, selectedId, width],
   );
@@ -92,28 +93,28 @@ export function ChurchyardHome() {
 
   return (
     <section className="stack">
-      <h1>{open.site.title}</h1>
-      {selected === undefined ? (
-        <p className="lead">{t("deskLead")}</p>
-      ) : (
-        <p className="summary-line" aria-live="polite">
-          {stateKey === undefined ? null : (
-            <svg className="mark-swatch" width="28" height="28" aria-hidden="true">
-              <path className={`plot ${stateKey}`} d="M5 25V13a9 9 0 0 1 18 0V25Z" />
-              {stateKey === "reserved" ? <line className="mark" x1="8" y1="22" x2="20" y2="10" /> : null}
-              {stateKey === "taken" ? <circle className="mark solid" cx="14" cy="17" r="4.5" /> : null}
-              {stateKey === "unusable" ? (
-                <g className="mark">
-                  <line x1="9" y1="12" x2="19" y2="22" />
-                  <line x1="9" y1="22" x2="19" y2="12" />
-                </g>
-              ) : null}
-            </svg>
-          )}
-          <span>{t("summaryLine", { code: selected.plot.code, section: selected.sectionName ?? t("noSection"), state: selected.stateText })}</span>
-        </p>
-      )}
-      <div className="actions">
+      <div className="desk-head on-ground">
+        <h1>{open.site.title}</h1>
+        {selected === undefined ? (
+          <p className="lead">{t("deskLead")}</p>
+        ) : (
+          <p className="summary-line" aria-live="polite">
+            {stateKey === undefined ? null : (
+              <svg className="mark-swatch" width="28" height="28" aria-hidden="true">
+                <path className={`plot ${stateKey}`} d="M5 25V13a9 9 0 0 1 18 0V25Z" />
+                {stateKey === "reserved" ? <line className="mark" x1="8" y1="22" x2="20" y2="10" /> : null}
+                {stateKey === "taken" ? <circle className="mark solid" cx="14" cy="17" r="4.5" /> : null}
+                {stateKey === "unusable" ? (
+                  <g className="mark">
+                    <line x1="9" y1="12" x2="19" y2="22" />
+                    <line x1="9" y1="22" x2="19" y2="12" />
+                  </g>
+                ) : null}
+              </svg>
+            )}
+            <span>{t("summaryLine", { code: selected.plot.code, section: selected.sectionName ?? t("noSection"), state: selected.stateText })}</span>
+          </p>
+        )}
         <ButtonLink href="#/">{t("changeRegister")}</ButtonLink>
       </div>
       {route.query.get("restarted") === "1" ? <p className="notice good" role="status">{t("walkthroughRestarted")}</p> : null}
@@ -131,66 +132,110 @@ export function ChurchyardHome() {
       ) : null}
 
       <div className="desk">
-        <div className="stack">
-          <section className="stack" aria-labelledby="find-heading">
-            <h2 id="find-heading">{t("findBurial")}</h2>
-            <form className="stack" role="search" aria-label={t("searchThisRegister")} onSubmit={submit}>
-              <TextField label={t("nameOrCode")} value={text} onChange={setText} autoComplete="off" />
+        <section className="stack card desk-find" aria-labelledby="find-heading">
+          <h2 id="find-heading">{t("findBurial")}</h2>
+          <form className="stack" role="search" aria-label={t("searchThisRegister")} onSubmit={submit}>
+            <TextField label={t("nameOrCode")} value={text} onChange={setText} autoComplete="off" />
+            <div className="actions">
+              <Button primary type="submit">
+                {t("search")}
+              </Button>
+              {query === "" ? null : <Button onClick={clear}>{t("clearSearch")}</Button>}
+              {practice ? <Button onClick={() => tryExample()}>{t("tryExample", { example: LANTERN_EXAMPLE })}</Button> : null}
+            </div>
+          </form>
+          <p>{t("searchScope", { site: open.site.title })}</p>
+          {query.trim() === "" ? (
+            <p>{t("searchPrompt")}</p>
+          ) : hits.length === 0 ? (
+            <div className="stack">
+              <p>{t("noMatchesFor", { query })}</p>
               <div className="actions">
-                <Button primary type="submit">
-                  {t("search")}
-                </Button>
-                {query === "" ? null : <Button onClick={clear}>{t("clearSearch")}</Button>}
-                {practice ? <Button onClick={() => tryExample()}>{t("tryExample", { example: LANTERN_EXAMPLE })}</Button> : null}
+                <Button onClick={clear}>{t("clearFilters")}</Button>
               </div>
-            </form>
-            <p>{t("searchScope", { site: open.site.title })}</p>
-            {query.trim() === "" ? (
-              <p>{t("searchPrompt")}</p>
-            ) : hits.length === 0 ? (
-              <div className="stack">
-                <p>{t("noMatchesFor", { query })}</p>
+            </div>
+          ) : (
+            <div className="stack results">
+              <h3>{t("resultsHeading")}</h3>
+              <p>{hits.length === 1 ? t("foundOne") : t("foundMany", { count: hits.length })}</p>
+              <ul className="cards plain">
+                {hits.map((hit, i) => {
+                  const row = rowOf(hit.plotId);
+                  const nowhere = hit.plotId === UNPLACED;
+                  return (
+                    <li key={`${hit.plotId}-${hit.recordId ?? i}`} className="card">
+                      <p>
+                        <strong>{hit.display === undefined ? t("plotTitle", { code: hit.code }) : t("burialAt", { name: hit.display, code: nowhere ? t("locationToConfirm") : hit.code, section: row?.sectionName ?? t("noSection") })}</strong>
+                      </p>
+                      {nowhere ? <p>{t("locationToConfirm")}</p> : <p>{row?.line}</p>}
+                      {hit.via === "priorCode" ? <p>{t("wasCode", { code: hit.matchedText })}</p> : null}
+                      {hit.via === "sourceRef" ? <p>{t("sourceOf", { ref: hit.matchedText })}</p> : null}
+                      {hit.via === "name" && (hit.source !== undefined || hit.date !== undefined) ? <p>{[hit.source === undefined ? "" : t("sourceOf", { ref: hit.source }), hit.date ?? ""].filter((s) => s !== "").join(" · ")}</p> : null}
+                      <div className="actions">
+                        {hit.recordId === undefined ? (
+                          <ButtonLink href={`${base}/plot/${hit.plotId}`}>{t("openPlot")}</ButtonLink>
+                        ) : (
+                          <ButtonLink href={`${base}/burial/${hit.recordId}`}>{t("openBurial")}</ButtonLink>
+                        )}
+                        {nowhere ? null : (
+                          <ButtonLink href={`${base}?plot=${hit.plotId}`} onClick={(e) => keepSearch(e, () => go(query, hit.plotId))}>
+                            {t("showOnMap")}
+                          </ButtonLink>
+                        )}
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          )}
+        </section>
+
+        <div className="stack desk-main">
+          <section className="stack" aria-labelledby="selected-heading">
+            <div className="desk-main-head on-ground">
+              <h2 id="selected-heading" ref={heading} tabIndex={-1}>
+                {t("selectedPlot")}
+              </h2>
+              {selected === undefined ? null : (
                 <div className="actions">
-                  <Button onClick={clear}>{t("clearFilters")}</Button>
+                  <ButtonLink href={`${base}/plot/${selected.plot.plotId}`}>{t("openPlot")}</ButtonLink>
+                  <ButtonLink href={`${base}/map?plot=${selected.plot.plotId}`}>{t("siteMap")}</ButtonLink>
                 </div>
-              </div>
+              )}
+            </div>
+            {selected === undefined ? (
+              <p className="ground-note">{t("noPlotSelected")}</p>
             ) : (
-              <div className="stack">
-                <h3>{t("resultsHeading")}</h3>
-                <p>{hits.length === 1 ? t("foundOne") : t("foundMany", { count: hits.length })}</p>
-                <ul className="cards plain">
-                  {hits.map((hit, i) => {
-                    const row = rowOf(hit.plotId);
-                    const nowhere = hit.plotId === UNPLACED;
-                    return (
-                      <li key={`${hit.plotId}-${hit.recordId ?? i}`} className="card">
-                        <p>
-                          <strong>{hit.display === undefined ? t("plotTitle", { code: hit.code }) : t("burialAt", { name: hit.display, code: nowhere ? t("locationToConfirm") : hit.code, section: row?.sectionName ?? t("noSection") })}</strong>
-                        </p>
-                        {nowhere ? <p>{t("locationToConfirm")}</p> : <p>{row?.line}</p>}
-                        {hit.via === "priorCode" ? <p>{t("wasCode", { code: hit.matchedText })}</p> : null}
-                        {hit.via === "sourceRef" ? <p>{t("sourceOf", { ref: hit.matchedText })}</p> : null}
-                        {hit.via === "name" && (hit.source !== undefined || hit.date !== undefined) ? <p>{[hit.source === undefined ? "" : t("sourceOf", { ref: hit.source }), hit.date ?? ""].filter((s) => s !== "").join(" · ")}</p> : null}
+              <div className="card stack">
+                <p>{selected.line}</p>
+                {burialsHere.length === 0 ? null : (
+                  <ul className="plain stack">
+                    {burialsHere.map((b) => (
+                      <li key={b.burialId} className="stack">
+                        <span>{[nameOf(b), formatPartialDate(b.date)].join(" · ")}</span>
                         <div className="actions">
-                          {hit.recordId === undefined ? (
-                            <ButtonLink href={`${base}/plot/${hit.plotId}`}>{t("openPlot")}</ButtonLink>
-                          ) : (
-                            <ButtonLink href={`${base}/burial/${hit.recordId}`}>{t("openBurial")}</ButtonLink>
-                          )}
-                          {nowhere ? null : (
-                            <ButtonLink href={`${base}?plot=${hit.plotId}`} onClick={(e) => keepSearch(e, () => go(query, hit.plotId))}>
-                              {t("showOnMap")}
-                            </ButtonLink>
-                          )}
+                          <ButtonLink href={`${base}/burial/${b.burialId}`}>{t("openBurial")}</ButtonLink>
                         </div>
                       </li>
-                    );
-                  })}
-                </ul>
+                    ))}
+                  </ul>
+                )}
+                {plotParam !== "" && query !== "" ? (
+                  <div className="actions">
+                    <Button onClick={() => go(query)}>{t("backToResults")}</Button>
+                  </div>
+                ) : null}
               </div>
             )}
           </section>
+          <div ref={holder} className="sheet-scroll" role="region" aria-label={t("siteMap")} tabIndex={0}>
+            {sheet.empty ? <p className="lead">{t("noMapYet")}</p> : <SheetSvg model={sheet} label={t("mapDescription")} />}
+          </div>
+          <MapKey />
+        </div>
 
+        <div className="desk-index on-ground">
           <LinkGroup id="group-records" title={t("groupRecords")}>
             <li>
               <ButtonLink href={`${base}/burial/new`}>{t("recordBurial")}</ButtonLink>
@@ -227,42 +272,6 @@ export function ChurchyardHome() {
               <ButtonLink href={`${base}/backup`}>{t("backUp")}</ButtonLink>
             </li>
           </LinkGroup>
-        </div>
-
-        <div className="stack">
-          <section className="stack" aria-labelledby="selected-heading">
-            <h2 id="selected-heading" ref={heading} tabIndex={-1}>
-              {t("selectedPlot")}
-            </h2>
-            {selected === undefined ? (
-              <p>{t("noPlotSelected")}</p>
-            ) : (
-              <div className="card stack">
-                <p>{selected.line}</p>
-                {burialsHere.length === 0 ? null : (
-                  <ul className="plain stack">
-                    {burialsHere.map((b) => (
-                      <li key={b.burialId} className="stack">
-                        <span>{[nameOf(b), formatPartialDate(b.date)].join(" · ")}</span>
-                        <div className="actions">
-                          <ButtonLink href={`${base}/burial/${b.burialId}`}>{t("openBurial")}</ButtonLink>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-                <div className="actions">
-                  <ButtonLink href={`${base}/plot/${selected.plot.plotId}`}>{t("openPlot")}</ButtonLink>
-                  <ButtonLink href={`${base}/map?plot=${selected.plot.plotId}`}>{t("siteMap")}</ButtonLink>
-                  {plotParam !== "" && query !== "" ? <Button onClick={() => go(query)}>{t("backToResults")}</Button> : null}
-                </div>
-              </div>
-            )}
-          </section>
-          <div ref={holder} className="sheet-scroll" role="region" aria-label={t("siteMap")} tabIndex={0}>
-            {sheet.empty ? <p className="lead">{t("noMapYet")}</p> : <SheetSvg model={sheet} label={t("mapDescription")} />}
-          </div>
-          <MapKey />
         </div>
       </div>
     </section>

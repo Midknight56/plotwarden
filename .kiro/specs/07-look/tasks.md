@@ -1,6 +1,6 @@
 # 07 Look: tasks
 
-Each task writes its test first, sees it fail on the missing behaviour, then writes the smallest complete code. A task is ticked only when its test passes. Expected values are the floors of `requirements.md`, not the output of the code. The work is in four slices. Slices 1 and 2 are built.
+Each task writes its test first, sees it fail on the missing behaviour, then writes the smallest complete code. A task is ticked only when its test passes. Expected values are the floors of `requirements.md`, not the output of the code. The work is in four slices. Slices 1 and 2 are built, and slice 3 is built to task 7.19.
 
 For each held back value, the line names the slice and task that turns it on (design L-D3).
 
@@ -37,11 +37,11 @@ Held back in slice 1 (design L-D3):
 
 ## Slice 3: layouts and art
 
-- [ ] 7.15 The header rows, the band heights and the three art files, with `origins.md`. Files: `theme.css` files, `assets/*.svg`, `assets/origins.md`, `tests/unit/{churchAssets,gardenAssets}.test.ts`. L7.1 to L7.3.
-- [ ] 7.16 The churchyard night ground with sheets under every block of text, and no night ground in high contrast. Files: `apps/churchyard-register/src/theme.css`, `ChurchyardHome.tsx`, `tests/unit/lookTokens.test.ts` (the held back test changes with it). L7.6.
-- [ ] 7.17 The index column (`.link-group` in its own wrapper) and the ring on the night ground. Files: `ChurchyardHome.tsx`, `AllotmentHome.tsx`, `register.css`. L7.4.
-- [ ] 7.18 Three desk columns, `main` widths. Files: `register.css`, both `theme.css`, `tests/unit/lookLayout.test.ts`, `layout.spec.ts`. L7.4, L7.5, L7.7.
-- [ ] 7.19 The allotment desk card. Files: `AllotmentHome.tsx`, `theme.css`. L7.4.
+- [x] 7.15 The header rows, the band heights and the three art files, with `origins.md`. Files: `theme.css` files, `assets/*.svg`, `assets/origins.md`, `tests/unit/{churchAssets,gardenAssets,lookLayout}.test.ts`. L7.1 to L7.3.
+- [x] 7.16 The churchyard night ground with sheets under every block of text, and no night ground in high contrast. Files: `apps/churchyard-register/src/theme.css`, `template/src/ui/register.css`, `ChurchyardHome.tsx`, `tests/unit/{lookTokens,lookComponents}.test.ts` (the held back tests change with it), `tests/browser/{layout,warden-family}.spec.ts`. L7.6.
+- [x] 7.17 The index column (`.link-group` in its own wrapper) and the ring on the night ground. Files: `ChurchyardHome.tsx`, `AllotmentHome.tsx`, `register.css`, `apps/churchyard-register/src/theme.css`, `tests/browser/accessibility.spec.ts`. L7.4.
+- [x] 7.18 Three desk columns, `main` widths. Files: `register.css`, both `theme.css`, both `*Home.tsx`, `tests/unit/lookLayout.test.ts`, `layout.spec.ts`. L7.4, L7.5, L7.7. Left to tasks 7.20 to 7.22: the 90rem of forms and records, and the site map at 105rem.
+- [x] 7.19 The allotment desk card, the plan marking the next free plot, and the code boxes sized from the widths of their own characters. Files: `AllotmentHome.tsx`, `theme.css`, `template/src/map/{labels,sheet}.ts`, `template/src/ui/SiteMap.tsx`, `site/src/practiceMaps.ts`, `tests/unit/{lookLayout,lookMap}.test.ts`, `tests/browser/{layout,paper-map}.spec.ts`. L6.5, L7.4.
 - [ ] 7.20 Site map side panel and plot record columns. Files: `template/src/ui/{SiteMap,PlotDetails}.tsx`, `register.css`. L7.4, L7.5.
 - [ ] 7.21 The start page. Files: `site/src/{Home.tsx,site.css}`, `tests/unit/siteCopy.test.ts`. L7.8.
 - [ ] 7.22 Record a burial, make an offer, season fees, committee review and settings, one at a time, and the slice 3 proof pictures and log row. Files: the screens named, `docs/acceptance/layout/**`, `docs/kiro-log.md`. L7.5.
