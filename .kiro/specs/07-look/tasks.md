@@ -1,6 +1,6 @@
 # 07 Look: tasks
 
-Each task writes its test first, sees it fail on the missing behaviour, then writes the smallest complete code. A task is ticked only when its test passes. Expected values are the floors of `requirements.md`, not the output of the code. The work is in four slices. Only slice 1 is built.
+Each task writes its test first, sees it fail on the missing behaviour, then writes the smallest complete code. A task is ticked only when its test passes. Expected values are the floors of `requirements.md`, not the output of the code. The work is in four slices. Slices 1 and 2 are built.
 
 For each held back value, the line names the slice and task that turns it on (design L-D3).
 
@@ -28,12 +28,12 @@ Held back in slice 1 (design L-D3):
 
 ## Slice 2: shared components and the map
 
-- [ ] 7.9 Button tiers, index rows, hover, pressed and the 120 ms colour transition, off for reduced motion and high contrast, and never on the start page. Files: `template/src/ui/register.css`, both `theme.css`, `tests/unit/lookComponents.test.ts`, `layout.spec.ts`. L5.1, L5.5 to L5.7.
-- [ ] 7.10 Fields, errors and check rows. Files: `template/src/ui/register.css`, the field component that draws an error, `tests/unit/lookComponents.test.ts`. L5.2, L5.3.
-- [ ] 7.11 Cards and notices: the allotment hatched strip, the saved tick and the error mark. Files: `register.css`, `theme.css` files. L5.4.
-- [ ] 7.12 The map drawing: state class on `.plot`, turf and base for arches, crop and furrow patterns for beds, the edge line of a path. Files: `template/src/ui/SiteMap.tsx`, `tests/unit/lookMap.test.ts`, `tests/unit/sheet.test.ts`. L6.2, L6.3, L6.5, L6.7.
-- [ ] 7.13 The key swatches, the joined frame, the map rules in each theme and in high contrast. Files: `SiteMap.tsx`, `register.css`, both `theme.css`, `site/src/site.css` (practice map). L6.1, L6.4, L6.6.
-- [ ] 7.14 Slice 2 proof pictures, log row. Files: `docs/acceptance/layout/**`, `docs/kiro-log.md`.
+- [x] 7.9 Button tiers, index rows, hover, pressed and the 120 ms colour transition, off for reduced motion and high contrast, and never on the start page. Also one copy of each font file on the whole site. Files: `template/src/ui/register.css`, both `theme.css`, `scripts/lib/site.mjs`, `scripts/lib/site.d.mts`, `tests/helpers/{cssRules,routes}.ts`, `tests/unit/{lookComponents,fonts}.test.ts`, `tests/browser/{layout,release}.spec.ts`. L5.1, L5.5 to L5.7, L2.4, L2.5.
+- [x] 7.10 Fields, errors and check rows. Files: `template/src/ui/register.css`, `tests/unit/lookComponents.test.ts`, `tests/browser/layout.spec.ts`. L5.2, L5.3. No component changed: the error message and the check rows are drawn by CSS.
+- [x] 7.11 Cards and notices: the allotment hatched strip, the saved tick and the error mark. Files: `register.css`, `apps/allotment-register/src/theme.css`, `tests/unit/lookComponents.test.ts`, `tests/browser/layout.spec.ts`. L5.4.
+- [x] 7.12 The map drawing: state class on `.plot`, turf and base for arches, crop and furrow patterns for beds, the edge line of a path, and the map labels at 14 px. Files: `template/src/ui/SiteMap.tsx`, `template/src/map/{sheet,labels}.ts`, `tests/unit/{lookMap,sheet}.test.ts`, `tests/browser/paper-map.spec.ts`. L6.2, L6.3, L6.5, L6.7.
+- [x] 7.13 The key swatches, the joined frame, the map rules in each theme, in high contrast and in print, and the practice maps of the start page. Files: `SiteMap.tsx`, `register.css`, `print.css`, both `theme.css`, `site/src/site.css`, `site/src/practiceMaps.ts`, `apps/churchyard-register/src/ChurchyardHome.tsx`, `tests/unit/{lookMap,siteCopy}.test.ts`. L6.1, L6.4, L6.6.
+- [x] 7.14 Slice 2 proof pictures, log row. Files: `docs/acceptance/layout/**`, `docs/kiro-log.md`.
 
 ## Slice 3: layouts and art
 
@@ -59,7 +59,7 @@ Held back in slice 1 (design L-D3):
 ## Not settled in spec 07
 
 - **The fonts are measured by file, not by glyph.** The `unicode-range` of each rule is the one the package declares, and the test checks that range. The browser spec checks that each family loads. No test opens the font files to list their glyphs.
-- **The size limit counts distinct files.** The ten files are 148,228 bytes. Each build (hub, churchyard, allotment) carries its own copy of the files that its stylesheets name, so the built site holds more than one copy of a file. Each folder is under 150,000 bytes. The shared file names are the same in every build, so the offline cache holds each copy once per folder.
+- **The size limit counts the files of the site.** The ten files are 148,228 bytes. The built site holds each of them once, in the `assets/` folder of the hub, and the styles of the two apps point at that copy. The standalone app builds in `dist/apps/` keep their own copies, so each of them works alone.
 - **The README and the mockups use two names for the churchyard lawn.** This spec uses `--row-ground`.
 - **Control heights are 46 and 48 only in the two themes.** An app with no theme keeps 44.
 - **No person has seen the new look.** The pictures are headless Chromium on one Windows machine. Nothing here was compared with the mockups by a person.

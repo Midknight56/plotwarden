@@ -235,7 +235,7 @@ h1:focus:not(:focus-visible) {
 }
 
 /* The practice map: the shared sheet, drawn when the project is built and kept as text. It stays at its own size,
-   272 px, so its words are never drawn under 12 px. On a page narrower than the drawing, as at 200 percent zoom on a
+   272 px, so its words are never drawn under 14 px. On a page narrower than the drawing, as at 200 percent zoom on a
    phone, the frame scrolls sideways and the page does not. */
 .practice-map {
   max-width: 100%;
@@ -251,11 +251,18 @@ h1:focus:not(:focus-visible) {
   font-family: inherit;
 }
 
+/* Each tone names its own lawn or grass, turf, base, walk edge, bed soil and crops. A part that a tone does not draw is none. */
 .choice.church .practice-map {
   --sheet-ink: #22252c;
   --sheet-paper: #faf5e9;
   --sheet-stone: #fffef8;
   --sheet-walk: #d9cdb0;
+  --sheet-ground: #e3e9d3;
+  --sheet-turf: #cdd9b3;
+  --sheet-base: #e2ddd0;
+  --sheet-kerb: #a99c7a;
+  --sheet-bed: none;
+  --sheet-crop: none;
 }
 
 .choice.garden .practice-map {
@@ -263,17 +270,67 @@ h1:focus:not(:focus-visible) {
   --sheet-paper: #efe6cc;
   --sheet-stone: #fffef6;
   --sheet-walk: #cfe0b8;
+  --sheet-ground: #dce8c4;
+  --sheet-turf: none;
+  --sheet-base: none;
+  --sheet-kerb: none;
+  --sheet-bed: #e6d6b4;
+  --sheet-crop: #a6c580;
 }
 
+/* A plot is open, and only a taken plot has a fill. A bed has furrows, and a taken bed has crops. */
 .practice-map .plot {
+  fill: none;
+  stroke: var(--sheet-ink);
+  stroke-width: 1.75;
+}
+
+.practice-map .plot.taken {
+  fill: var(--sheet-stone);
+}
+
+.practice-map .plot.bed {
+  fill: url(#furrows);
+  stroke-width: 2;
+}
+
+.practice-map .plot.bed.taken {
+  fill: url(#crops);
+}
+
+.practice-map .soil {
+  fill: var(--sheet-bed);
+}
+
+.practice-map .crop {
+  fill: var(--sheet-crop);
+}
+
+.practice-map .furrow {
+  fill: rgba(110, 84, 48, 0.22);
+}
+
+.practice-map .turf {
+  fill: var(--sheet-turf);
+  stroke: none;
+}
+
+.practice-map .base {
   fill: var(--sheet-stone);
   stroke: var(--sheet-ink);
   stroke-width: 1.75;
 }
 
-.practice-map .plot.bed {
-  fill: #e6d6b4;
-  stroke-width: 2;
+.practice-map .base.taken {
+  fill: var(--sheet-base);
+}
+
+.practice-map .path-edge {
+  fill: none;
+  stroke: var(--sheet-kerb);
+  stroke-width: 16;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .practice-map .arch-inner {
@@ -311,12 +368,15 @@ h1:focus:not(:focus-visible) {
   fill: var(--sheet-ink);
 }
 
+.practice-map .label {
+  font-weight: 700;
+}
+
 .practice-map .section-outline {
-  fill: none;
+  fill: var(--sheet-ground);
   stroke: var(--sheet-ink);
   stroke-width: 1.5;
   stroke-dasharray: 8 5;
-  opacity: 0.8;
 }
 
 .practice-map .path {

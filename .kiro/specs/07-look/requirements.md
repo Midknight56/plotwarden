@@ -39,8 +39,8 @@ Tests: `tests/unit/fonts.test.ts`, browser `release.spec.ts`. Implements R22.1 o
 1. The registers, the start page and the Review Desk preview shall use Atkinson Hyperlegible Next at weights 400, 600 and 700 for text. The Churchyard Register, the start page and the Desk headings shall use Gelasio at weights 600 and 700. The Allotment Register headings shall use the text font.
 2. The font files shall be woff2 only, in the repository under `assets/fonts/`, served from the same origin, each with `font-display: swap`. No stylesheet shall name a font host.
 3. When the declared `unicode-range` of each family is read, it shall cover U+0020 to U+007E (Basic Latin), U+00A0 to U+00FF (Latin 1 Supplement), U+0100 to U+017F (Latin Extended A) and each of `·` U+00B7, `’` U+2019, `“` U+201C, `”` U+201D and `…` U+2026.
-4. When the font files are measured, the distinct files together shall be under 150,000 bytes. Each app folder of the built site shall be under that too. The measure is recorded in the evidence rows with the exact sum.
-5. When the site is built and assembled, each font file shall be in the built site, and the offline list that `sw.js` carries shall name each of them.
+4. When the font files are measured, the files of the built site together shall be under 150,000 bytes. The measure is recorded in the evidence rows with the exact sum.
+5. When the site is built and assembled, the built site shall hold each font file once, in the `assets/` folder of the hub. The styles of each app shall point at that copy, and each page shall still load the families that it used before. The offline list that `sw.js` carries shall name each font file once.
 6. When the licences are checked, `THIRD_PARTY_NOTICES.md` shall hold a row for `@fontsource/atkinson-hyperlegible-next` and for `@fontsource/gelasio` at the pinned version with the licence the package states, and the text of the SIL Open Font License 1.1 with each copyright line. `scripts/check-licenses.mjs` shall fail when either row is missing.
 7. When a visitor file or a printed document is built, it shall hold no `@font-face`, no `url(` and no font file. It uses system fonts only (L9).
 8. When any page of the built site is opened with the network blocked except the site's own origin, no font shall be requested from another origin, and the page shall make zero requests to another origin.
@@ -64,7 +64,7 @@ Tests: browser `release.spec.ts` (the picture step), a look at the retaken pictu
 
 Tests: `tests/unit/lookComponents.test.ts`, browser `layout.spec.ts`, `accessibility.spec.ts`. Implements R23.2 and R23.4.
 
-1. Every interactive target shall be at least 44 by 44 px with at least 12 px between distinct targets, measured by `measureLayout` at 360 by 640 and 1920 by 1080. A button is 46 px high, a field 48 px, an index row 44 px, a check row 44 px with a 24 px box.
+1. Every interactive target shall be at least 44 by 44 px with at least 12 px between distinct targets, measured by `measureLayout` at 360 by 640 and 1920 by 1080. A button is 46 px high, a field 48 px, an index row 44 px, a check row 44 px. The box of a check box or a radio button is 24 px, drawn inside an input that is a 44 by 44 px target.
 2. Body text and fields shall be 16 px, labels 14 px bold, nothing under 12 px.
 3. When a field is invalid, its border shall be 3 px solid in the error colour, a mark and the message shall follow it, and focus shall move to the first invalid field.
 4. When a notice reports a save, it shall carry a tick mark and the border `--ok`. When it reports an error, it shall carry a mark and the border `--error`. Both marks are hidden from a screen reader and never carry meaning alone.
@@ -74,13 +74,13 @@ Tests: `tests/unit/lookComponents.test.ts`, browser `layout.spec.ts`, `accessibi
 
 ## L6 The map (slice 2)
 
-Tests: `tests/unit/sheet.test.ts`, `tests/unit/visitor.test.ts`, `tests/unit/lookMap.test.ts`, browser `layout.spec.ts`. Implements the map requirements of spec 02 and the map key rules of the experience steering.
+Tests: `tests/unit/sheet.test.ts`, `tests/unit/visitor.test.ts`, `tests/unit/lookMap.test.ts`, browser `layout.spec.ts` and `paper-map.spec.ts`. Implements the map requirements of spec 02 and the map key rules of the experience steering.
 
-1. Each plot shall keep its shape for its state, never colour alone: free is an empty outline, reserved a slash, taken a solid centre dot, unusable a cross, needs checking a dotted outline. The word sits next to its symbol in the key, and the key sits directly under the map in one frame with it.
+1. Each plot shall keep its shape for its state, never colour alone: free is an empty outline, reserved a slash, taken a solid centre dot, unusable a cross, needs checking a dotted outline. The word sits next to its symbol in the key, and the key sits directly under the map in one frame with it, with no gap between the two frames.
 2. The drawing shall give each plot its state as a class (`free`, `reserved`, `taken`, `unusable`), and the key swatch shall carry the same class.
-3. A section shall be filled with its row ground, an arch plot shall have a turf ellipse under it and a base at its foot behind the code, a bed shall have the crop pattern when taken and the furrow pattern otherwise, and a path shall have an edge line under it. These fills repeat what the mark says and add nothing.
+3. A section shall be filled with its row ground, an arch plot shall have a turf ellipse under it and, when its code is drawn, a base at its foot behind the code, a bed shall have the crop pattern when taken and the furrow pattern otherwise, and a path shall have an edge line under it. These fills repeat what the mark says and add nothing.
 4. In high contrast and in print, the ground, turf, patterns, edge and stone fill shall be removed.
-5. Map labels shall be at least 12 px and shall not collide (the label tests stay as they are).
+5. Names and codes on the map shall be 14 px, bold, in the shipped text font. No label shall overlap another label, a plot, a path line, the code tab, the north arrow, the gate mark, an outline or the frame, at 360 and at 1440 wide, in both registers and on the two practice maps of the start page. The width that the sheet reserves for a name or a code shall be at least the width that the browser draws, with the shipped font. `LABEL_SIZE` and `CHAR_WIDTH` come from a measure of that font in a browser.
 6. Plots shall not be buttons. Every map selection has an equal list selection.
 7. The chosen plot shall keep its two outlines and its code tab, with the tab fill in `--tab`.
 

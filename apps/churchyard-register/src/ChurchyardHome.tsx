@@ -99,7 +99,7 @@ export function ChurchyardHome() {
         <p className="summary-line" aria-live="polite">
           {stateKey === undefined ? null : (
             <svg className="mark-swatch" width="28" height="28" aria-hidden="true">
-              <path className="plot" d="M5 25V13a9 9 0 0 1 18 0V25Z" />
+              <path className={`plot ${stateKey}`} d="M5 25V13a9 9 0 0 1 18 0V25Z" />
               {stateKey === "reserved" ? <line className="mark" x1="8" y1="22" x2="20" y2="10" /> : null}
               {stateKey === "taken" ? <circle className="mark solid" cx="14" cy="17" r="4.5" /> : null}
               {stateKey === "unusable" ? (

@@ -4,8 +4,8 @@
    above the title, so no word and no control ever sits on a picture.
 
    The values follow the design of spec 07. Held back until the markup and the art for them exist (slice 3): the band
-   heights (--band). Held back until the map drawing has the classes for them (slice 2): what uses --row-ground and
-   --crop. The headings use the text font, which the shared screens set. */
+   heights (--band). The map drawing has the grass of a section and the crop and furrow patterns of a bed, and this
+   file fills them. The headings use the text font, which the shared screens set. */
 
 :root {
   --paper: #f7f5e8;
@@ -33,6 +33,7 @@
   --action-hover: var(--leaf-hover);
   --action-pressed: var(--leaf-pressed);
   --action-edge: var(--leaf);
+  --outline-pressed: #d5e0c2; /* an outlined button, a quiet button and an index row while pressed */
 
   --radius-control: 10px;
   --radius-card: 14px;
@@ -57,6 +58,7 @@ html[data-contrast="high"] {
   --action-hover: #000000;
   --action-pressed: #000000;
   --action-edge: #000000;
+  --outline-pressed: var(--grass);
   --row-ground: none;
 }
 
@@ -136,14 +138,28 @@ header.app nav {
   padding: 8px 16px 16px;
 }
 
-/* Seed packets: a green top edge and soft corners. */
+/* Seed packets: soft corners and a strip of hatching along the top, as on a bed. */
 .card {
-  border-top: 10px solid var(--leaf);
+  border: 2px solid var(--ink);
   background: var(--stone);
 }
 
-html[data-contrast="high"] .card {
-  border-top-color: var(--ink);
+.card::before {
+  content: "";
+  flex: none;
+  height: 8px;
+  margin: -16px -16px 0;
+  border-bottom: 1.5px solid rgba(27, 49, 42, 0.5);
+  border-radius: 12px 12px 0 0;
+  background:
+    repeating-linear-gradient(-45deg, transparent 0 3px, rgba(27, 49, 42, 0.45) 3px 4.5px),
+    var(--stone);
+}
+
+/* High contrast draws no hatching. The strip is a plain band under the same line. */
+html[data-contrast="high"] .card::before {
+  border-bottom-color: var(--ink);
+  background: none;
 }
 
 /* The charge a committee check names. An inner frame, so it also shows in high contrast and never leaves the card. */
@@ -163,6 +179,15 @@ dialog,
   background: var(--soil);
 }
 
+/* With the key under it, the map and the key are one rounded frame. */
+.sheet-scroll:has(+ .map-key) {
+  border-radius: 12px 12px 0 0;
+}
+
+.map-key {
+  border-radius: 0 0 12px 12px;
+}
+
 svg.sheet {
   background: var(--soil);
 }
@@ -179,6 +204,37 @@ svg.sheet {
 
 .sheet .plot.selected {
   fill: var(--tab);
+}
+
+/* A bed is bare soil with furrows, and a taken bed is planted. The two patterns are in the defs of the sheet. The fill
+   only repeats the mark. The chosen bed is the tab colour. High contrast draws plain soil, and its rule outranks the
+   other three. */
+.sheet .plot.bed {
+  fill: url(#furrows);
+}
+
+.sheet .plot.bed.taken {
+  fill: url(#crops);
+}
+
+.sheet .plot.bed.selected {
+  fill: var(--tab);
+}
+
+html[data-contrast="high"] .sheet .plot.bed {
+  fill: var(--bedfill);
+}
+
+.sheet .soil {
+  fill: var(--bedfill);
+}
+
+.sheet .crop {
+  fill: var(--crop);
+}
+
+.sheet .furrow {
+  fill: rgba(110, 84, 48, 0.22);
 }
 
 .sheet .hatch,

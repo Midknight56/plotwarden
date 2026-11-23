@@ -184,13 +184,20 @@ describe("the hub", () => {
     expect(garden?.html).toContain(`aria-label="${SITE_COPY.allotmentMapLabel}"`);
     const count = (html: string, pattern: RegExp): number => (html.match(pattern) ?? []).length;
     // Lantern Fold, hand totals 1: 12 plots. 6 taken, 2 reserved, 1 unusable, 3 free.
-    expect(count(church?.html ?? "", /<path class="plot"/g)).toBe(12);
+    expect(count(church?.html ?? "", /<path class="plot[ "]/g)).toBe(12);
+    // Each plot carries its state as a class (spec 07, L6.2), and the counts are the hand totals.
+    for (const [state, n] of [["taken", 6], ["reserved", 2], ["unusable", 1], ["free", 3]] as const) {
+      expect(count(church?.html ?? "", new RegExp(`<path class="plot ${state}"`, "g")), `Lantern Fold, ${state}`).toBe(n);
+    }
     expect(count(church?.html ?? "", /<circle class="mark solid"/g)).toBe(6);
     expect(count(church?.html ?? "", /<line class="mark"/g)).toBe(2);
     expect(count(church?.html ?? "", /<g class="mark">/g)).toBe(1);
     expect(church?.html).toContain("Main gate");
     // Thimble Beds, hand totals 2.1: 6 beds. 3 taken, 1 unusable, 2 free, none reserved.
-    expect(count(garden?.html ?? "", /<polygon class="plot bed"/g)).toBe(6);
+    expect(count(garden?.html ?? "", /<polygon class="plot bed[ "]/g)).toBe(6);
+    for (const [state, n] of [["taken", 3], ["reserved", 0], ["unusable", 1], ["free", 2]] as const) {
+      expect(count(garden?.html ?? "", new RegExp(`<polygon class="plot bed ${state}"`, "g")), `Thimble Beds, ${state}`).toBe(n);
+    }
     expect(count(garden?.html ?? "", /<circle class="mark solid"/g)).toBe(3);
     expect(count(garden?.html ?? "", /<line class="mark"/g)).toBe(0);
     expect(count(garden?.html ?? "", /<g class="mark">/g)).toBe(1);

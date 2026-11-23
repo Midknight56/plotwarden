@@ -52,4 +52,35 @@
   .print-index li {
     break-inside: avoid;
   }
+
+  /* The map on paper: no lawn, turf, crops, furrows, stone or edge. The walk and the chosen plot are light grey, and
+     every other plot is white, so the mark and the word tell the state apart. The `html` in front gives each rule more
+     weight than the same rule in a theme file, whichever file loads last. The chosen plot comes last on purpose. */
+  html svg.sheet .section-outline,
+  html svg.sheet .turf {
+    fill: none;
+  }
+
+  html svg.sheet .path-edge {
+    stroke: none;
+  }
+
+  html svg.sheet .path {
+    stroke: #dadada;
+  }
+
+  html svg.sheet .plot,
+  html svg.sheet .plot.taken,
+  html svg.sheet .plot.bed,
+  html svg.sheet .plot.bed.taken,
+  html svg.sheet .base,
+  html svg.sheet .base.taken {
+    fill: #ffffff;
+  }
+
+  html svg.sheet .plot.selected,
+  html svg.sheet .plot.bed.selected,
+  html svg.sheet .tab {
+    fill: #e6e6e6;
+  }
 }

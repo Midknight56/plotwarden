@@ -3,8 +3,12 @@
 // fix a crossing, pin a private plan, hide it, import a finished layout twice, reject a
 // conflicting import, rename a linked code and find the old code in the list and in print.
 import { expect, test } from "@playwright/test";
-import { focusRingContrast, measureLayout, trackRequests } from "../helpers/measureLayout";
+import { CHAR_WIDTH, LABEL_SIZE } from "../../template/src/map/sheet";
+import { textWidth } from "../../template/src/map/labels";
+import { findLabelCollisions, focusRingContrast, measureLayout, readSheetScene, trackRequests } from "../helpers/measureLayout";
+import { APPS, openPractice, plotIdOf, settle, sizeOf, storedEvents } from "../helpers/routes";
 import { BOOK_GRID, fillGrid, fixturePath, generateGrid, openMapEditor, readDownload, startRegister, upload } from "../helpers/screens";
+import { SITE } from "../helpers/siteOrigin";
 
 const noViolations = async (page: import("@playwright/test").Page) => {
   const violations = await measureLayout(page);
@@ -559,5 +563,95 @@ test.describe("map setup shows the plots while the keeper types (P22)", () => {
     await expect(page.getByLabel("Section name", { exact: true })).toBeFocused();
     await expect(page.getByRole("alert").first()).toBeVisible();
     await expect(page.getByRole("button", { name: "Apply layout" })).toHaveCount(0);
+  });
+});
+
+// ---- Map labels in the shipped font (spec 07, task 7.13, L6.5) ------------------------------------------------------
+// Names and codes are 14 px, Atkinson Hyperlegible Next at weight 700. `LABEL_SIZE` and `CHAR_WIDTH` in map/sheet.ts come
+// from a measure of that font in a browser, and this is the check that holds them to it: every name is read at its real
+// width and must fit the box that the sheet reserved for it, and no label overlaps another label, a plot, a path line,
+// the code tab, the north arrow, the gate mark, an outline or the frame. At 360 wide on the phone project and 1440 wide
+// on the desktop project, in both registers and on the two practice maps of the start page.
+
+const widthOf = (page: import("@playwright/test").Page): { width: number; height: number } => (sizeOf(page) === "phone" ? { width: 360, height: 640 } : { width: 1440, height: 900 });
+
+interface TextRead {
+  text: string;
+  kind: string | null;
+  size: number;
+  weight: string;
+  family: string;
+  width: number;
+}
+
+/** Every text of every sheet on the page, with the size, weight and family that the browser used and the width it drew. */
+async function readTexts(page: import("@playwright/test").Page): Promise<TextRead[]> {
+  return page.evaluate(() =>
+    [...document.querySelectorAll<SVGTextElement>("svg.sheet text")].map((t) => {
+      const svg = t.closest("svg") as SVGSVGElement;
+      const scale = svg.viewBox.baseVal.width > 0 ? svg.getBoundingClientRect().width / svg.viewBox.baseVal.width : 1;
+      const style = getComputedStyle(t);
+      return { text: (t.textContent ?? "").trim(), kind: t.getAttribute("data-kind"), size: parseFloat(style.fontSize) * scale, weight: style.fontWeight, family: style.fontFamily, width: t.getComputedTextLength() * scale };
+    }),
+  );
+}
+
+function expectFit(texts: readonly TextRead[], where: string): void {
+  // A phone map has no code inside its small plots, so it holds the names of the gate and the section and little more.
+  expect(texts.length, `${where}: the map has text`).toBeGreaterThanOrEqual(2);
+  const faults: string[] = [];
+  for (const t of texts) {
+    if (t.text === "") continue;
+    if (Math.abs(t.size - LABEL_SIZE) > 0.01) faults.push(`"${t.text}" is ${t.size} px, not ${LABEL_SIZE}`);
+    if (t.weight !== "700") faults.push(`"${t.text}" has weight ${t.weight}, not 700`);
+    if (!t.family.includes("Atkinson Hyperlegible Next")) faults.push(`"${t.text}" is set in ${t.family}`);
+    // The sheet boxes a code (in its plot and on its tab) at CHAR_WIDTH a character and a name at the width of a letter in labels.ts.
+    const reserved = t.kind === "plot" || t.kind === "tab" ? [...t.text].length * CHAR_WIDTH : textWidth(t.text, LABEL_SIZE);
+    if (t.width > reserved + 0.5) faults.push(`"${t.text}" is ${t.width.toFixed(1)} px wide and its box is ${reserved.toFixed(1)} px`);
+  }
+  expect(faults, `${where}\n${faults.join("\n")}`).toEqual([]);
+}
+
+for (const app of APPS) {
+  test.describe(`${app.title}, map labels in the shipped font`, () => {
+    test.use({ baseURL: app.origin });
+
+    test("names and codes are 14 px bold in the shipped font, fit their boxes and touch nothing", async ({ page }) => {
+      test.setTimeout(120_000);
+      await page.setViewportSize(widthOf(page));
+      const requests = trackRequests(page, app.origin);
+      const siteId = await openPractice(page, app);
+      const events = await storedEvents(page, siteId);
+      const codes = app.key === "churchyard" ? ["Y07", "Y01", "Y12"] : ["B02", "B05", "B06"];
+      const views = [
+        { route: `/#/r/${siteId}/map`, what: "map, nothing chosen" },
+        { route: `/#/r/${siteId}`, what: "home" },
+        ...codes.map((code) => ({ route: `/#/r/${siteId}/map?plot=${plotIdOf(events, code)}`, what: `map, ${code} chosen` })),
+      ];
+      for (const view of views) {
+        await page.goto(view.route);
+        await settle(page);
+        expect(await page.evaluate(() => document.fonts.check('700 14px "Atkinson Hyperlegible Next"')), `${view.what}: the shipped font is loaded`).toBe(true);
+        expectFit(await readTexts(page), view.what);
+        const found = findLabelCollisions(await page.evaluate(readSheetScene));
+        expect(found, `${view.what} at ${page.viewportSize()?.width}\n${JSON.stringify(found, null, 1)}`).toEqual([]);
+      }
+      expect(requests.external).toEqual([]);
+    });
+  });
+}
+
+test.describe("the practice maps of the start page, in the shipped font", () => {
+  test("names are 14 px bold, fit their boxes and touch nothing", async ({ page }) => {
+    await page.setViewportSize(widthOf(page));
+    await page.goto(SITE);
+    await expect(page.getByRole("heading", { level: 1, name: "Plotwarden" })).toBeVisible();
+    await page.evaluate(() => document.fonts.ready.then(() => undefined));
+    expect(await page.evaluate(() => document.fonts.check('700 14px "Atkinson Hyperlegible Next"'))).toBe(true);
+    const scenes = await page.evaluate(readSheetScene);
+    expect(scenes.length, "both practice maps").toBe(2);
+    expectFit(await readTexts(page), "start page");
+    const found = findLabelCollisions(scenes);
+    expect(found, `start page at ${page.viewportSize()?.width}\n${JSON.stringify(found, null, 1)}`).toEqual([]);
   });
 });

@@ -92,26 +92,42 @@ const MIN_HEIGHT = 120;
 /** The smallest span fitted, in site units, so one tiny plot is not blown up. */
 const MIN_SPAN = 100;
 const DEFAULT_BOUNDS: Bounds = { minEast: 0, minNorth: 0, maxEast: 1000, maxNorth: 1000 };
-const LABEL_SIZE = 12;
+/**
+ * The size of a name and of a plot code on the sheet. 14 px. The text is Atkinson Hyperlegible Next at weight 700
+ * (`.sheet .label` in register.css). A name is boxed at `LETTER_WIDTH` a letter (labels.ts), 0.617 em, which holds
+ * every name that was measured in headless Chromium with the shipped font: names of 8 to 26 letters came to 0.49 to
+ * 0.56 em a letter.
+ */
+export const LABEL_SIZE = 14;
+/** The band at the foot of a plot that its code stands in: the text, the cap height above its baseline and the room round it. */
+export const LABEL_BAND = LABEL_SIZE + 8;
 const TAB_SIZE = 14;
 const TAB_HEIGHT = 28;
 /** How far the tab keeps from a path line, so it does not cover the gravel strip if another place will do. */
 const TAB_LINE_CLEAR = 8;
 /** The least a plot may measure for its code to be drawn inside it. */
 const LABEL_MIN_BOX = 40;
-/** A name with no clear place beside its feature stands outside the block, in rows under the drawing, 18 px apart (P19.8). */
-const OUTSIDE_ROW = 18;
+/** A name with no clear place beside its feature stands outside the block, in rows under the drawing, 3 px apart (P19.8). */
+const OUTSIDE_ROW = LABEL_SIZE + 3 + 3;
 /** The gap between the drawing and the first row of outside names, and between the leader line and its name. */
 const BAND_GAP = 8;
-/** The height of a name's box: from 12 px above its baseline to 3 px below it. */
-const NAME_BOX_HEIGHT = 15;
+/** The height of a name's box: from its size above its baseline to 3 px below it. */
+const NAME_BOX_HEIGHT = LABEL_SIZE + 3;
 /** A place that costs this much covers another plot, the north arrow, the gate mark or leaves the sheet. */
 const OUTSIDE_COST = 1000;
 /** The farthest a name may stand from its feature, from the edge of its box, without a leader line (P19.8). A little under 24 px. */
 const NEAR_FEATURE = 22;
-const CHAR_WIDTH = 7.2;
-/** How far a label keeps from the line of a path: half the gravel strip and a margin. */
-const GATE_CLEAR = 8;
+/**
+ * The most that one character of a plot code takes, in pixels at `LABEL_SIZE`. Measured, not guessed: in headless
+ * Chromium, with the shipped Atkinson Hyperlegible Next at weight 700, the widest digit is 0 at 0.659 em (9.23 px at
+ * 14 px), and the capitals are 0.42 to 0.76 em, except M at 0.86 and W at 0.90. 9.7 px (0.693 em) covers every digit
+ * and the capitals up to 0.69 em, which are the letters that a code starts with in both registers (Y and B are 0.69 and
+ * 0.64). A code that starts with one of M, N, O, G, Q or W is a little wider than its box.
+ * tests/browser/paper-map.spec.ts reads the real width of every code on the maps.
+ */
+export const CHAR_WIDTH = 9.7;
+/** How far a label keeps from the line of a path: half the 16 px edge of the walk and a margin. */
+const GATE_CLEAR = 9;
 /** How far a label keeps from the dashed outline of a section, and how much that matters next to a path. */
 const OUTLINE_CLEAR = 3;
 const OUTLINE_WEIGHT = 0.5;
@@ -285,7 +301,7 @@ export function buildSheet(input: SheetInput, options: SheetOptions): SheetModel
       code: p.code,
       points,
       box,
-      symbolCenter: labelled ? [c[0], box.y + (box.height - 18) / 2] : c,
+      symbolCenter: labelled ? [c[0], box.y + (box.height - LABEL_BAND) / 2] : c,
       mark: p.mark,
       selected: p.plotId === input.selectedPlotId,
     };
@@ -396,7 +412,7 @@ export function buildSheet(input: SheetInput, options: SheetOptions): SheetModel
     const [x, y] = gatePoint;
     hard.push({ box: { x0: x - 8, y0: y - 8, x1: x + 8, y1: y + 8 }, gap: 3 });
     const feature: Feature = { anchors: [[x, y]], own: [], reach: (box) => distanceToLine(box, [[x, y], [x, y]]) };
-    gate = { name: map.gate.name, x, y, label: place(map.gate.name, spotsAround(x, y), keepOff(GATE_CLEAR), feature) };
+    gate = { name: map.gate.name, x, y, label: place(map.gate.name, spotsAround(x, y, 0, LABEL_SIZE), keepOff(GATE_CLEAR), feature) };
   }
 
   // A section name keeps as far from a path as the gate name does: a path is drawn as a strip 14 px wide.
@@ -416,7 +432,7 @@ export function buildSheet(input: SheetInput, options: SheetOptions): SheetModel
     const lines: Scene["lines"] = [...pathLines.map((line, i) => ({ points: line, clear: i === index ? OWN_LINE_CLEAR : GATE_CLEAR })), ...outlineLines()];
     const ends: Pt[] = points.length === 0 ? [] : [points[0] as Pt, points[points.length - 1] as Pt];
     const feature: Feature = { anchors: ends, own: points, reach: (b) => distanceToLine(b, points) };
-    return { pathId: p.pathId, name: p.name, points, label: place(p.name, spotsAlongLine(points), lines, feature) };
+    return { pathId: p.pathId, name: p.name, points, label: place(p.name, spotsAlongLine(points, LABEL_SIZE), lines, feature) };
   });
 
   // The tab may stand under the lowest plot, past the drawing. The sheet is then taller by what it needs.
@@ -481,8 +497,11 @@ export function buildSheet(input: SheetInput, options: SheetOptions): SheetModel
       rows = Math.max(rows, best.row + 1);
     }
   }
-  const lastRowBottom = rows === 0 ? 0 : bandTop + (rows - 1) * OUTSIDE_ROW + NAME_BOX_HEIGHT;
-  const sheetHeight = rows === 0 ? body : Math.max(body, lastRowBottom + SHEET_MARGIN);
+  // The bottom of the lowest name, measured as a reader of the label measures it (its baseline and 3 px). A hundredth of
+  // a pixel is added to the margin, so a name that stands exactly on the margin is never a rounding error outside it.
+  let lastRowBottom = 0;
+  for (const item of outside) if (item.label.leader !== undefined) lastRowBottom = Math.max(lastRowBottom, item.label.y + 3);
+  const sheetHeight = rows === 0 ? body : Math.max(body, lastRowBottom + SHEET_MARGIN + 0.01);
   const model: SheetModel = {
     width,
     height: sheetHeight,

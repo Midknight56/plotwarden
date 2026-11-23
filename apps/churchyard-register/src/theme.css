@@ -3,8 +3,8 @@
    own above the title, so no word and no control ever sits on a picture.
 
    The values follow the design of spec 07. Held back until the markup for them exists (slice 3): the night ground
-   (--ground and --on-ground stay the paper and the ink), the band heights (--band) and the header rows. Held back
-   until the map drawing has the classes for them (slice 2): what uses --row-ground, --turf, --stone-base and --kerb. */
+   (--ground and --on-ground stay the paper and the ink), the band heights (--band) and the header rows. The map
+   drawing has the classes for the lawn, the turf, the base and the edge of a walk, and this file fills them. */
 
 @import "../../../fonts/gelasio.css";
 
@@ -25,6 +25,7 @@
   --action-hover: #f6d68f;
   --action-pressed: #e3b24f;
   --action-edge: var(--ink);
+  --outline-pressed: var(--gravel); /* an outlined button, a quiet button and an index row while pressed */
 
   --radius-control: 2px;
   --radius-card: 16px 16px 2px 2px;
@@ -136,10 +137,16 @@ html[data-contrast="high"] .card {
   box-shadow: inset 0 0 0 5px var(--paper), inset 0 0 0 6px var(--ink);
 }
 
+/* This rule outranks the shared one, so the three fills are set here, in this order: no fill, a stone for a taken plot,
+   then the tab for the chosen plot. The fill only repeats what the mark says. */
 svg.sheet .plot {
-  fill: var(--stone);
+  fill: none;
   stroke: var(--ink);
   stroke-width: 1.75;
+}
+
+svg.sheet .plot.taken {
+  fill: var(--stone);
 }
 
 svg.sheet .plot.selected {
@@ -172,9 +179,9 @@ svg.sheet .path-line {
 }
 
 .sheet .section-outline {
+  stroke: var(--soft-line);
   stroke-dasharray: 8 5;
   stroke-width: 1.5;
-  opacity: 0.8;
 }
 
 .sheet .gate {
@@ -215,9 +222,13 @@ svg.sheet .path-line {
 }
 
 .mark-swatch .plot {
-  fill: var(--stone);
+  fill: none;
   stroke: var(--ink);
   stroke-width: 2;
+}
+
+.mark-swatch .plot.taken {
+  fill: var(--stone);
 }
 
 .lead {

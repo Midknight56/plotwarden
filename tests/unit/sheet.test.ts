@@ -619,7 +619,7 @@ describe("names keep clear of plots, lines and each other (P19)", () => {
     const tab = tabBox(m);
     for (const { what, label, ownPath } of all) {
       const b = nameBox(label);
-      expect(label.size, `${name}: ${what} size`).toBe(12);
+      expect(label.size, `${name}: ${what} size`).toBe(14);
       expect(b.x0, `${name}: ${what} left edge`).toBeGreaterThanOrEqual(8);
       expect(b.x1, `${name}: ${what} right edge`).toBeLessThanOrEqual(m.width - 8);
       expect(b.y1, `${name}: ${what} bottom edge`).toBeLessThanOrEqual(m.height);
@@ -907,7 +907,7 @@ describe("names keep clear of plots, lines and each other (P19)", () => {
       for (const { what, label } of led) {
         const end = (label.leader as Pt[])[(label.leader as Pt[]).length - 1] as Pt;
         expect(pointToBox(end, nameBox(label)), `${what} at ${width}`).toBeLessThanOrEqual(1.5);
-        expect(label.size).toBe(12);
+        expect(label.size).toBe(14);
       }
     }
   });

@@ -1,6 +1,6 @@
 // Assembling the static site and stamping its service worker. Used by scripts/assemble-site.mjs,
 // scripts/build-sw.mjs and scripts/check-release.mjs.
-import { cpSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { LOCK_PATH, readLock, verifyPreview } from "./desk.mjs";
 import { Refusal, listFiles, sha256 } from "./files.mjs";
@@ -24,6 +24,72 @@ export function shellOf(siteDir) {
   const files = rels.map((f) => `/${f}`).sort();
   const text = files.map((f) => `${f}\0${sha256(readFileSync(join(siteDir, f.slice(1))))}\n`).join("");
   return { version: sha256(text).slice(0, 16), files };
+}
+
+/** A font file in a built site is a woff2 file. */
+const isFont = (name) => name.endsWith(".woff2");
+
+/**
+ * Keep one copy of each font file in a built site.
+ *
+ * The three builds (the hub, the Churchyard Register and the Allotment Register) each carry the font files that their
+ * styles name, with a hashed name, so the same font has the same name and the same bytes in every build. The copy that
+ * the site keeps is in the hub's own `assets/` folder. A file in an app's `assets/` folder is removed when the shared
+ * folder holds the same name with the same bytes. A file that only the app holds moves to the shared folder. Two files
+ * with one name and different bytes are refused, and nothing is changed. Each `.css` file of an app is then pointed
+ * at the shared copy, with a path relative to itself, so the site works from any folder.
+ * Folders that are not named (the Desk preview at `review/`) are not read or changed.
+ * @param {string} siteDir
+ * @param {readonly string[]} appFolders folders of the site that hold one app build each, such as `churchyard`
+ * @returns {{ removed: string[], moved: string[] }} the paths removed and moved, relative to the site
+ */
+export function dedupeFonts(siteDir, appFolders) {
+  const shared = join(siteDir, "assets");
+  const fontsOf = (dir) => (existsSync(dir) ? readdirSync(dir).filter(isFont).sort() : []);
+  const plan = [];
+  const claimed = new Map();
+  for (const name of fontsOf(shared)) claimed.set(name, sha256(readFileSync(join(shared, name))));
+  for (const folder of appFolders) {
+    const dir = join(siteDir, folder, "assets");
+    for (const name of fontsOf(dir)) {
+      const digest = sha256(readFileSync(join(dir, name)));
+      const known = claimed.get(name);
+      if (known === undefined) {
+        claimed.set(name, digest);
+        plan.push({ folder, name, action: "move" });
+      } else if (known === digest) {
+        plan.push({ folder, name, action: "remove" });
+      } else {
+        throw new Refusal(`The font file ${name} has the same name in ${folder}/assets and in another folder, with different bytes. One copy cannot serve both.`, 1);
+      }
+    }
+  }
+  const removed = [];
+  const moved = [];
+  mkdirSync(shared, { recursive: true });
+  for (const { folder, name, action } of plan) {
+    const from = join(siteDir, folder, "assets", name);
+    if (action === "move") {
+      renameSync(from, join(shared, name));
+      moved.push(`${folder}/assets/${name}`);
+    } else {
+      rmSync(from);
+      removed.push(`${folder}/assets/${name}`);
+    }
+  }
+  // Point each app's styles at the shared copy. A url that already names the shared folder is left as it is.
+  const names = new Set(claimed.keys());
+  for (const folder of appFolders) {
+    const dir = join(siteDir, folder, "assets");
+    if (!existsSync(dir)) continue;
+    for (const file of readdirSync(dir).filter((f) => f.endsWith(".css"))) {
+      const path = join(dir, file);
+      const css = readUtf8(path);
+      const next = css.replace(/url\((["']?)\.\/([^)"']+\.woff2)\1\)/g, (whole, quote, name) => (names.has(name) ? `url(${quote}../../assets/${name}${quote})` : whole));
+      if (next !== css) writeFileSync(path, next);
+    }
+  }
+  return { removed, moved };
 }
 
 /** Read the stamp at the head of sw.js. Undefined when the worker has none. */
@@ -98,6 +164,8 @@ export function assembleSite({ root, deskPreview, out }) {
     cpSync(join(apps, "churchyard"), join(temp, "churchyard"), { recursive: true });
     cpSync(join(apps, "allotments"), join(temp, "allotments"), { recursive: true });
     cpSync(deskPreview, join(temp, "review"), { recursive: true });
+    // Each build carries its own copy of the font files. The site keeps one, and the apps' styles point at it.
+    dedupeFonts(temp, ["churchyard", "allotments"]);
     for (const page of PAGES_WITH_TAG) {
       const file = join(temp, page);
       writeFileSync(file, injectWorkerTag(readUtf8(file), page));

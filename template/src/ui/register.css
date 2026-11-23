@@ -36,6 +36,8 @@
   --control-h: 44px; /* a button */
   --field-h: 44px; /* a field */
   --motion: 120ms ease-out; /* background and border colour only */
+  --outline-pressed: var(--soft); /* an outlined button, a quiet button and an index row while pressed */
+  --soft-line: var(--ink); /* the outline of an index row and the dashed edge of a section */
 }
 
 html[data-contrast="high"] {
@@ -171,6 +173,13 @@ html[data-contrast="high"] .mist {
   display: none;
 }
 
+/* High contrast changes colour at once. */
+html[data-contrast="high"] *,
+html[data-contrast="high"] *::before,
+html[data-contrast="high"] *::after {
+  transition: none !important;
+}
+
 /* The shell sets data-motion to the resolved motion (reduce or allow) from the app setting and the system. */
 html[data-motion="reduce"],
 html[data-motion="reduce"] *,
@@ -267,9 +276,19 @@ legend {
   font-weight: 600;
 }
 
-/* A named group of links on a desk. The heading names the group, and the links keep the gap of a button row. */
+/* A named group of links on a desk. The heading names the group, and the links are index rows, 12 px apart. */
 .link-group {
   gap: 8px;
+}
+
+.link-group ul.actions {
+  flex-direction: column;
+  flex-wrap: nowrap;
+  align-items: stretch;
+}
+
+.link-group li {
+  min-width: 0;
 }
 
 .group-heading {
@@ -306,6 +325,48 @@ legend {
   color: var(--error);
 }
 
+/* The mark of a saved notice and of an error notice. It is drawn here, has no text and stands in the padding at the
+   left, so it adds no word and a screen reader hears nothing of it. */
+.notice.good,
+.notice.error {
+  position: relative;
+  padding-left: 52px;
+}
+
+.notice.good::before,
+.notice.error::before {
+  content: "";
+  position: absolute;
+  top: 12px;
+  left: 16px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+}
+
+.notice.good::before {
+  background: var(--ok);
+}
+
+.notice.good::after {
+  content: "";
+  position: absolute;
+  top: 16px;
+  left: 25px;
+  width: 6px;
+  height: 12px;
+  border: solid var(--paper);
+  border-width: 0 3px 3px 0;
+  transform: rotate(45deg);
+}
+
+.notice.error::before {
+  background:
+    linear-gradient(var(--paper), var(--paper)) 50% 5px / 3px 9px no-repeat,
+    linear-gradient(var(--paper), var(--paper)) 50% 17px / 3px 3px no-repeat,
+    var(--error);
+}
+
 .notice p {
   color: inherit;
 }
@@ -338,6 +399,28 @@ pre.preview {
   font-weight: 700;
 }
 
+/* The message of an invalid field follows it, with a round mark at the left. The mark has no text. */
+.field .error {
+  position: relative;
+  padding-left: 28px;
+  color: var(--error);
+  font-weight: 600;
+}
+
+.field .error::before {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 0;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background:
+    linear-gradient(var(--paper), var(--paper)) 50% 4px / 2px 8px no-repeat,
+    linear-gradient(var(--paper), var(--paper)) 50% 14px / 2px 2px no-repeat,
+    var(--error);
+}
+
 input,
 select,
 textarea,
@@ -364,13 +447,80 @@ input[type="file"] {
   cursor: pointer;
 }
 
+/* A check box and a radio button are a 44 by 44 target with a 24 px box drawn inside it. The ring goes round the box. */
 input[type="checkbox"],
 input[type="radio"] {
+  position: relative;
   flex: none;
   width: 44px;
   height: 44px;
   margin: 0;
-  accent-color: var(--ink);
+  border: 0;
+  background: transparent;
+  appearance: none;
+  cursor: pointer;
+}
+
+input[type="checkbox"]::before,
+input[type="radio"]::before {
+  content: "";
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  box-sizing: border-box;
+  width: 24px;
+  height: 24px;
+  border: 2px solid var(--ink);
+  background: var(--field);
+}
+
+input[type="checkbox"]::before {
+  border-radius: min(var(--radius-control), 4px);
+}
+
+input[type="radio"]::before {
+  border-radius: 50%;
+}
+
+input[type="checkbox"]:checked::before {
+  background: var(--ink);
+}
+
+input[type="checkbox"]:checked::after {
+  content: "";
+  position: absolute;
+  top: 14px;
+  left: 19px;
+  width: 6px;
+  height: 12px;
+  border: solid var(--paper);
+  border-width: 0 3px 3px 0;
+  transform: rotate(45deg);
+}
+
+input[type="radio"]:checked::after {
+  content: "";
+  position: absolute;
+  inset: 16px;
+  border-radius: 50%;
+  background: var(--ink);
+}
+
+input[type="checkbox"]:focus-visible,
+input[type="radio"]:focus-visible {
+  outline-offset: -8px;
+}
+
+input[type="checkbox"]:disabled,
+input[type="radio"]:disabled {
+  cursor: not-allowed;
+}
+
+input[type="checkbox"]:disabled::before,
+input[type="radio"]:disabled::before {
+  border-color: var(--muted);
+  border-style: dashed;
+  background: var(--soft);
 }
 
 input:disabled,
@@ -380,11 +530,11 @@ textarea:disabled {
   color: var(--muted);
 }
 
-input[aria-invalid="true"],
+/* Three pixels, solid, in the error colour. The input rule names its type twice over, so it outranks the base rule. */
+input[aria-invalid="true"]:not([type="checkbox"]):not([type="radio"]),
 select[aria-invalid="true"],
 textarea[aria-invalid="true"] {
-  border-color: var(--error);
-  border-style: dashed;
+  border: 3px solid var(--error);
 }
 
 .check {
@@ -425,7 +575,7 @@ a.button {
   padding: 8px 16px;
   border: 2px solid var(--ink);
   border-radius: var(--radius-control);
-  background: var(--paper);
+  background: var(--field);
   color: var(--ink);
   font-size: 16px;
   font-weight: 600;
@@ -433,6 +583,16 @@ a.button {
   text-align: center;
   text-decoration: none;
   cursor: pointer;
+  transition: background-color var(--motion), border-color var(--motion);
+}
+
+/* Hover and pressed change the fill and nothing else. A disabled button does not change. */
+.button:hover:not(:disabled) {
+  background: var(--soft);
+}
+
+.button:active:not(:disabled) {
+  background: var(--outline-pressed);
 }
 
 .button.primary {
@@ -440,6 +600,35 @@ a.button {
   background: var(--action);
   color: var(--action-ink);
   font-weight: 700;
+}
+
+.button.primary:hover:not(:disabled) {
+  background: var(--action-hover);
+}
+
+.button.primary:active:not(:disabled) {
+  background: var(--action-pressed);
+}
+
+/* An index row: a full width link to another screen, with a chevron at the right that has no text for a reader. */
+.link-group .button {
+  justify-content: space-between;
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid var(--soft-line);
+  text-align: left;
+}
+
+.link-group .button:hover:not(:disabled) {
+  border-color: var(--ink);
+}
+
+.link-group .button::after {
+  content: "\203A" / "";
+  flex: none;
+  font-size: 20px;
+  line-height: 1;
 }
 
 .button:disabled,
@@ -495,6 +684,11 @@ dialog::backdrop {
   background: var(--paper);
 }
 
+/* The key joins the map as one frame: the map has no bottom edge and the key has the rest of the frame. */
+.sheet-scroll:has(+ .map-key) {
+  border-bottom: 0;
+}
+
 svg.sheet {
   display: block;
   max-width: none;
@@ -506,10 +700,15 @@ svg.sheet text {
   font-family: inherit;
 }
 
+/* A plot is open. Only a taken plot has a fill, and the fill repeats what the mark says. */
 .sheet .plot {
-  fill: var(--paper);
+  fill: none;
   stroke: var(--ink);
   stroke-width: 1.5;
+}
+
+.sheet .plot.taken {
+  fill: var(--stone, var(--paper));
 }
 
 .sheet .plot.checking,
@@ -539,12 +738,14 @@ svg.sheet text {
   fill: var(--ink);
 }
 
+/* Names and codes are 14 px bold. LABEL_SIZE and CHAR_WIDTH in map/sheet.ts are measured at this weight. */
 .sheet .label {
   fill: var(--ink);
+  font-weight: 700;
 }
 
 .sheet .section-outline {
-  fill: none;
+  fill: var(--row-ground, none);
   stroke: var(--ink);
   stroke-width: 2;
   stroke-dasharray: 8 4;
@@ -554,6 +755,31 @@ svg.sheet text {
   fill: none;
   stroke: var(--ink);
   stroke-width: 3;
+}
+
+/* The edge of a walk, under the walk. A theme gives it a colour with --kerb. */
+.sheet .path-edge {
+  fill: none;
+  stroke: var(--kerb, none);
+  stroke-width: 16;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* The turf under an arch, and the base at its foot that holds its code. */
+.sheet .turf {
+  fill: var(--turf, none);
+  stroke: none;
+}
+
+.sheet .base {
+  fill: var(--field);
+  stroke: var(--ink);
+  stroke-width: 1.75;
+}
+
+.sheet .base.taken {
+  fill: var(--stone-base, var(--field));
 }
 
 /* A second line along a path. An app that wants a gravel walk turns it on. */
@@ -595,21 +821,36 @@ svg.sheet text {
 }
 
 .swatch .plot {
-  fill: var(--paper);
+  fill: none;
   stroke: var(--ink);
   stroke-width: 1.5;
+}
+
+.swatch .plot.taken {
+  fill: var(--stone, var(--paper));
 }
 
 .map-key {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px 24px;
+  gap: 2px 24px;
+  margin: 0;
+  padding: 6px 16px;
+  border: 2px solid var(--ink);
+  border-top-width: 1px;
+  background: var(--field);
+}
+
+/* The screens that hold the map space their parts by --gap. The key takes that gap back, so the two frames touch. */
+.sheet-scroll + .map-key {
+  margin-top: calc(var(--gap) * -1);
 }
 
 .map-key li {
   display: flex;
   align-items: center;
   gap: 8px;
+  min-height: 30px;
 }
 
 /* Fast entry: the page and the rows */
@@ -657,12 +898,12 @@ svg.sheet text {
 /* A plain action: no box, an underline. For a choice that is there but is not the main one. */
 .button.quiet {
   min-height: 44px;
-  padding-right: 0;
-  padding-left: 0;
+  padding: 8px;
   border-color: transparent;
   background: transparent;
   text-decoration: underline;
-  text-underline-offset: 3px;
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 5px;
 }
 
 .button.quiet:disabled {

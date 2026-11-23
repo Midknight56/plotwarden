@@ -1,11 +1,11 @@
 // The two self hosted fonts (spec 07, task 7.3, L2): Atkinson Hyperlegible Next for text and Gelasio for the
 // churchyard, start page and Desk headings. Both are under the SIL Open Font License 1.1. Only woff2 files, from the
 // same origin, each with font-display swap. Together under 150,000 bytes. The visitor files keep system fonts only.
-import { mkdirSync, mkdtempSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { shellOf } from "../../scripts/lib/site.mjs";
+import { dedupeFonts, shellOf } from "../../scripts/lib/site.mjs";
 import { buildVisitorFiles } from "../../tools/site/visitorFiles";
 
 const ROOT = join(__dirname, "..", "..");
@@ -204,6 +204,124 @@ describe("the offline list", () => {
     const shell = shellOf(site) as { version: string; files: string[] };
     for (const path of placed) expect(shell.files, path).toContain(path);
     expect(shell.files).not.toContain("/sw.js");
+  });
+});
+
+// One copy of each font file on the whole site (spec 07, task 7.9 and design L-D3). Each build of the hub, the
+// Churchyard Register and the Allotment Register carries its own copy of the files that its styles name, with the same
+// hashed name and the same bytes. Assembling the site keeps the copy in the hub's `assets/`, removes the others and points
+// each app's styles at that copy. The Desk preview at `review/` is copied as it is and is never touched.
+describe("one copy of each font file on the built site", () => {
+  const APP_FOLDERS = ["churchyard", "allotments"] as const;
+  const GELASIO_FIRST = expectedFiles(GELASIO)[0] as string;
+  const fontBytes = (file: string): Buffer => readFileSync(join(ROOT, "fonts", file));
+  const fontCss = (files: readonly string[]): string => files.map((f) => `@font-face{font-family:"x";src:url(./${f}) format("woff2")}`).join("");
+
+  /** A site as the three builds leave it: the hub holds all ten files, the churchyard ten, the allotments the six of Atkinson. */
+  function site(options: { churchyard?: string[]; allotments?: string[]; changeOne?: boolean } = {}): string {
+    const dir = mkdtempSync(join(tmpdir(), "plotwarden-onecopy-"));
+    const put = (rel: string, data: string | Buffer): void => {
+      mkdirSync(join(dir, rel, ".."), { recursive: true });
+      writeFileSync(join(dir, rel), data);
+    };
+    const atkinson = expectedFiles(ATKINSON);
+    const churchyard = options.churchyard ?? ALL_FILES;
+    const allotments = options.allotments ?? atkinson;
+    put("index.html", "<!doctype html>");
+    put("sw.js", "// worker");
+    put("assets/main-HUB.css", fontCss(ALL_FILES));
+    for (const f of ALL_FILES) put(`assets/${f}`, fontBytes(f));
+    put("churchyard/index.html", "<!doctype html>");
+    put("churchyard/assets/index-CHURCH.css", `${fontCss(churchyard)}.a{color:red}`);
+    for (const f of churchyard) put(`churchyard/assets/${f}`, options.changeOne === true && f === churchyard[0] ? Buffer.from("different bytes") : fontBytes(f));
+    put("allotments/index.html", "<!doctype html>");
+    put("allotments/assets/index-GARDEN.css", fontCss(allotments));
+    for (const f of allotments) put(`allotments/assets/${f}`, fontBytes(f));
+    // The Desk preview is a pinned copy. It holds a file of its own that must stay.
+    put("review/assets/desk.woff2", Buffer.from("wOF2 desk"));
+    return dir;
+  }
+
+  const fontsIn = (dir: string, skip = "review/"): string[] => listAll(dir).filter((f) => f.endsWith(".woff2") && !f.startsWith(skip));
+  function listAll(dir: string, rel = ""): string[] {
+    const out: string[] = [];
+    for (const entry of readdirSync(join(dir, rel), { withFileTypes: true })) {
+      const next = rel === "" ? entry.name : `${rel}/${entry.name}`;
+      if (entry.isDirectory()) out.push(...listAll(dir, next));
+      else out.push(next);
+    }
+    return out.sort();
+  }
+
+  it("holds each of the ten font files once, all in the assets folder of the hub, under 150,000 bytes together", () => {
+    const dir = site();
+    expect(fontsIn(dir).length).toBe(26);
+    const result = dedupeFonts(dir, APP_FOLDERS);
+    expect(result.removed.length).toBe(16);
+    expect(fontsIn(dir)).toEqual(ALL_FILES.map((f) => `assets/${f}`).sort());
+    const total = fontsIn(dir).reduce((sum, f) => sum + statSync(join(dir, f)).size, 0);
+    expect(total).toBeGreaterThan(50_000);
+    expect(total).toBeLessThan(150_000);
+  });
+
+  it("points the styles of each app at the shared copy, so every font url still reaches a file with the same bytes", () => {
+    const dir = site();
+    dedupeFonts(dir, APP_FOLDERS);
+    for (const css of ["churchyard/assets/index-CHURCH.css", "allotments/assets/index-GARDEN.css", "assets/main-HUB.css"]) {
+      const text = readFileSync(join(dir, css), "utf8");
+      const urls = [...text.matchAll(/url\(([^)]+\.woff2)\)/g)].map((m) => m[1] as string);
+      expect(urls.length, css).toBeGreaterThan(0);
+      for (const url of urls) {
+        const target = join(dir, css, "..", url);
+        expect(readFileSync(target), `${css} ${url}`).toEqual(fontBytes(url.split("/").pop() as string));
+      }
+    }
+    expect(readFileSync(join(dir, "churchyard/assets/index-CHURCH.css"), "utf8")).toContain(`url(../../assets/${ALL_FILES[0]})`);
+    expect(readFileSync(join(dir, "churchyard/assets/index-CHURCH.css"), "utf8")).toContain(".a{color:red}");
+    expect(readFileSync(join(dir, "assets/main-HUB.css"), "utf8")).toContain(`url(./${ALL_FILES[0]})`);
+  });
+
+  it("names each font file once in the offline list", () => {
+    const dir = site();
+    dedupeFonts(dir, APP_FOLDERS);
+    const shell = shellOf(dir) as { files: string[] };
+    const listed = shell.files.filter((f) => f.endsWith(".woff2") && !f.startsWith("/review/"));
+    expect(listed).toEqual(ALL_FILES.map((f) => `/assets/${f}`).sort());
+  });
+
+  it("moves a file that only an app holds to the shared folder, so it is still held once", () => {
+    const dir = site({ churchyard: [...ALL_FILES] });
+    rmSync(join(dir, `assets/${GELASIO_FIRST}`));
+    dedupeFonts(dir, APP_FOLDERS);
+    expect(fontsIn(dir)).toEqual(ALL_FILES.map((f) => `assets/${f}`).sort());
+  });
+
+  it("leaves the Desk preview as it is", () => {
+    const dir = site();
+    dedupeFonts(dir, APP_FOLDERS);
+    expect(readFileSync(join(dir, "review/assets/desk.woff2"), "utf8")).toBe("wOF2 desk");
+  });
+
+  it("refuses two different files with one name, and removes nothing", () => {
+    const dir = site({ changeOne: true });
+    const before = listAll(dir);
+    expect(() => dedupeFonts(dir, APP_FOLDERS)).toThrow(/same name|different/i);
+    expect(listAll(dir)).toEqual(before);
+  });
+
+  it("gives the same site when it runs a second time", () => {
+    const dir = site();
+    dedupeFonts(dir, APP_FOLDERS);
+    const once = listAll(dir).map((f) => [f, readFileSync(join(dir, f)).toString("latin1")]);
+    const second = dedupeFonts(dir, APP_FOLDERS);
+    expect(second.removed).toEqual([]);
+    expect(listAll(dir).map((f) => [f, readFileSync(join(dir, f)).toString("latin1")])).toEqual(once);
+  });
+
+  it("does nothing to an app folder that is not there", () => {
+    const dir = site();
+    rmSync(join(dir, "allotments"), { recursive: true });
+    expect(() => dedupeFonts(dir, APP_FOLDERS)).not.toThrow();
   });
 });
 

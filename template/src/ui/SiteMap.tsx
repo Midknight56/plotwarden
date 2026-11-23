@@ -2,7 +2,7 @@
 // The overview has no button per plot. A plot is chosen from the list, which holds the same plots.
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode, RefObject } from "react";
-import { buildSheet } from "../map/sheet";
+import { CHAR_WIDTH, LABEL_BAND, LABEL_SIZE, buildSheet } from "../map/sheet";
 import type { KeyState, SheetModel, SheetPlot } from "../map/sheet";
 import { AsAtField, AsAtHeading } from "./AsAtField";
 import { Button, ButtonLink, Notice, SelectField } from "./controls";
@@ -31,7 +31,7 @@ export function useElementWidth(ref: RefObject<HTMLElement | null>, fallback = 3
 function Mark({ plot }: { plot: SheetPlot }) {
   const { box, symbolCenter } = plot;
   const [cx, cy] = symbolCenter;
-  const room = Math.max(0, Math.min(box.width, box.height - (plot.label === undefined ? 0 : 18)));
+  const room = Math.max(0, Math.min(box.width, box.height - (plot.label === undefined ? 0 : LABEL_BAND)));
   const half = Math.max(3, room / 4);
   switch (plot.mark.state) {
     case "reserved":
@@ -68,6 +68,47 @@ function archPath(box: { x: number; y: number; width: number; height: number }, 
 function isRectangle(points: readonly (readonly [number, number])[]): boolean {
   if (points.length !== 4) return false;
   return new Set(points.map((p) => Math.round(p[0] * 10))).size === 2 && new Set(points.map((p) => Math.round(p[1] * 10))).size === 2;
+}
+
+/** The classes of a plot: its shape, its state as a word, whether it needs checking, and whether it is the chosen one. A fill repeats what the mark says and adds nothing. */
+function plotClass(plot: SheetPlot, bedded: boolean): string {
+  const state = plot.mark.state;
+  return ["plot", bedded ? "bed" : "", state ?? "", plot.mark.needsChecking ? "checking" : "", plot.selected ? "selected" : ""].filter((c) => c !== "").join(" ");
+}
+
+const round1 = (n: number): number => Math.round(n * 10) / 10;
+
+/** The turf under the foot of an arch: an ellipse a little wider than the arch, its lower edge 3 px under the plot. */
+function Turf({ box }: { box: SheetPlot["box"] }) {
+  const w = Math.max(6, box.width);
+  const rx = w / 2 + Math.min(11, Math.max(4, w * 0.2));
+  const ry = Math.max(4, box.height * 0.17);
+  return <ellipse className="turf" cx={round1(box.x + box.width / 2)} cy={round1(box.y + box.height + 3 - ry)} rx={round1(rx)} ry={round1(ry)} />;
+}
+
+/** The base at the foot of an arch, behind its code: 5 percent wider on each side, 27 percent of the arch high and never under the code band. A taken plot that is not the chosen one has a stone base. */
+function Base({ plot }: { plot: SheetPlot }) {
+  const { box } = plot;
+  const w = Math.max(6, box.width);
+  const height = Math.max(LABEL_BAND, box.height * 0.27);
+  const stone = plot.mark.state === "taken" && !plot.selected;
+  return <rect className={stone ? "base taken" : "base"} x={round1(box.x + box.width / 2 - w * 0.55)} y={round1(box.y + box.height - height)} width={round1(w * 1.1)} height={round1(height)} />;
+}
+
+/** The two patterns of a bed, drawn once in a sheet. A taken bed is planted and any other bed is bare soil. Their colours come from the theme. */
+function BedPatterns() {
+  return (
+    <defs>
+      <pattern id="crops" width="12" height="12" patternUnits="userSpaceOnUse">
+        <rect className="soil" width="12" height="12" fill="none" />
+        <circle className="crop" cx="6" cy="6" r="3.5" fill="none" />
+      </pattern>
+      <pattern id="furrows" width="12" height="12" patternUnits="userSpaceOnUse">
+        <rect className="soil" width="12" height="12" fill="none" />
+        <rect className="furrow" y="8" width="12" height="2" fill="none" />
+      </pattern>
+    </defs>
+  );
 }
 
 /** A strip of short slanted strokes along the north edge of a bed. */
@@ -127,6 +168,7 @@ export function SheetSvg({
           preserveAspectRatio="none"
         />
       ) : null}
+      {bedded ? <BedPatterns /> : null}
       {model.sections.map((s) =>
         s.points === undefined ? null : (
           <g key={s.sectionId}>
@@ -139,6 +181,7 @@ export function SheetSvg({
       )}
       {model.paths.map((p) => (
         <g key={p.pathId}>
+          <polyline className="path-edge" points={pointsOf(p.points)} />
           <polyline className="path" points={pointsOf(p.points)} />
           <polyline className="path-line" points={pointsOf(p.points)} />
           {p.label === undefined ? null : (
@@ -152,18 +195,20 @@ export function SheetSvg({
         <g key={plot.plotId}>
           {arched ? (
             <>
+              <Turf box={plot.box} />
               {plot.selected ? <path className="plot-selected-outer" d={archPath(plot.box, 3)} /> : null}
-              <path className={`plot${plot.mark.needsChecking ? " checking" : ""}${plot.selected ? " selected" : ""}`} d={archPath(plot.box)} />
+              <path className={plotClass(plot, false)} d={archPath(plot.box)} />
               {plot.box.width >= 22 ? <path className="arch-inner" d={archPath({ x: plot.box.x + 3, y: plot.box.y + 3, width: plot.box.width - 6, height: plot.box.height - 4 })} /> : null}
+              {plot.label === undefined ? null : <Base plot={plot} />}
               {plot.selected ? <path className="plot-selected-inner" d={archPath(plot.box, 1)} /> : null}
             </>
           ) : (
             <>
               {plot.selected ? <polygon className="plot-selected-outer" points={pointsOf(plot.points)} /> : null}
-              <polygon className={`plot${bedded ? " bed" : ""}${plot.mark.needsChecking ? " checking" : ""}${plot.selected ? " selected" : ""}`} points={pointsOf(plot.points)} />
+              <polygon className={plotClass(plot, bedded)} points={pointsOf(plot.points)} />
               {bedded && isRectangle(plot.points) && plot.box.width >= 24 && plot.box.height >= 24 ? <path className="hatch" d={hatchPath(plot.box)} /> : null}
               {bedded && plot.label !== undefined && !(plot.selected && model.tab !== undefined) ? (
-                <rect className="peg" x={plot.label.x - (plot.label.text.length * 7.4 + 10) / 2} y={plot.label.y - 14} width={plot.label.text.length * 7.4 + 10} height={20} />
+                <rect className="peg" x={round1(plot.label.x - (plot.label.text.length * CHAR_WIDTH + 12) / 2)} y={round1(plot.label.y - LABEL_SIZE - 1)} width={round1(plot.label.text.length * CHAR_WIDTH + 12)} height={LABEL_SIZE + 5} />
               ) : null}
               {plot.selected ? <polygon className="plot-selected-inner" points={pointsOf(plot.points)} /> : null}
             </>
@@ -212,6 +257,11 @@ const KEY_WORDS: Record<KeyState, { word: string; shape: string }> = {
   checking: { word: "legendChecking", shape: "checking" },
 };
 
+/** The classes of a key swatch. They are the classes of a plot in the drawing, so the same rules fill both. */
+function swatchClass(state: KeyState, bedded: boolean): string {
+  return ["plot", bedded ? "bed" : "", state].filter((c) => c !== "").join(" ");
+}
+
 /** A small drawing of each mark, beside its word. The word always appears with its symbol. */
 export function MapKey() {
   const { t, app } = useShell();
@@ -224,10 +274,10 @@ export function MapKey() {
         <li key={state}>
           <svg width="28" height="28" aria-hidden="true" className="swatch">
             {arched ? (
-              <path className={`plot${state === "checking" ? " checking" : ""}`} d={archPath({ x: 5, y: 3, width: 18, height: 22 })} />
+              <path className={swatchClass(state, false)} d={archPath({ x: 5, y: 3, width: 18, height: 22 })} />
             ) : (
               <>
-                <rect className={`plot${arched ? "" : bedded ? " bed" : ""}${state === "checking" ? " checking" : ""}`} x="3" y="3" width="22" height="22" />
+                <rect className={swatchClass(state, bedded)} x="3" y="3" width="22" height="22" />
                 {bedded ? <path className="hatch" d="M6 9L11 5M11 9L16 5M16 9L21 5" /> : null}
               </>
             )}

@@ -127,30 +127,37 @@ export function bestSpot(text: string, size: number, spots: readonly Spot[], sce
   return best;
 }
 
-/** Places round a mark such as the gate. Above and below first, since a mark often stands on a line. */
-export function spotsAround(x: number, y: number, reach = 0): Spot[] {
+/**
+ * Places round a mark such as the gate. Above and below first, since a mark often stands on a line. The offsets are
+ * written for text of 12 px. A larger size moves the places below the mark down by the extra height, and the places
+ * beside it down by half of that, so each keeps the same clearance. The places above need no change: the bottom of a
+ * box is the same distance from its baseline at every size.
+ */
+export function spotsAround(x: number, y: number, reach = 0, size = 12): Spot[] {
   const r = 14 + reach;
+  const d = size - 12;
+  const h = d / 2;
   return [
     { x, y: y - r - 3, anchor: "middle" },
-    { x, y: y + r + 13, anchor: "middle" },
-    { x: x + r, y: y + 4, anchor: "start" },
-    { x: x - r, y: y + 4, anchor: "end" },
+    { x, y: y + r + 13 + d, anchor: "middle" },
+    { x: x + r, y: y + 4 + h, anchor: "start" },
+    { x: x - r, y: y + 4 + h, anchor: "end" },
     { x: x + 8, y: y - r - 1, anchor: "start" },
     { x: x - 8, y: y - r - 1, anchor: "end" },
-    { x: x + 8, y: y + r + 11, anchor: "start" },
-    { x: x - 8, y: y + r + 11, anchor: "end" },
-    { x, y: y - r - 20, anchor: "middle" },
-    { x, y: y + r + 30, anchor: "middle" },
-    { x: x + r + 24, y: y + 4, anchor: "start" },
-    { x: x - r - 24, y: y + 4, anchor: "end" },
+    { x: x + 8, y: y + r + 11 + d, anchor: "start" },
+    { x: x - 8, y: y + r + 11 + d, anchor: "end" },
+    { x, y: y - r - 20 - d, anchor: "middle" },
+    { x, y: y + r + 30 + d, anchor: "middle" },
+    { x: x + r + 24, y: y + 4 + h, anchor: "start" },
+    { x: x - r - 24, y: y + 4 + h, anchor: "end" },
     // A gate on the edge of a section: inside the outline, above then below the walk, a little way in.
     { x: x + 32, y: y - r - 1, anchor: "start" },
-    { x: x + 32, y: y + r + 11, anchor: "start" },
+    { x: x + 32, y: y + r + 11 + d, anchor: "start" },
     { x: x + 64, y: y - r - 1, anchor: "start" },
-    { x: x + 64, y: y + r + 11, anchor: "start" },
+    { x: x + 64, y: y + r + 11 + d, anchor: "start" },
     // Where the walk runs between two outlines and those do not fit: as near the walk as still keeps 8 px off its dots.
     { x: x + 32, y: y - 11, anchor: "start" },
-    { x: x + 32, y: y + 20, anchor: "start" },
+    { x: x + 32, y: y + 20 + d, anchor: "start" },
   ];
 }
 
@@ -167,14 +174,21 @@ export function spotsAlongTop(box: { x: number; y: number; width: number; height
     for (let x = box.x + 4; x + w <= box.x + box.width + 4; x += step) spots.push({ x, y: box.y - lift, anchor: "start" });
     spots.push({ x: box.x + box.width - 4, y: box.y - lift, anchor: "end" });
   }
-  spots.push({ x: box.x + 4, y: box.y + box.height + 16, anchor: "start" });
-  spots.push({ x: box.x + box.width - 4, y: box.y + box.height + 16, anchor: "end" });
-  for (let x = box.x + 8; x + w <= box.x + box.width; x += step) spots.push({ x, y: box.y + 16, anchor: "start" });
+  // Below the box and inside it, the baseline stands lower by the height that the text has over 12 px.
+  const d = size - 12;
+  spots.push({ x: box.x + 4, y: box.y + box.height + 16 + d, anchor: "start" });
+  spots.push({ x: box.x + box.width - 4, y: box.y + box.height + 16 + d, anchor: "end" });
+  for (let x = box.x + 8; x + w <= box.x + box.width; x += step) spots.push({ x, y: box.y + 16 + d, anchor: "start" });
   return spots;
 }
 
-/** Places along a line: above, below, then at each side, from the middle of each segment outward. */
-export function spotsAlongLine(points: readonly (readonly [number, number])[]): Spot[] {
+/**
+ * Places along a line: above, below, then at each side, from the middle of each segment outward. The offsets are
+ * written for text of 12 px. A larger size moves the places below the line down by the extra height, and the places
+ * beside it down by half of that.
+ */
+export function spotsAlongLine(points: readonly (readonly [number, number])[], size = 12): Spot[] {
+  const d = size - 12;
   const segments: { a: readonly [number, number]; b: readonly [number, number]; length: number }[] = [];
   for (let i = 0; i + 1 < points.length; i++) {
     const a = points[i] as readonly [number, number];
@@ -187,7 +201,7 @@ export function spotsAlongLine(points: readonly (readonly [number, number])[]): 
     for (const s of segments) {
       const x = s.a[0] + (s.b[0] - s.a[0]) * fraction;
       const y = s.a[1] + (s.b[1] - s.a[1]) * fraction;
-      spots.push({ x, y: y - 10, anchor: "middle" }, { x, y: y + 20, anchor: "middle" }, { x: x + 10, y: y + 4, anchor: "start" }, { x: x - 10, y: y + 4, anchor: "end" });
+      spots.push({ x, y: y - 10, anchor: "middle" }, { x, y: y + 20 + d, anchor: "middle" }, { x: x + 10, y: y + 4 + d / 2, anchor: "start" }, { x: x - 10, y: y + 4 + d / 2, anchor: "end" });
     }
   }
   // Where a walk runs between two outlines there may be no room for the easy places. These sit a little closer.
@@ -195,7 +209,7 @@ export function spotsAlongLine(points: readonly (readonly [number, number])[]): 
     for (const s of segments) {
       const x = s.a[0] + (s.b[0] - s.a[0]) * fraction;
       const y = s.a[1] + (s.b[1] - s.a[1]) * fraction;
-      spots.push({ x, y: y - 7, anchor: "middle" }, { x, y: y + 16, anchor: "middle" });
+      spots.push({ x, y: y - 7, anchor: "middle" }, { x, y: y + 16 + d, anchor: "middle" });
     }
   }
   if (spots.length === 0) {

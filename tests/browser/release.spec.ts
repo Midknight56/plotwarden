@@ -445,21 +445,19 @@ function fontFilesOf(dir: string, out: string[] = []): string[] {
 }
 
 test.describe("the fonts of the built site", () => {
-  test("every font file is in the built site and in the offline list, and the distinct files are under 150,000 bytes", async ({ page }) => {
-    const files = fontFilesOf(SITE_DIR);
-    expect(files.length).toBeGreaterThanOrEqual(10);
+  test("each font file is in the built site once and in the offline list, and together they are under 150,000 bytes", async ({ page }) => {
+    const files = fontFilesOf(SITE_DIR).filter((f) => !/[\\/]review[\\/]/.test(f));
+    const names = files.map((f) => f.split(/[\\/]/).pop() as string);
+    expect(files.length, `${files.length} font files: ${files.join(", ")}`).toBe(10);
+    expect(new Set(names).size, "ten different names").toBe(10);
     const distinct = new Map<string, number>();
     for (const file of files) distinct.set(createHash("sha256").update(readFileSync(file)).digest("hex"), statSync(file).size);
     expect(distinct.size, "ten distinct font files").toBe(10);
     const total = [...distinct.values()].reduce((a, b) => a + b, 0);
-    expect(total, `the distinct font files together, ${total} bytes`).toBeLessThan(150_000);
-    // Each app folder, and the hub, holds its own copies. Each of them is under the limit too.
-    for (const folder of ["", "churchyard", "allotments"]) {
-      const own = fontFilesOf(join(SITE_DIR, folder)).filter((f) => folder !== "" || !/[\\/](churchyard|allotments|review)[\\/]/.test(f));
-      const bytes = own.reduce((sum, f) => sum + statSync(f).size, 0);
-      expect(bytes, `${folder === "" ? "hub" : folder} fonts, ${bytes} bytes`).toBeLessThan(150_000);
-    }
+    expect(total, `the font files together, ${total} bytes`).toBeLessThan(150_000);
     const shell = await shellOf(page, SITE);
+    const listed = shell.files.filter((f) => f.endsWith(".woff2") && !f.startsWith("/review/"));
+    expect(listed.length, `the offline list names ${listed.length} font files`).toBe(10);
     for (const file of files) {
       const path = `/${file.slice(SITE_DIR.length + 1).replace(/\\/g, "/")}`;
       expect(shell.files, path).toContain(path);

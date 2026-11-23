@@ -312,6 +312,8 @@ interface Reading {
   mistAnimation: string;
   animated: string[];
   transitioned: string[];
+  /** Every element and part that has a transition: whether it is a button, and what it changes and how long it takes. */
+  transitions: { button: boolean; property: string; duration: string }[];
   scrollBehavior: string;
 }
 
@@ -321,11 +323,15 @@ async function readMotion(page: Page): Promise<Reading> {
     const mist = document.querySelector<HTMLElement>(".mist");
     const animated: string[] = [];
     const transitioned: string[] = [];
+    const transitions: { button: boolean; property: string; duration: string }[] = [];
     for (const el of document.querySelectorAll("*")) {
       for (const pseudo of [null, "::before", "::after"] as const) {
         const style = getComputedStyle(el, pseudo);
         if (style.animationName !== "none" && style.display !== "none") animated.push(`${el.tagName.toLowerCase()}${el.className ? `.${String(el.className).split(" ")[0]}` : ""}${pseudo ?? ""}`);
-        if (style.transitionDuration.split(",").some((d) => d.trim() !== "0s")) transitioned.push(`${el.tagName.toLowerCase()}${pseudo ?? ""}`);
+        if (style.transitionDuration.split(",").some((d) => d.trim() !== "0s")) {
+          transitioned.push(`${el.tagName.toLowerCase()}${pseudo ?? ""}`);
+          transitions.push({ button: pseudo === null && el.classList.contains("button"), property: style.transitionProperty, duration: style.transitionDuration });
+        }
       }
     }
     return {
@@ -335,6 +341,7 @@ async function readMotion(page: Page): Promise<Reading> {
       mistAnimation: mist === null ? "none" : getComputedStyle(mist).animationName,
       animated,
       transitioned,
+      transitions,
       scrollBehavior: getComputedStyle(document.documentElement).scrollBehavior,
     };
   });
@@ -368,14 +375,21 @@ for (const app of APPS) {
           expect(read.transitioned).toEqual([]);
           expect(read.scrollBehavior).toBe("auto");
         } else if (c.contrast === "high") {
-          // High contrast takes the decorative mist away, even when motion is allowed.
+          // High contrast takes the decorative mist away, even when motion is allowed, and runs no transition (L5.6).
           expect(read.mistDisplay).toBe("none");
           expect(read.animated).toEqual([]);
+          expect(read.transitioned).toEqual([]);
         } else {
-          // Motion is allowed: the one decoration is the mist, and nothing else moves.
+          // Motion is allowed: the one decoration is the mist. The only other thing that moves is the colour of a button,
+          // its fill and its border, in 120 ms (L5.5). Nothing else has a transition.
           expect(read.mistDisplay).not.toBe("none");
           expect(read.mistAnimation).not.toBe("none");
-          expect(read.transitioned).toEqual([]);
+          expect(read.transitions.length, "buttons change colour in 120 ms").toBeGreaterThan(0);
+          for (const t of read.transitions) {
+            expect(t.button, `a transition on something that is not a button: ${JSON.stringify(t)}`).toBe(true);
+            expect(t.property).toBe("background-color, border-color");
+            expect(t.duration).toBe("0.12s, 0.12s");
+          }
         }
         await check(page, `motion ${c.resolved}`);
       });
@@ -400,6 +414,132 @@ for (const app of APPS) {
       await page.emulateMedia({ reducedMotion: "no-preference" });
       await expect(page.locator("html")).toHaveAttribute("data-motion", "reduce");
       expect((await readMotion(page)).animated).toEqual([]);
+    });
+  });
+}
+
+// ---- Components (spec 07, L5) ----------------------------------------------------------------------------------
+// The sizes of the shared components, read from the real page: a button 46 high, an index row 44, a field 48, a check
+// row 44 with a 24 px box inside a 44 by 44 target, an invalid field with a 3 px solid error border and a mark, and a
+// saved notice with its tick. `measureLayout` already refuses a target under 44 or two targets under 12 apart.
+
+for (const app of APPS) {
+  test.describe(`${app.title}, components`, () => {
+    test.use({ baseURL: app.origin });
+
+    test("a button is 46 high, an index row is 44 high with a chevron and 12 apart, and a field is 48 high", async ({ page }) => {
+      const siteId = await openPractice(page, app);
+      await page.goto(`/#/r/${siteId}`);
+      await settle(page);
+      const read = await page.evaluate(() => {
+        const visible = (el: Element): boolean => el.getBoundingClientRect().height > 0 && getComputedStyle(el).visibility !== "hidden";
+        const rect = (el: Element) => el.getBoundingClientRect();
+        const rows = [...document.querySelectorAll<HTMLElement>(".link-group .button")].filter(visible);
+        const groupOf = (el: Element): number => [...document.querySelectorAll(".link-group ul")].indexOf(el.closest("ul") as Element);
+        const primary = [...document.querySelectorAll<HTMLElement>("main .button.primary")].filter(visible)[0];
+        const outlined = [...document.querySelectorAll<HTMLElement>("main .button:not(.primary):not(.quiet)")].filter((b) => visible(b) && b.closest(".link-group") === null)[0];
+        const field = [...document.querySelectorAll<HTMLElement>('main input:not([type="checkbox"]):not([type="radio"])')].filter(visible)[0];
+        return {
+          rows: rows.map((r) => ({ group: groupOf(r), groupWidth: rect(r.closest("ul") as Element).width, top: rect(r).top, bottom: rect(r).bottom, height: rect(r).height, width: rect(r).width, chevron: getComputedStyle(r, "::after").content, border: getComputedStyle(r).borderTopWidth })),
+          keyGap: ((): number => {
+            const sheet = document.querySelector(".sheet-scroll");
+            const key = document.querySelector(".map-key");
+            return sheet === null || key === null ? Number.NaN : key.getBoundingClientRect().top - sheet.getBoundingClientRect().bottom;
+          })(),
+          primaryHeight: primary === undefined ? 0 : rect(primary).height,
+          outlinedHeight: outlined === undefined ? 0 : rect(outlined).height,
+          fieldHeight: field === undefined ? 0 : rect(field).height,
+          fieldFont: field === undefined ? "" : getComputedStyle(field).fontSize,
+          labelFont: ((): string => {
+            const label = document.querySelector<HTMLElement>(".field label");
+            return label === null ? "" : `${getComputedStyle(label).fontSize} ${getComputedStyle(label).fontWeight}`;
+          })(),
+        };
+      });
+      expect(read.rows.length, "the index rows of the desk").toBeGreaterThanOrEqual(3);
+      expect(read.rows.some((row, i) => read.rows[i + 1]?.group === row.group), "a group of more than one row was measured").toBe(true);
+      for (const [i, row] of read.rows.entries()) {
+        expect(Math.round(row.height), `row ${i} height`).toBe(44);
+        expect(Math.round(row.width), `row ${i} fills its group`).toBe(Math.round(row.groupWidth));
+        expect(row.chevron, `row ${i} has a chevron`).toContain("›");
+        expect(row.border).toBe("1px");
+        const next = read.rows[i + 1];
+        if (next !== undefined && next.group === row.group) expect(Math.round(next.top - row.bottom), `rows ${i} and ${i + 1} are 12 apart`).toBe(12);
+      }
+      expect(Math.abs(read.keyGap), "the key joins the map: the two frames touch").toBeLessThanOrEqual(1);
+      expect(Math.round(read.primaryHeight), "the main action").toBeGreaterThanOrEqual(46);
+      expect(Math.round(read.primaryHeight), "the main action").toBeLessThanOrEqual(60);
+      expect(Math.round(read.outlinedHeight), "an outlined button").toBeGreaterThanOrEqual(46);
+      expect(Math.round(read.fieldHeight), "a field").toBe(48);
+      expect(read.fieldFont).toBe("16px");
+      expect(read.labelFont).toBe("14px 700");
+      await check(page, "desk components");
+    });
+
+    test("a check row is 44 high with a 24 px box in a 44 by 44 target, and the saved notice has its tick", async ({ page }) => {
+      await page.goto("/#/settings");
+      await settle(page);
+      const checkRow = await page.evaluate(() => {
+        const input = [...document.querySelectorAll<HTMLInputElement>('input[type="checkbox"], input[type="radio"]')].find((el) => el.getBoundingClientRect().height > 0);
+        if (input === undefined) return undefined;
+        const row = input.closest(".check");
+        const before = getComputedStyle(input, "::before");
+        const r = input.getBoundingClientRect();
+        return {
+          rowHeight: row === null ? 0 : row.getBoundingClientRect().height,
+          width: r.width,
+          height: r.height,
+          boxWidth: before.width,
+          boxHeight: before.height,
+          boxBorder: before.borderTopWidth,
+          appearance: getComputedStyle(input).appearance,
+        };
+      });
+      expect(checkRow, "a check box or a radio button on the settings screen").toBeDefined();
+      expect(Math.round(checkRow?.rowHeight ?? 0)).toBe(44);
+      expect([checkRow?.width, checkRow?.height]).toEqual([44, 44]);
+      expect([checkRow?.boxWidth, checkRow?.boxHeight, checkRow?.boxBorder]).toEqual(["24px", "24px", "2px"]);
+      expect(checkRow?.appearance).toBe("none");
+      await check(page, "settings with check rows");
+
+      await page.getByLabel("Reduce motion").check();
+      await expect(page.getByLabel("Reduce motion")).toBeChecked();
+      await page.getByRole("button", { name: "Save settings" }).click();
+      const notice = page.locator(".notice.good");
+      await expect(notice).toHaveText("Settings saved.");
+      const style = await notice.evaluate((el) => ({ border: getComputedStyle(el).borderTopColor, mark: getComputedStyle(el, "::before").width, markColour: getComputedStyle(el, "::before").backgroundColor, tick: getComputedStyle(el, "::after").transform, text: el.textContent }));
+      expect(style.border).toBe("rgb(31, 91, 54)");
+      expect([style.mark, style.markColour]).toEqual(["24px", "rgb(31, 91, 54)"]);
+      expect(style.tick).not.toBe("none");
+      expect(style.text, "the mark adds no word").toBe("Settings saved.");
+    });
+
+    test("an invalid field has a 3 px solid error border, a mark and the message, and holds focus", async ({ page }) => {
+      await page.goto("/#/new");
+      await settle(page);
+      if (app.currency !== undefined) await page.getByLabel("Currency").selectOption(app.currency);
+      await page.getByRole("button", { name: "Create register" }).click();
+      const message = page.getByText("Enter a site name.");
+      await expect(message).toBeVisible();
+      const input = page.getByLabel("Site name");
+      await expect(input).toBeFocused();
+      const field = await input.evaluate((el) => {
+        const s = getComputedStyle(el);
+        return { width: s.borderTopWidth, style: s.borderTopStyle, colour: s.borderTopColor, height: el.getBoundingClientRect().height };
+      });
+      expect(field).toEqual({ width: "3px", style: "solid", colour: "rgb(139, 26, 26)", height: 48 });
+      const mark = await message.evaluate((el) => {
+        const s = getComputedStyle(el, "::before");
+        return { width: s.width, height: s.height, radius: s.borderTopLeftRadius, colour: s.backgroundColor, weight: getComputedStyle(el).fontWeight, ink: getComputedStyle(el).color, text: el.textContent };
+      });
+      expect(mark.width).toBe("20px");
+      expect(mark.height).toBe("20px");
+      expect(mark.radius).toBe("50%");
+      expect(mark.colour).toBe("rgb(139, 26, 26)");
+      expect(mark.weight).toBe("600");
+      expect(mark.ink).toBe("rgb(139, 26, 26)");
+      expect(mark.text, "the mark adds no word").toBe("Enter a site name.");
+      await check(page, "invalid field");
     });
   });
 }

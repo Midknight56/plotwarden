@@ -17,6 +17,15 @@ export interface MeasureOptions {
 
 /** Everything is measured inside the page, then sent back as plain data. */
 export async function measureLayout(page: Page, options: MeasureOptions = {}): Promise<Violation[]> {
+  // A colour change of 120 ms, as a button goes from disabled to ready, is over before anything is measured: a contrast
+  // read half way is not the contrast of the page at rest. An animation with no end (the band mist) is left out, because
+  // it would hold the wait for ever.
+  await page.waitForFunction(() =>
+    document.getAnimations().every((a) => {
+      const timing = a.effect?.getComputedTiming();
+      return timing === undefined || timing.iterations === Infinity || a.playState === "finished" || a.playState === "idle";
+    }),
+  );
   const found = await page.evaluate((opts) => {
     const violations: { rule: string; element: string; detail: string }[] = [];
     const TOLERANCE = 0.5;

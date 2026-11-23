@@ -121,6 +121,14 @@ export async function settle(page: Page): Promise<void> {
   await expect(page.locator("main h1").first()).toBeVisible();
   await page.waitForFunction(() => !/Opening register/.test(document.querySelector("main")?.textContent ?? ""));
   await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
+  // A colour change of 120 ms (a button that was disabled while the page loaded) is over before anything is measured.
+  // An animation with no end, the band mist, is left out, because it would hold the wait for ever.
+  await page.waitForFunction(() =>
+    document.getAnimations().every((a) => {
+      const timing = a.effect?.getComputedTiming();
+      return timing === undefined || timing.iterations === Infinity || a.playState === "finished" || a.playState === "idle";
+    }),
+  );
 }
 
 /** The routes of the library, the same in both apps. */
