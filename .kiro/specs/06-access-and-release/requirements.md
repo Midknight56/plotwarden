@@ -253,7 +253,7 @@ A first time reader shall see what the product does and one thing to press in fi
 
 ## Z22 The write-up
 
-Tests: `tests/unit/release.test.ts` (group "T36 the write-up"), `check:links`, `check:public`. Implements the evidence rule of `.kiro/steering/evidence.md`. Built in task 12-write-up. Task 6.31 changed its headings and its paragraphs. Task 6.32 changed items 5 and 9, and the write-up names only what was used.
+Tests: `tests/unit/release.test.ts` (group "T36 the write-up"), `check:links`, `check:public`. Implements the evidence rule of `.kiro/steering/evidence.md`. Built in task 12-write-up. Task 6.31 changed its headings and its paragraphs. Task 6.32 changed items 5 and 9, and the write-up names only what was used. Task 6.33 added item 10 and changed the opening paragraph.
 
 1. When the repository is read, `docs/write-up.md` shall exist and shall hold exactly eight second level headings, in this order: "Kiro IDE, CLI, Web, Crew", "Custom agents", "Agent hooks", "Spec driven development", "Steering docs", "MCP", "Property based testing (PBT)", "Kiro powers".
 2. When a section is read, it shall hold two paragraphs that start with a bold label, "Done." and "Effect.", in that order, once each. There shall be no "Not done." paragraph. The page answers what each heading asks, and stops. The effect shall link to a file of this repository or cite a row of `docs/kiro-log.md`.
@@ -264,6 +264,7 @@ Tests: `tests/unit/release.test.ts` (group "T36 the write-up"), `check:links`, `
 7. When `docs/kiro-log.md` is read, no row shall carry a date later than the day the check runs, and a row shall carry the day its work was done.
 8. When the README is read, the section "Technological Implementation" shall link to `docs/write-up.md`.
 9. Facts that come from a person's own observation and not from a file (the profile of each step, the spec against short prompt run, the live host) shall be labelled so. The Crew version shall be labelled by where it is recorded: the host record `docs/acceptance/host/README.md` in the Desk repository, written as code and not as a link. Nothing in the page claims use by a person or time saved.
+10. When the write-up is read, no line shall hold "not used", "not on record", "no activation", "not in this repository", "does not say which" or "not a browser assertion".
 
 ---
 

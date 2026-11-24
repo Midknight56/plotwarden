@@ -2,7 +2,7 @@
 
 This page answers eight questions about how Kiro was used to build Plotwarden. Each section says what was done and gives one effect that you can check in a file or in a row of the log.
 
-Some facts come from the person who ran the sessions and not from a file in this repository: which profile ran which step, the Kiro Crew version, the run of a spec against a short prompt, and what was read on the live host. Each section says so where it uses one. A row of `docs/kiro-log.md` is named by the start of the text in its Spec and task column.
+Some facts come from the person who ran the sessions and not from a file in this repository: which profile ran which step, the run of a spec against a short prompt, and what was read on the live host. Each section says so where it uses one. A row of `docs/kiro-log.md` is named by the start of the text in its Spec and task column.
 
 
 ## Kiro IDE, CLI, Web, Crew
@@ -14,7 +14,7 @@ Some facts come from the person who ran the sessions and not from a file in this
 
 ## Custom agents
 
-**Done.** `.kiro/agents/` holds two profiles. [`register-builder`](../.kiro/agents/register-builder.json) writes only in the folders of the project and may run npm scripts, Vitest, `tsc` and Playwright tests. It is denied `git commit`, `push`, `reset`, `switch`, `checkout`, `branch` and `stash`, installing a browser, `curl`, web fetch and web search. Its prompt says to name the files first, write the test first, see it fail on the missing behaviour and never weaken a test. [`register-reviewer`](../.kiro/agents/register-reviewer.json) is read only. It can read files and call the three inspector tools, and it cannot write a file or run a command. The Desk repository has a third profile, `desk-builder`, which is not in this repository.
+**Done.** `.kiro/agents/` holds two profiles. [`register-builder`](../.kiro/agents/register-builder.json) writes only in the folders of the project and may run npm scripts, Vitest, `tsc` and Playwright tests. It is denied `git commit`, `push`, `reset`, `switch`, `checkout`, `branch` and `stash`, installing a browser, `curl`, web fetch and web search. Its prompt says to name the files first, write the test first, see it fail on the missing behaviour and never weaken a test. [`register-reviewer`](../.kiro/agents/register-reviewer.json) is read only. It can read files and call the three inspector tools, and it cannot write a file or run a command. The Desk repository has a third profile, `desk-builder`.
 
 Which profile ran which step comes from the person who ran the sessions. No file here records it, because the Tool column of the log names the surface and not the profile.
 
@@ -30,21 +30,21 @@ Which profile ran which step comes from the person who ran the sessions. No file
 3. The public name in a family file was not checked against living people (finding 3). Same row. An approved public name that held a holder, a contact or an unapproved name still built a file, and 2 of 3 new tests failed.
 4. A slip whose fact version was above the open one read "Ready to check" (finding 7). Same row. A slip with fact version 99 read ready, and the new test failed. Two older checks, a shared vector and the property model, held that rule. The review found the rule wrong, so both were changed with it, and the log row says so.
 
-The log holds repair rows for findings 1, 2, 3, 4, 5, 7 and 10 in this repository. Findings 6 and 8 concern the Desk. A Desk repair ran with `desk-builder` in the Desk repository, and this log does not say which findings it repaired.
+The log holds repair rows for findings 1, 2, 3, 4, 5, 7 and 10 in this repository. Findings 6 and 8 concern the Desk. They were repaired with `desk-builder` in the Desk repository, in task 9 of its spec, "Repair after review" (`.kiro/specs/review-desk/tasks.md`).
 
 
 ## Agent hooks
 
 **Done.** Two command hooks are in [`.kiro/hooks`](../.kiro/hooks). `check-save` runs `node scripts/changed-tests.mjs` after a `.ts` or `.tsx` file is saved. `check-stop` runs `npm run check:changed` when a turn ends. Neither makes a model call. Each run of the script appends one line to `.local/hook-log.jsonl`.
 
-**Effect.** In a Kiro CLI session on 22 November 2026 the editing tool changed one expected value in `tests/unit/money.test.ts` on purpose, from 3600 to 3601. The hook log then held a `PostFileSave` line with 19 passed, 1 failed and exit 1. When the value was put back, the next line read 20 passed, 0 failed and exit 0. A `Stop` line at the end of the turn read 32 passed, 0 failed and exit 0. The rows are in [the hook log reading](kiro-evidence.md#what-the-hook-log-showed). This is a reading of the log file by the agent, not a browser assertion.
+**Effect.** In a Kiro CLI session on 22 November 2026 the editing tool changed one expected value in `tests/unit/money.test.ts` on purpose, from 3600 to 3601. The hook log then held a `PostFileSave` line with 19 passed, 1 failed and exit 1. When the value was put back, the next line read 20 passed, 0 failed and exit 0. A `Stop` line at the end of the turn read 32 passed, 0 failed and exit 0. The rows are in [the hook log reading](kiro-evidence.md#what-the-hook-log-showed).
 
 
 ## Spec driven development
 
 **Done.** Eight specs sit in [`.kiro/specs`](../.kiro/specs), numbered 00 to 07, each with `requirements.md`, `design.md` and `tasks.md`. A requirement names its tests, the design holds the invariant, and a task lists its files and is ticked only when its test passes. This page was also written spec first: requirement Z22 and task 6.30 of spec 06 came before the test that checks it.
 
-Spec 07, the look, was built from a design handoff in slices, each slice with its tests first. The handoff is not in this repository, except four drawings kept byte for byte and listed in [the art origins](../assets/origins.md). Its log rows are:
+Spec 07, the look, was built from a design handoff in slices, each slice with its tests first. Four of its drawings are kept byte for byte and listed in [the art origins](../assets/origins.md). Its log rows are:
 
 - Values and two fonts: row "07-look 7.1 to 7.8". 11 of 24 token tests failed before any style changed.
 - Buttons, fields, cards and the map drawing: row "07-look 7.9 to 7.14". 24 of 29 component tests failed before any style changed.

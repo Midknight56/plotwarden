@@ -1549,13 +1549,20 @@ describe("T36 the write-up (Z22)", () => {
       expect(body).not.toContain("web app");
     });
 
-    it("no line of the page says a thing was not used, not on record or has no activation", () => {
+    it("no line of the page says a thing was not used, not on record, has no activation, is not in this repository, does not say which or is not a browser assertion", () => {
       expect(writeUp().length).toBeGreaterThan(0);
-      const banned = ["not used", "not on record", "no activation"];
+      const banned = ["not used", "not on record", "no activation", "not in this repository", "does not say which", "not a browser assertion"];
       const hits = writeUp()
         .split("\n")
         .filter((line) => banned.some((text) => line.toLowerCase().includes(text)));
       expect(hits).toEqual([]);
+    });
+
+    it("the opening paragraph that lists the facts from the person who ran the sessions does not name the Kiro Crew version", () => {
+      const opening = paragraphsOf(writeUp()).find((p) => p.includes("from the person who ran the sessions")) ?? "";
+      expect(opening).not.toBe("");
+      expect(opening).toContain("which profile ran which step");
+      expect(opening).not.toContain("Kiro Crew version");
     });
 
     it("Custom agents: the read only reviewer found twelve, four are named with their rows, and its inspector tools were off", () => {
