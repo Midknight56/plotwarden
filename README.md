@@ -4,7 +4,7 @@ Plotwarden keeps plot registers on the keeper's own device. There is no server, 
 
 **Live site:** https://plotwarden.pages.dev
 
-**Film:** https://youtu.be/emYYWQX-SLw (2 min 46 s, spoken and captioned)
+**Film:** https://youtu.be/wKHEp0O9Pww (2 min 33 s, spoken and captioned)
 
 ## Judging criteria at a glance
 
@@ -30,7 +30,7 @@ A burial can stay in one place for generations. A garden plot can change hands e
 
 ### Presentation
 
-Follow a warden to a burial, watch a secretary offer a plot, then follow a committee check back to its source. Check it in the captioned film: https://youtu.be/emYYWQX-SLw
+Follow a warden to a burial, watch a secretary offer a plot, then follow a committee check back to its source. Check it in the captioned film: https://youtu.be/wKHEp0O9Pww
 
 ## What it is
 
