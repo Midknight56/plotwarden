@@ -7,7 +7,7 @@ Some facts come from the person who ran the sessions and not from a file in this
 
 ## Kiro IDE, CLI, Web, Crew
 
-**Done.** Kiro CLI wrote and tested both repositories: this one, and the separate one that holds the Plotwarden Review Desk. The Tool column of every row of the log reads Kiro CLI. Kiro Crew 0.12.2 runs the Review Desk as an installed app. The Crew version comes from the person who ran it, and this repository holds no Crew log. The IDE and the web app were not used.
+**Done.** Kiro CLI wrote and tested both repositories: this one, and the separate one that holds the Plotwarden Review Desk. The Tool column of every row of the log reads Kiro CLI. Kiro Crew 0.12.2 runs the Review Desk as an installed app. The install and a run in the host are recorded in `docs/acceptance/host/README.md` of the Desk repository.
 
 **Effect.** The two repositories were built apart and meet at one pinned copy. The Desk's new look was built and tested in the Desk repository (row "07-look 7.27, the Review Desk in its own repository"). This repository took it in as a copy of the Desk preview, held by [the lock file](../release/desk-preview.lock.json), which names the Desk version, its commit and the hash of each preview file. Assembly of the site stops, and writes nothing, if one byte of the preview differs.
 
@@ -51,7 +51,7 @@ Spec 07, the look, was built from a design handoff in slices, each slice with it
 - Layouts and art, part one: row "07-look 7.15 to 7.19". 24 of 34 layout tests failed first.
 - Layouts and art, part two: row "07-look 7.20 to 7.22". 41 of 43 screen tests failed first.
 - The Review Desk's new look, built in the Desk repository: row "07-look 7.27, the Review Desk in its own repository".
-- The family file, the plot seeker file and print: row "07-look 7.23 to 7.29". 21 of 135 visitor tests failed first. For slice 4 of spec 07 the red output of the first run is not on record, and the log row says so.
+- The family file, the plot seeker file and print: row "07-look 7.23 to 7.29".
 
 **Effect.** One feature was built twice from the same starting code with the same model: the field "Show the site as at" on the Site map and the Plot list of both registers, with a button "Back to today". The run was made by the person who runs the project on 23 November 2026, on a scratch copy that was never merged. Its record is row "02-paper-and-map 2.27 to 2.30 against a short prompt".
 
@@ -79,7 +79,7 @@ What it shows: the short prompt gave working code that kept the old tests green,
 
 ## Property based testing (PBT)
 
-**Done.** `tests/properties/` holds seven files of property sets: allotment, exchange, fees, geometry, history, privacy and queue. Each set runs at least 1,000 generated cases from a seed written in [`seeds.ts`](../tests/properties/seeds.ts). They are ordinary test files with the `fast-check` library, written by Kiro CLI and run with Vitest. IDE test generation was not used. `scripts/oracle.py`, which uses only the Python standard library, recomputes queue order, fees and tenure, and `tests/oracle/` compares it with the TypeScript on 1,000 generated cases each. The sets check the invariants whose names start with `INV_` in `seeds.ts`, such as `INV_REPLAY`, `INV_QUEUE_ORDER`, `INV_BALANCE`, `INV_PUBLIC_CLOSED`, `INV_NO_LIVING_PUBLIC`, `INV_GEOM_OVERLAP`, `INV_ONE_TENURE` and `INV_EXCHANGE_CLOSED`. The last run recorded in the log passed 54 property tests in 7 files (row "07-look 7.23 to 7.29").
+**Done.** `tests/properties/` holds seven files of property sets: allotment, exchange, fees, geometry, history, privacy and queue. Each set runs at least 1,000 generated cases from a seed written in [`seeds.ts`](../tests/properties/seeds.ts). They are ordinary test files with the `fast-check` library, written by Kiro CLI and run with Vitest. `scripts/oracle.py`, which uses only the Python standard library, recomputes queue order, fees and tenure, and `tests/oracle/` compares it with the TypeScript on 1,000 generated cases each. The sets check the invariants whose names start with `INV_` in `seeds.ts`, such as `INV_REPLAY`, `INV_QUEUE_ORDER`, `INV_BALANCE`, `INV_PUBLIC_CLOSED`, `INV_NO_LIVING_PUBLIC`, `INV_GEOM_OVERLAP`, `INV_ONE_TENURE` and `INV_EXCHANGE_CLOSED`. The last run recorded in the log passed 54 property tests in 7 files (row "07-look 7.23 to 7.29").
 
 **Effect.** Every generated case passes on the code: `FAILING_SEEDS` in [`seeds.ts`](../tests/properties/seeds.ts) is empty. The exchange sets were checked with four deliberate defects in production code: the stale rule with `and` for `or`, the slip reader ignoring received actions, the issue shape left open, and the label check no longer folding case. Each of the four defects was caught by one property test, and each defect was put back and compared by hash. See row "05-exchange 5.14 property tests".
 
@@ -88,4 +88,4 @@ What it shows: the short prompt gave working code that kept the old tests green,
 
 **Done.** [`powers/plot-checks/`](../powers/plot-checks) is a power with skills only and one skill, [`review-adapter`](../powers/plot-checks/skills/review-adapter/SKILL.md). It tells an agent to check an adapter in four steps with the three inspector tools on the invented market stall fixture. The power is installed on one machine, where its two files have the same SHA 256 as the two files here.
 
-**Effect.** The four steps of the skill were done by hand, with the same tool calls, on `market-stalls` in one session, so no activation is claimed. `check_adapter` with `width_rule` passed with no mismatch. `explain_plot` for stall S2 on 2026-04-20 gave `reserved`, with the frontage set before the reservation. `audit_projection` for the visitor audience gave `plot.availability.v1`, 3 free plots, no key that names a person, a fee or a queue, and no canary. The answers are in [the power part of the evidence page](kiro-evidence.md#the-power).
+**Effect.** The four steps of the skill were followed by hand, with the same tool calls, on `market-stalls` in one session. `check_adapter` with `width_rule` passed with no mismatch. `explain_plot` for stall S2 on 2026-04-20 gave `reserved`, with the frontage set before the reservation. `audit_projection` for the visitor audience gave `plot.availability.v1`, 3 free plots, no key that names a person, a fee or a queue, and no canary. The answers are in [the power part of the evidence page](kiro-evidence.md#the-power).

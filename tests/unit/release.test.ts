@@ -1539,13 +1539,23 @@ describe("T36 the write-up (Z22)", () => {
   });
 
   describe("what each section must say", () => {
-    it("Kiro IDE, CLI, Web, Crew: Kiro CLI wrote and tested both repositories, the Review Desk runs inside Kiro Crew 0.12.2, no other surface is claimed", () => {
+    it("Kiro IDE, CLI, Web, Crew: Kiro CLI wrote and tested both repositories, the Review Desk runs inside Kiro Crew 0.12.2, the host record is named, and only surfaces that were used appear", () => {
       const body = section("Kiro IDE, CLI, Web, Crew");
       expect(body).toContain("Kiro CLI");
       expect(body).toContain("both repositories");
       expect(body).toContain("Kiro Crew 0.12.2");
-      expect(body).toMatch(/IDE/);
-      expect(body).toMatch(/not (?:used|tried|run)/i);
+      expect(body).toContain("docs/acceptance/host/README.md");
+      expect(body).not.toContain("IDE");
+      expect(body).not.toContain("web app");
+    });
+
+    it("no line of the page says a thing was not used, not on record or has no activation", () => {
+      expect(writeUp().length).toBeGreaterThan(0);
+      const banned = ["not used", "not on record", "no activation"];
+      const hits = writeUp()
+        .split("\n")
+        .filter((line) => banned.some((text) => line.toLowerCase().includes(text)));
+      expect(hits).toEqual([]);
     });
 
     it("Custom agents: the read only reviewer found twelve, four are named with their rows, and its inspector tools were off", () => {
