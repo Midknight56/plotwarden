@@ -65,9 +65,18 @@
   /* The map on paper: no lawn, turf, crops, furrows, stone or edge. The walk and the chosen plot are light grey, and
      every other plot is white, so the mark and the word tell the state apart. The `html` in front gives each rule more
      weight than the same rule in a theme file, whichever file loads last. The chosen plot comes last on purpose. */
-  html svg.sheet .section-outline,
   html svg.sheet .turf {
     fill: none;
+  }
+
+  /* A section keeps its dashed line, in a dark gray in place of the leaf green of the allotment. */
+  html svg.sheet .section-outline {
+    fill: none;
+    stroke: #595959;
+  }
+
+  html[data-contrast="high"] svg.sheet .section-outline {
+    stroke: #595959;
   }
 
   html svg.sheet .path-edge {
@@ -76,6 +85,30 @@
 
   html svg.sheet .path {
     stroke: #dadada;
+  }
+
+  /* A garden map stands on soil and its frame on the page ground. Neither prints. */
+  html svg.sheet,
+  html .sheet-scroll {
+    background: #ffffff;
+  }
+
+  /* A double rule under the title of a printed page. */
+  html main h1 {
+    padding-bottom: 10px;
+    border-bottom: 3px double #000000;
+  }
+
+  /* Every word is black on white. A heading in the green of the allotment and the second ink of a hint print black. The
+     rule is important because a rule of a class in a theme file has more weight than a type and would keep its colour. */
+  html main,
+  html main * {
+    color: #000000 !important;
+  }
+
+  html svg.sheet .label,
+  html svg.sheet .tab-text {
+    fill: #000000;
   }
 
   html svg.sheet .plot,
@@ -87,9 +120,23 @@
     fill: #ffffff;
   }
 
+  /* In high contrast the allotment theme sets the bed fill with an attribute selector, which has more weight than the
+     rules above. This rule has one more type than it, and comes before the chosen plot rules. It names no more classes
+     than they do, so the chosen plot rules, which come after it, win over it. */
+  html[data-contrast="high"] svg.sheet .plot.bed {
+    fill: #ffffff;
+  }
+
   html svg.sheet .plot.selected,
   html svg.sheet .plot.bed.selected,
   html svg.sheet .tab {
     fill: #e6e6e6;
+  }
+
+  /* The swatches of the key are drawn like the plots of the sheet, white, so the shapes tell the states apart. */
+  html svg.swatch .plot,
+  html svg.swatch .plot.taken,
+  html svg.swatch .plot.bed {
+    fill: #ffffff;
   }
 }

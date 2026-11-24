@@ -1,9 +1,15 @@
 // The map of an availability file, drawn from its public geometry alone. Pure text: it builds SVG as a string.
 // It imports only the visitor types and the label placement. Beds are footprints with a strip of hatching and a
 // square peg that holds the code. Other ground is a plain outline that says nothing about why it is not listed.
-// Text is drawn at real pixel size, so a drawing shown at its own width keeps 12 px labels. Colours come from the
-// page that holds the drawing, by class name.
-import { bestSpot, spotsAlongLine, spotsAlongTop, spotsAround } from "../map/labels";
+// Text is drawn at real pixel size, so a drawing shown at its own width keeps its sizes: every word 12 px, a tab 24
+// high with its code at 14 px bold. A visitor file holds two drawings, one made at 320 and one at 640, and shows the
+// one that fits its frame (spec 07, L9.7). Colours come from the page that holds the drawing, by class name.
+//
+// A tab touches its bed: its bottom edge meets the top of the bed, centred, and when that place would cover the walk
+// band, the gate, the north arrow, a name or another plot, it touches the bottom edge instead, and the drawing grows
+// (`placeTab`, spec 07, L9.5). While the tab of a bed shows, the code on its peg is hidden and the peg stays, so each
+// code shows once (L9.8). With `namesToLegend`, a name with no clear place is left to the legend that joins the map.
+import { CAPTION_COST, SHEET_MARGIN, TAB_HEIGHT, TAB_TEXT_SIZE, TAB_WALK_CLEAR, bestSpot, placeTab, spotsAlongLine, spotsAlongTop, spotsAround, tabWidth } from "../map/labels";
 import type { Box, Scene } from "../map/labels";
 import { escapeHtml } from "./familyMap";
 import type { AvailabilityFile, Point, PublicPlot } from "./privacy";
@@ -24,6 +30,12 @@ export interface AvailabilityMapOptions {
   sectionBoxes?: boolean;
   /** Give each plot a group that a script can select. */
   selectable?: boolean;
+  /** Leave a name with no clear place to the legend that joins the map in a visitor file. Default false. */
+  namesToLegend?: boolean;
+  /** Keep every tab off every other tab, for tabs that show together. Default false. */
+  tabsApart?: boolean;
+  /** Which of the two drawings of a visitor file this is. Written as `data-view`, for the page to show one at a time. */
+  view?: "narrow" | "wide";
 }
 
 const num = (n: number): string => String(Math.round(n * 10) / 10);
@@ -102,19 +114,17 @@ export function availabilityMapSvg(file: AvailabilityFile, options: Availability
   const gx = X(file.gate.x);
   const gy = Y(file.gate.y);
   if (context) hard.push({ box: { x0: gx - 6, y0: gy - 6, x1: gx + 6, y1: gy + 6 }, gap: 4 });
-  const place = (text: string, spots: ReturnType<typeof spotsAround>, lines: Scene["lines"]): { x: number; y: number; anchor: string } => {
+  const place = (text: string, spots: ReturnType<typeof spotsAround>, lines: Scene["lines"]): { x: number; y: number; anchor: string } | undefined => {
     const best = bestSpot(text, 12, spots, scene(lines));
+    // A visitor file joins a legend to the map. A name with no clear place is left to it.
+    if (options.namesToLegend === true && best.cost >= CAPTION_COST) return undefined;
     hard.push({ box: best.box, gap: 2 });
     return { x: best.spot.x, y: best.spot.y, anchor: best.spot.anchor };
   };
-  const textAt = (text: string, spot: { x: number; y: number; anchor: string }): string =>
-    `<text x="${num(spot.x)}" y="${num(spot.y)}" font-size="12" text-anchor="${spot.anchor}">${escapeHtml(text)}</text>`;
+  const textAt = (text: string, spot: { x: number; y: number; anchor: string } | undefined): string =>
+    spot === undefined ? "" : `<text x="${num(spot.x)}" y="${num(spot.y)}" font-size="12" text-anchor="${spot.anchor}">${escapeHtml(text)}</text>`;
 
-  const out: string[] = [];
-  out.push(
-    `<svg class="map" viewBox="0 0 ${num(width)} ${num(height)}" width="${num(width)}" height="${num(height)}" role="img" aria-label="${escapeHtml(options.label)}" font-family="system-ui, Arial, sans-serif">`,
-  );
-
+  const out: string[] = [""];
   for (const g of ground) out.push(`<polygon class="ground" points="${pts(g.outline)}"/>`);
 
   if (context) {
@@ -149,6 +159,16 @@ export function availabilityMapSvg(file: AvailabilityFile, options: Availability
     }
   }
 
+  // Tabs are placed after the names, so each keeps clear of them, and the drawing grows to hold a tab under its last plot.
+  const groundBoxes: Box[] = ground.map((g) => {
+    const b = boundsOf(g.outline);
+    return { x0: X(b.minX), y0: Y(b.maxY), x1: X(b.maxX), y1: Y(b.minY) };
+  });
+  const tabHard: Scene["hard"] = [...hard];
+  const tabLines: Scene["lines"] = lineSets.map((points) => ({ points, clear: TAB_WALK_CLEAR }));
+  const tabsApart = options.tabsApart === true;
+  let drawnHeight = height;
+
   for (const b of bedBoxes) {
     const { plot } = b;
     const selected = options.selectedPlotId === plot.id;
@@ -162,23 +182,30 @@ export function availabilityMapSvg(file: AvailabilityFile, options: Availability
       for (let x = b.x0 + 3; x + 8 <= b.x1 - 2; x += 6) strokes.push(`M${num(x)} ${num(b.y0 + 10)}L${num(x + 8)} ${num(b.y0 + 3)}`);
       out.push(`<path class="hatch" d="${strokes.join("")}"/>`);
     }
+    // The code of a plot shows once. While the tab of the plot shows, the code on its peg is hidden and the peg stays.
+    // A plot that is chosen in the markup has no code on its peg. A plot that a script chooses hides it by its class.
     if (labels) {
       const pegW = Math.max(30, [...plot.code].length * 7.4 + 10);
       const cx = (b.x0 + b.x1) / 2;
       if (w >= pegW + 6 && h >= 34) {
         const top = b.y1 - 22;
         out.push(`<rect class="peg" x="${num(cx - pegW / 2)}" y="${num(top)}" width="${num(pegW)}" height="18"/>`);
-        out.push(`<text x="${num(cx)}" y="${num(top + 13.5)}" font-size="12" text-anchor="middle">${escapeHtml(plot.code)}</text>`);
-      } else {
-        out.push(`<text x="${num(cx)}" y="${num(b.y1 + 15)}" font-size="12" text-anchor="middle">${escapeHtml(plot.code)}</text>`);
+        if (!selected) out.push(`<text class="peg-code" x="${num(cx)}" y="${num(top + 13.5)}" font-size="12" text-anchor="middle">${escapeHtml(plot.code)}</text>`);
+      } else if (!selected) {
+        out.push(`<text class="peg-code" x="${num(cx)}" y="${num(b.y1 + 15)}" font-size="12" text-anchor="middle">${escapeHtml(plot.code)}</text>`);
       }
     }
     if (selected || options.selectable === true) {
-      const cx = (b.x0 + b.x1) / 2;
       const hidden = selected ? "" : ` class="selbits"`;
       out.push(`<g${hidden}><polygon class="sel-outer" points="${pts(plot.outline as Point[])}"/><polygon class="sel-inner" points="${pts(plot.outline as Point[])}"/>`);
-      const tabW = Math.max(48, [...plot.code].length * 9 + 16);
-      out.push(`<rect class="tab" x="${num(cx - tabW / 2)}" y="${num(b.y0 - 34)}" width="${num(tabW)}" height="24"/><text class="tab-text" x="${num(cx)}" y="${num(b.y0 - 17)}" font-size="14" text-anchor="middle">${escapeHtml(plot.code)}</text></g>`);
+      const own: Box = { x0: b.x0, y0: b.y0, x1: b.x1, y1: b.y1 };
+      const others = [...bedBoxes.filter((o) => o !== b).map((o) => ({ x0: o.x0, y0: o.y0, x1: o.x1, y1: o.y1 })), ...groundBoxes];
+      const { box } = placeTab(own, tabWidth(plot.code), { width, height, hard: tabHard, lines: tabLines, soft: [], plots: others });
+      if (tabsApart) tabHard.push({ box, gap: 4 });
+      drawnHeight = Math.max(drawnHeight, box.y1 + SHEET_MARGIN);
+      out.push(
+        `<rect class="tab" x="${num(box.x0)}" y="${num(box.y0)}" width="${num(box.x1 - box.x0)}" height="${TAB_HEIGHT}"/><text class="tab-text" x="${num((box.x0 + box.x1) / 2)}" y="${num(box.y0 + 17)}" font-size="${TAB_TEXT_SIZE}" text-anchor="middle">${escapeHtml(plot.code)}</text></g>`,
+      );
     }
     out.push("</g>");
   }
@@ -187,5 +214,6 @@ export function availabilityMapSvg(file: AvailabilityFile, options: Availability
     out.push(`<g class="north" transform="translate(${num(north.x)} ${num(north.y)}) rotate(${file.north})"><path d="M0 -14L6 8L0 3L-6 8Z"/></g>`);
   }
   out.push("</svg>");
+  out[0] = `<svg class="map"${options.view === undefined ? "" : ` data-view="${options.view}"`} viewBox="0 0 ${num(width)} ${num(drawnHeight)}" width="${num(width)}" height="${num(drawnHeight)}" role="img" aria-label="${escapeHtml(options.label)}" font-family="system-ui, Arial, sans-serif">`;
   return out.join("");
 }

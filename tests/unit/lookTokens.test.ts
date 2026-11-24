@@ -108,11 +108,13 @@ const REGISTER = "template/src/ui/register.css";
 const CHURCH_THEME = "apps/churchyard-register/src/theme.css";
 const GARDEN_THEME = "apps/allotment-register/src/theme.css";
 const SITE = "site/src/site.css";
+const MARKET_THEME = "examples/market/src/theme.css";
 
 const SCOPES = {
   plain: [REGISTER],
   church: [REGISTER, CHURCH_THEME],
   garden: [REGISTER, GARDEN_THEME],
+  market: [REGISTER, MARKET_THEME],
   site: [SITE],
 } as const;
 type Scope = keyof typeof SCOPES;
@@ -343,6 +345,53 @@ describe("the contrast of the allotment values", () => {
   });
   it("meets the same floors in high contrast", () => {
     expect(measure("garden", true, GARDEN_HIGH)).toEqual([]);
+  });
+});
+
+// The market stall example (L11, task 7.26). A third use gives its own few values in its own theme file and the shared
+// foundation needs no change. Its paper, ink and main action are the values of the design.
+const MARKET: readonly Pair[] = [
+  ["ink on paper", "--ink", "--paper", 4.5],
+  ["ink on field", "--ink", "--field", 4.5],
+  ["ink on soft", "--ink", "--soft", 4.5],
+  ["muted on paper", "--muted", "--paper", 4.5],
+  ["error on paper", "--error", "--paper", 4.5],
+  ["main action text on its fill", "--action-ink", "--action", 4.5],
+  ["main action text on hover", "--action-ink", "--action-hover", 4.5],
+  ["main action text on pressed", "--action-ink", "--action-pressed", 4.5],
+  ["main action edge on paper", "--action-edge", "--paper", 3],
+  ["main action fill on paper", "--action", "--paper", 3],
+  ["focus ring on paper", "--focus", "--paper", 3],
+  ["ink on the page ground", "--ink", "--ground", 4.5],
+];
+
+describe("the contrast of the market example values", () => {
+  it("meets 4.5 to 1 for text and 3 to 1 for edges and rings", () => {
+    expect(measure("market", false, [...SHARED, ...ON_LIGHT_GROUND, ...MARKET])).toEqual([]);
+  });
+  it("meets the same floors in high contrast", () => {
+    expect(measure("market", true, HIGH)).toEqual([]);
+  });
+  it("has the paper, the ink and the main action of the design, as declared values in its own file", () => {
+    const own = layerOf([MARKET_THEME], "root");
+    const want: Record<string, string> = { "--paper": "#fbf6ee", "--ink": "#2a2320", "--action": "#8e3b2f", "--action-ink": "#ffffff", "--action-edge": "#8e3b2f" };
+    for (const [name, hex] of Object.entries(want)) expect(own.get(name)?.toLowerCase(), name).toBe(hex);
+  });
+  it("is the adapter's own paper and ink too, because the shell sets those two from the adapter", async () => {
+    const { marketAdapter } = await import("../../examples/market/src/adapter");
+    expect(marketAdapter.theme.paper.toLowerCase()).toBe(valueOf(SCOPES.market, false, "--paper").toLowerCase());
+    expect(marketAdapter.theme.ink.toLowerCase()).toBe(valueOf(SCOPES.market, false, "--ink").toLowerCase());
+    expect(marketAdapter.theme.accent?.toLowerCase()).toBe(valueOf(SCOPES.market, false, "--action").toLowerCase());
+  });
+  it("keeps the comment of the file in step with the values", () => {
+    const css = read(MARKET_THEME);
+    expect(css).toContain("#2A2320");
+    expect(css).toContain("#FBF6EE");
+    expect(css).not.toMatch(/#2B2118|#F6EFE3/i);
+  });
+  it("changes nothing in the foundation: the file holds custom properties, the heading font and the line under the header, and no other rule", () => {
+    const selectors = topBlocks(read(MARKET_THEME)).map((b) => b.selector);
+    expect(selectors).toEqual([":root", "h1, h2, h3, header.app .brand", "header.app"]);
   });
 });
 

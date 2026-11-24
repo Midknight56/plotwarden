@@ -9,7 +9,7 @@ import { readFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 import { AVAILABILITY_CANARIES, CONTACTS, NEW_HOLDER, RECEIPT_REF, TENANTS } from "../helpers/gardenCanaries";
 import { measureLayout, trackRequests } from "../helpers/measureLayout";
-import { siteIdOf, storedEvents } from "../helpers/routes";
+import { restPointer, siteIdOf, storedEvents } from "../helpers/routes";
 import { expectNoNameInAddress, expectSearchOutOfAddress } from "../helpers/screens";
 
 const APP = "http://127.0.0.1:4178/";
@@ -26,7 +26,10 @@ const sizeOf = (page: Page): string => ((page.viewportSize()?.width ?? 0) < 600 
 async function check(page: Page, name?: string): Promise<void> {
   const violations = await measureLayout(page);
   expect(violations, JSON.stringify(violations, null, 1)).toEqual([]);
-  if (name !== undefined) await page.screenshot({ path: `${SHOTS}/${name}-${sizeOf(page)}.png`, type: "png" });
+  if (name !== undefined) {
+    await restPointer(page);
+    await page.screenshot({ path: `${SHOTS}/${name}-${sizeOf(page)}.png`, type: "png" });
+  }
 }
 
 async function openBeds(page: Page): Promise<void> {

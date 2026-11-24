@@ -462,7 +462,10 @@ describe("print removes the ground, turf, patterns, edge and stone fill (L6.4)",
   it("puts the html prefix on every rule that draws the sheet, so it outranks a theme file whatever the order they load in", () => {
     const sheetRules = print.filter((r) => declOf(r.body, "fill") !== undefined || declOf(r.body, "stroke") !== undefined);
     expect(sheetRules.length).toBeGreaterThan(8);
-    for (const r of sheetRules) expect(r.selector.startsWith("html svg.sheet "), r.selector).toBe(true);
+    // Two more prefixes, each with its own reason, and each one checked against the theme rules it must outrank in
+    // lookPrint.test.ts: the high contrast form of a rule (an attribute selector gives a theme rule more weight than
+    // the plain form has), and the swatches of the key, which are drawn like the plots of the sheet.
+    for (const r of sheetRules) expect(/^html(\[data-contrast="high"\])? svg\.(sheet|swatch) /.test(r.selector), r.selector).toBe(true);
   });
 });
 

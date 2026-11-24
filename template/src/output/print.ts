@@ -31,6 +31,7 @@ const page = (o: PrintOptions): string => `@page{size:${o.paper} ${o.orientation
 const BASE_CSS = `*{box-sizing:border-box}
 html{background:#fff;color:#000;font:12pt/1.45 system-ui,"Segoe UI",Arial,sans-serif}
 body{margin:0}
+header{padding-bottom:10px;margin-bottom:12pt;border-bottom:3px double #000}
 h1{font-size:22pt;margin:0 0 4pt}h2{font-size:15pt;margin:14pt 0 6pt}h3{font-size:12pt;margin:10pt 0 4pt}
 p,ul,ol{margin:0 0 6pt}
 ul.plain,ol.plain{list-style:none;padding:0}
@@ -45,14 +46,14 @@ tr{break-inside:avoid;page-break-inside:avoid}
 .arch-inner{fill:none;stroke:#444;stroke-width:1}
 .section{fill:none;stroke:#888;stroke-width:1.5;stroke-dasharray:8 4}
 .outline{fill:none;stroke:#666;stroke-width:1}
-.walk,.walk-sample{fill:none;stroke:#bbb;stroke-width:${WALK_BAND};stroke-linecap:round}
+.walk,.walk-sample{fill:none;stroke:#dadada;stroke-width:${WALK_BAND};stroke-linecap:round}
 .walk-line,.walk-line-sample{fill:none;stroke:#000;stroke-width:1.5;stroke-dasharray:1 6;stroke-linecap:round}
 .section-sample{stroke:#888;stroke-width:1.5;stroke-dasharray:8 4}
 .gate,.gate-sample{fill:#000;stroke:#000}
 .north{fill:#000}
 .sel-outer{fill:none;stroke:#fff;stroke-width:7}
 .sel-inner{fill:none;stroke:#000;stroke-width:3}
-.tab{fill:#ddd;stroke:#000;stroke-width:2}
+.tab{fill:#e6e6e6;stroke:#000;stroke-width:2}
 .tab-text{font-weight:700}
 .bed{fill:#fff;stroke:#000;stroke-width:2}
 .hatch{fill:none;stroke:#444;stroke-width:1.25}

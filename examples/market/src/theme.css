@@ -1,9 +1,15 @@
-/* The look of the market stall register: warm paper in dark brown ink. Ink #2B2118 on paper #F6EFE3.
-   High contrast replaces both colours. Nothing here moves. */
+/* The look of the market stall register: warm paper in dark brown ink, with a brick red main action. Ink #2A2320 on
+   paper #FBF6EE. These few values are all this app gives the shared foundation. High contrast replaces them. Nothing
+   here moves. The shell takes the paper and the ink from the adapter too, which holds the same two values. */
 
 :root {
-  --awning: #8a4b1f;
-  --awning-ink: #f6efe3;
+  --paper: #fbf6ee;
+  --ink: #2a2320;
+  --action: #8e3b2f;
+  --action-ink: #ffffff;
+  --action-edge: #8e3b2f;
+  --action-hover: #75301f;
+  --action-pressed: #5f2619;
 }
 
 h1,
@@ -14,5 +20,5 @@ header.app .brand {
 }
 
 header.app {
-  border-bottom: 4px solid var(--awning);
+  border-bottom: 4px solid var(--action);
 }

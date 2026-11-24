@@ -149,6 +149,9 @@ export async function measureLayout(page: Page, options: MeasureOptions = {}): P
       if (text === "" || el === null || seen.has(el)) continue;
       if (["SCRIPT", "STYLE", "OPTION", "TITLE"].includes(el.tagName)) continue;
       if (!visible(el) && el.namespaceURI !== "http://www.w3.org/2000/svg") continue;
+      // A word of a drawing that is not drawn (a hidden tab, or the drawing a visitor file does not show at this width)
+      // is not read: it has no box, so it has no size on the screen.
+      if (el.namespaceURI === "http://www.w3.org/2000/svg" && el.getClientRects().length === 0) continue;
       if (el.closest("[hidden], [aria-hidden='true']") !== null) continue;
       seen.add(el);
       const style = getComputedStyle(el);

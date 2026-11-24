@@ -922,7 +922,8 @@ describe("T22 plain outlines of the other plots (C5.10)", () => {
     await env.must([settings({ outlines: true })]);
     const { file } = built();
     const html = buildFamilyHtml(file, FAMILY_WORDS);
-    expect(html.match(/<polygon class="outline"/g)).toHaveLength(11);
+    // The page holds the drawing twice, one for a narrow frame and one for a wide frame, and the print holds it once.
+    expect(html.match(/<polygon class="outline"/g)).toHaveLength(22);
     const print = buildFamilyPrint(file, FAMILY_WORDS, { paper: "A4", orientation: "portrait" });
     expect(print.match(/<polygon class="outline"/g)).toHaveLength(11);
     expect(JSON.parse(/<script type="application\/json" id="plot-family">([\s\S]*?)<\/script>/.exec(html)?.[1] ?? "").outlines).toEqual(file.outlines);
@@ -1118,12 +1119,18 @@ describe("T22 the drawn map keeps every code and name off the walk, the plots an
   it("writes a plot code on its tab only, never beside the plot", async () => {
     await env.must([settings({ outlines: true }), ...SOUTH_AND_NORTH.map((ref) => withLine(ref))]);
     const html = buildFamilyHtml(built().file, FAMILY_WORDS);
-    const { texts } = readDrawing(html);
     const codes = new Set(built().file.plots.map((p) => p.code));
+    // The register's own drawing writes the gate and the walk under the drawing when they have no clear place.
+    const { texts } = readDrawing(familyMapSvg(built().file, { width: 320, label: "Map", selectable: true }));
     const written = texts.filter((t) => codes.has(t.text));
     expect(written.length).toBe(codes.size);
     for (const t of written) expect(t.tab, `${t.text} is on a tab`).toBe(true);
     expect(texts.filter((t) => !t.tab).map((t) => t.text).sort()).toEqual(["Lantern Gate", "N", "Yew Walk"]);
+    // A visitor drawing leaves those two names to its legend when they have no clear place, and writes no code beside a plot.
+    for (const m of drawingsOf(html)) {
+      expect(m.tabs.map((t) => t.code).sort()).toEqual([...codes].sort());
+      expect(m.names.map((t) => t.text).filter((t) => t !== "N" && t !== "Lantern Gate" && t !== "Yew Walk")).toEqual([]);
+    }
   });
 
   it("draws the tab of the selected plot alone, and of every plot for a print of the whole map", async () => {
@@ -1164,5 +1171,654 @@ describe("T22 the drawn map keeps every code and name off the walk, the plots an
     expect(css).toMatch(/html\.has-script \.selbits\{display:none\}/);
     expect(css).toMatch(/html\.has-script \.plotg\.on \.selbits\{display:inline\}/);
     expect(css).not.toMatch(/(^|\})\.selbits\{display:none\}/);
+  });
+});
+
+// ---------------------------------------------------------------------------------------------------------
+// The visitor files in the new look (spec 07, tasks 7.23 to 7.25, L9 and L10). The expected values are the ones
+// the design handoff names: the night `#232A5C` with a 4 px `#F2C96B` line, the code tab, the gate and the walk.
+// They are typed here, not read back from the code. The files stay one sealed file on system fonts.
+// ---------------------------------------------------------------------------------------------------------
+import { contrast, declOf, rulesOf } from "../helpers/cssRules";
+
+const styleOf = (html: string): string => /<style>([\s\S]*?)<\/style>/.exec(html)?.[1] ?? "";
+
+/** The value of a property in the last rule with exactly this selector, inside the given at rule ("" is the top level). */
+function declIn(html: string, selector: string, property: string, at = ""): string | undefined {
+  let found: string | undefined;
+  for (const rule of rulesOf(styleOf(html))) if (rule.selector === selector && rule.at === at) found = declOf(rule.body, property) ?? found;
+  return found;
+}
+
+/** A hex as six upper case digits, whichever way it was written. */
+function hexOf(value: string | undefined): string | undefined {
+  const m = /#([0-9a-f]{3}|[0-9a-f]{6})\b/i.exec(value ?? "");
+  if (m === null) return undefined;
+  const digits = (m[1] as string).length === 3 ? [...(m[1] as string)].map((c) => c + c).join("") : (m[1] as string);
+  return `#${digits.toUpperCase()}`;
+}
+
+/** Every hex colour in a piece of CSS, as six upper case digits. */
+const hexesIn = (css: string): string[] => [...css.matchAll(/#(?:[0-9a-f]{6}|[0-9a-f]{3})\b/gi)].map((m) => hexOf(m[0]) as string);
+const isGray = (hex: string): boolean => hex.slice(1, 3) === hex.slice(3, 5) && hex.slice(3, 5) === hex.slice(5, 7);
+
+const PRINT = "@media print";
+
+describe("7.23 the family file in the look of the churchyard (L9)", () => {
+  const html = (): string => buildFamilyHtml(built().file, FAMILY_WORDS);
+
+  it("uses system fonts for text and Georgia for headings, and holds no font file", () => {
+    const page = html();
+    expect(declIn(page, "html", "font")).toMatch(/16px\/1\.5 system-ui/);
+    for (const heading of ["h1", "h2", "h3"]) expect(declIn(page, heading, "font-family"), heading).toMatch(/^Georgia,/);
+    expect(styleOf(page)).not.toMatch(/@font-face|url\(|Atkinson|Gelasio|woff/i);
+  });
+
+  it("draws the header band in the night with a 4 px amber line below it", () => {
+    const page = html();
+    expect(hexOf(declIn(page, ".sky", "background"))).toBe("#232A5C");
+    expect(declIn(page, ".sky", "border-bottom")).toBe("4px solid #F2C96B");
+    expect(hexOf(declIn(page, ".sky", "color"))).toBe("#FAF5E9");
+    expect(hexOf(declIn(page, ".sky p", "color"))).toBe("#C9CEE6");
+  });
+
+  it("stands the search, the burial card and the directions in one column and the map in the other", () => {
+    const page = html();
+    const find = page.indexOf('<div class="col-find">');
+    const map = page.indexOf('<div class="col-map">');
+    expect(page.indexOf('<div class="cols">')).toBeGreaterThan(-1);
+    expect(find, "the first column comes first").toBeGreaterThan(page.indexOf('<div class="cols">'));
+    expect(map).toBeGreaterThan(find);
+    const first = page.slice(find, map);
+    for (const part of ['id="find-heading"', 'id="q"', 'id="list"', 'id="entrance-heading"', "Enter at Lantern Gate"]) expect(first, part).toContain(part);
+    const second = page.slice(map);
+    for (const part of ['id="map-heading"', '<svg class="map"', 'id="printloc"', 'id="printmap"']) expect(second, part).toContain(part);
+    expect(first).not.toContain("<svg");
+    expect(declIn(page, ".cols", "display")).toBe("flex");
+    expect(declIn(page, ".cols", "flex-wrap")).toBe("wrap");
+    expect(declIn(page, ".col-find", "flex")).toBe("1 1 320px");
+    expect(declIn(page, ".col-map", "flex")).toBe("1.5 1 420px");
+  });
+
+  it("draws the burial card with a 2 px edge, stone corners and the name at 24 px, and the code in its tab", () => {
+    const page = html();
+    expect(declIn(page, "ul.list li", "border")).toBe("2px solid #22252C");
+    expect(declIn(page, "ul.list li", "border-radius")).toBe("16px 16px 2px 2px");
+    expect(hexOf(declIn(page, "ul.list li", "background"))).toBe("#FFFEF8");
+    expect(declIn(page, ".name", "font")).toMatch(/^700 24px\/1\.2 Georgia,/);
+    expect(hexOf(declIn(page, ".code-tab", "background"))).toBe("#F2C96B");
+    expect(declIn(page, ".code-tab", "border")).toBe("2px solid #22252C");
+    expect(page).toMatch(/<strong class="name">Mirel Quillmoss<\/strong>/);
+    expect(page).toMatch(/Plot <span class="code-tab">Y07<\/span> · Section Yew Walk/);
+  });
+
+  it("fills the chosen plot and its tab, and draws every other plot as a plain outline, with a solid gate and a gravel walk", () => {
+    const page = html();
+    expect(declIn(page, ".arch", "fill")).toBe("none");
+    expect(declIn(page, ".arch-inner", "display")).toBe("none");
+    expect(hexOf(declIn(page, ".plotg.on .arch", "fill"))).toBe("#F2C96B");
+    expect(hexOf(declIn(page, ".tab", "fill"))).toBe("#F2C96B");
+    expect(hexOf(declIn(page, ".tab", "stroke"))).toBe("#22252C");
+    expect(hexOf(declIn(page, ".gate", "fill"))).toBe("#22252C");
+    expect(hexOf(declIn(page, ".walk", "stroke"))).toBe("#D9CDB0");
+    expect(declIn(page, ".walk-line", "stroke-dasharray")).toBe("1 6");
+  });
+
+  it("joins the legend to the bottom of the map in one frame, with the gate and the walk", () => {
+    const page = html();
+    expect(page).toMatch(/<\/svg><ul class="legend">/);
+    const legend = /<ul class="legend">([\s\S]*?)<\/ul>/.exec(page)?.[1] ?? "";
+    expect(legend).toContain('<span class="key-gate"></span>Lantern Gate');
+    expect(legend).toContain('<span class="key-walk"></span>Yew Walk');
+    expect(declIn(page, ".map", "border")).toBe("2px solid #22252C");
+    expect(declIn(page, ".map", "border-bottom")).toBe("0");
+    expect(declIn(page, ".legend", "border")).toBe("2px solid #22252C");
+    expect(declIn(page, ".legend", "border-top")).toBe("0");
+    expect(hexOf(declIn(page, ".legend", "background"))).toBe("#FFFEF8");
+    // The two print buttons follow the frame.
+    expect(page.indexOf('id="printloc"')).toBeGreaterThan(page.indexOf('<ul class="legend">'));
+    expect(page.indexOf('id="printmap"')).toBeGreaterThan(page.indexOf('id="printloc"'));
+  });
+
+  it("keeps each pair of colours at its floor: text at 4.5 to 1, edges and rings at 3 to 1", () => {
+    const page = html();
+    const c = (selector: string, property: string): string => hexOf(declIn(page, selector, property)) as string;
+    const pairs: [string, string, string, number][] = [
+      ["ivory on the night", c(".sky", "color"), c(".sky", "background"), 4.5],
+      ["second text on the night", c(".sky p", "color"), c(".sky", "background"), 4.5],
+      ["amber line on the night", "#F2C96B", c(".sky", "background"), 3],
+      ["ink on the page", c("html", "color"), c("html", "background"), 4.5],
+      ["ink on the burial card", c("html", "color"), c("ul.list li", "background"), 4.5],
+      ["ink on the code tab", c("html", "color"), c(".code-tab", "background"), 4.5],
+      ["paper on the Find button", c("button.primary", "color"), c("button.primary", "background"), 4.5],
+      ["ink on a button", c("button", "color"), c("button", "background"), 4.5],
+      ["ink on the button when hovered", c("button", "color"), c("button:hover", "background"), 4.5],
+      ["ink on the legend", c("html", "color"), c(".legend", "background"), 4.5],
+      ["ink edge on the page", "#22252C", c("html", "background"), 3],
+      ["focus ring on the page", hexOf(declIn(page, ":focus-visible", "outline")) as string, c("html", "background"), 3],
+    ];
+    const failures = pairs.filter(([, fg, bg, floor]) => contrast(fg, bg) < floor).map(([what, fg, bg, floor]) => `${what}: ${fg} on ${bg} is ${contrast(fg, bg).toFixed(2)}, needs ${floor}`);
+    expect(failures).toEqual([]);
+  });
+
+  it("prints black on white, the walk #DADADA, the chosen plot and its tab #E6E6E6, and a double rule under the title", () => {
+    const page = html();
+    expect(hexOf(declIn(page, "html", "color", PRINT))).toBe("#000000");
+    expect(hexOf(declIn(page, "html", "background", PRINT))).toBe("#FFFFFF");
+    expect(hexOf(declIn(page, ".sky", "background", PRINT))).toBe("#FFFFFF");
+    expect(hexOf(declIn(page, ".sky", "color", PRINT))).toBe("#000000");
+    expect(declIn(page, ".sky", "border-bottom", PRINT)).toBe("3px double #000");
+    expect(hexOf(declIn(page, ".walk", "stroke", PRINT))).toBe("#DADADA");
+    expect(hexOf(declIn(page, ".plotg.on .arch", "fill", PRINT))).toBe("#E6E6E6");
+    expect(hexOf(declIn(page, ".tab", "fill", PRINT))).toBe("#E6E6E6");
+    expect(hexOf(declIn(page, ".code-tab", "background", PRINT))).toBe("#E6E6E6");
+    expect(hexOf(declIn(page, ".arch", "fill", PRINT))).toBe("#FFFFFF");
+    expect(hexOf(declIn(page, ".legend", "background", PRINT))).toBe("#FFFFFF");
+  });
+
+  it("holds only black, white and grays in its print rules, and sets the margin of the printed sheet", () => {
+    const page = html();
+    const rules = printRules(page);
+    expect(hexesIn(rules).filter((hex) => !isGray(hex))).toEqual([]);
+    // A4 at 96 per inch is 794 by 1123. The sheet keeps 52 above and below and 60 at the sides, on every page.
+    expect(styleOf(page)).toContain("@page{margin:52px 60px}");
+  });
+
+  it("tells the chosen plot from the others in grays by its double outline and its tab, never by its fill alone", () => {
+    const page = html();
+    expect(declIn(page, ".sel-inner", "stroke-width")).toBe("3");
+    expect(hexOf(declIn(page, ".sel-inner", "stroke"))).toBe("#22252C");
+    expect(page).toMatch(/class="selring"/);
+    expect(page).toMatch(/class="tab-text"/);
+  });
+});
+
+describe("7.24 the plot seeker file in the look of the allotment (L9)", () => {
+  beforeEach(async () => {
+    garden = await GardenEnv.create();
+    await buildThimble(garden, { geometry: true });
+    await garden.must([gardenSettings()]);
+  });
+  const html = (): string => buildAvailabilityHtml(gbuilt().file, AVAILABILITY_WORDS);
+
+  it("uses system fonts for text and for headings, and holds no font file", () => {
+    const page = html();
+    expect(declIn(page, "html", "font")).toMatch(/16px\/1\.5 system-ui/);
+    expect(styleOf(page)).not.toMatch(/@font-face|url\(|Georgia|Atkinson|Gelasio|woff/i);
+  });
+
+  it("draws the header band in the allotment sky with a 4 px leaf line below it", () => {
+    const page = html();
+    expect(hexOf(declIn(page, ".day", "background"))).toBe("#CFE7DF");
+    expect(hexOf(declIn(page, ".day", "color"))).toBe("#1B312A");
+    expect(declIn(page, ".day", "border-bottom")).toBe("4px solid #2F6B4F");
+    expect(hexOf(declIn(page, "html", "background"))).toBe("#F7F5E8");
+  });
+
+  it("stands the list and the directions in one column and the map in the other", () => {
+    const page = html();
+    const first = page.indexOf('<div class="col-find">');
+    const second = page.indexOf('<div class="col-map">');
+    expect(first).toBeGreaterThan(page.indexOf('<div class="cols">'));
+    expect(second).toBeGreaterThan(first);
+    for (const part of ['id="avail-heading"', 'id="list"', 'id="ask-heading"', 'id="entrance-heading"']) expect(page.slice(first, second), part).toContain(part);
+    for (const part of ['id="map-heading"', '<svg class="map"', 'id="printmap"']) expect(page.slice(second), part).toContain(part);
+    expect(page.slice(first, second)).not.toContain("<svg");
+    expect(declIn(page, ".cols", "flex-wrap")).toBe("wrap");
+    expect(declIn(page, ".col-find", "flex")).toBe("1 1 320px");
+    expect(declIn(page, ".col-map", "flex")).toBe("1.5 1 420px");
+  });
+
+  it("draws each plot card with a 2 px edge, round corners and a hatched strip, and the code in its tab", () => {
+    const page = html();
+    expect(declIn(page, "ul.list li", "border")).toBe("2px solid #1B312A");
+    expect(declIn(page, "ul.list li", "border-radius")).toBe("14px");
+    expect(hexOf(declIn(page, "ul.list li", "background"))).toBe("#FFFEF6");
+    expect(declIn(page, "ul.list li::before", "height")).toBe("8px");
+    expect(declIn(page, "ul.list li::before", "background")).toMatch(/^repeating-linear-gradient\(-45deg,/);
+    expect(hexOf(declIn(page, ".code-tab", "background"))).toBe("#BFE0EA");
+    expect(declIn(page, ".code-tab", "border")).toBe("2px solid #1B312A");
+    expect(page).toMatch(/<strong class="name">Plot <span class="code-tab">B03<\/span><\/strong>/);
+  });
+
+  it("fills the chosen bed and its tab in the sky blue of the next plot, and keeps the walk grass green", () => {
+    const page = html();
+    expect(hexOf(declIn(page, ".bed", "fill"))).toBe("#E6D6B4");
+    expect(hexOf(declIn(page, ".plotg.on .bed", "fill"))).toBe("#BFE0EA");
+    expect(hexOf(declIn(page, ".tab", "fill"))).toBe("#BFE0EA");
+    expect(hexOf(declIn(page, ".peg", "fill"))).toBe("#FFFEF6");
+    expect(hexOf(declIn(page, ".gate", "fill"))).toBe("#1B312A");
+    expect(hexOf(declIn(page, ".walk", "stroke"))).toBe("#CFE0B8");
+    expect(hexOf(declIn(page, "ul.list li.on", "background"))).toBe("#BFE0EA");
+  });
+
+  it("joins the legend to the bottom of the map in one frame, with the gate and the walk", () => {
+    const page = html();
+    expect(page).toMatch(/<\/svg><ul class="legend">/);
+    const legend = /<ul class="legend">([\s\S]*?)<\/ul>/.exec(page)?.[1] ?? "";
+    expect(legend).toContain('<span class="key-gate"></span>Thimble Gate');
+    expect(legend).toContain('<span class="key-walk"></span>Grass Walk');
+    expect(declIn(page, ".map", "border-bottom")).toBe("0");
+    expect(declIn(page, ".legend", "border")).toBe("2px solid #1B312A");
+    expect(declIn(page, ".legend", "border-top")).toBe("0");
+    expect(page.indexOf('id="printmap"')).toBeGreaterThan(page.indexOf('<ul class="legend">'));
+  });
+
+  it("keeps each pair of colours at its floor: text at 4.5 to 1, edges and rings at 3 to 1", () => {
+    const page = html();
+    const c = (selector: string, property: string): string => hexOf(declIn(page, selector, property)) as string;
+    const pairs: [string, string, string, number][] = [
+      ["ink on the band", c(".day", "color"), c(".day", "background"), 4.5],
+      ["leaf line on the band", "#2F6B4F", c(".day", "background"), 3],
+      ["ink on the page", c("html", "color"), c("html", "background"), 4.5],
+      ["ink on a plot card", c("html", "color"), c("ul.list li", "background"), 4.5],
+      ["ink on the chosen plot card", c("html", "color"), c("ul.list li.on", "background"), 4.5],
+      ["ink on the code tab", c("html", "color"), c(".code-tab", "background"), 4.5],
+      ["ink on a button", c("button", "color"), c("button", "background"), 4.5],
+      ["ink on the button when hovered", c("button", "color"), c("button:hover", "background"), 4.5],
+      ["ink on the legend", c("html", "color"), c(".legend", "background"), 4.5],
+      ["ink on a bed", c("html", "color"), c(".bed", "fill"), 4.5],
+      ["ink edge on the page", "#1B312A", c("html", "background"), 3],
+      ["focus ring on the page", hexOf(declIn(page, ":focus-visible", "outline")) as string, c("html", "background"), 3],
+    ];
+    const failures = pairs.filter(([, fg, bg, floor]) => contrast(fg, bg) < floor).map(([what, fg, bg, floor]) => `${what}: ${fg} on ${bg} is ${contrast(fg, bg).toFixed(2)}, needs ${floor}`);
+    expect(failures).toEqual([]);
+  });
+
+  it("prints black on white, the walk #DADADA, the chosen bed and its tab #E6E6E6, and a double rule under the title", () => {
+    const page = html();
+    expect(hexOf(declIn(page, "html", "color", PRINT))).toBe("#000000");
+    expect(hexOf(declIn(page, "html", "background", PRINT))).toBe("#FFFFFF");
+    expect(hexOf(declIn(page, ".day", "background", PRINT))).toBe("#FFFFFF");
+    expect(hexOf(declIn(page, ".day", "color", PRINT))).toBe("#000000");
+    expect(declIn(page, ".day", "border-bottom", PRINT)).toBe("3px double #000");
+    expect(hexOf(declIn(page, ".walk", "stroke", PRINT))).toBe("#DADADA");
+    expect(hexOf(declIn(page, ".bed", "fill", PRINT))).toBe("#FFFFFF");
+    expect(hexOf(declIn(page, ".plotg.on .bed", "fill", PRINT))).toBe("#E6E6E6");
+    expect(hexOf(declIn(page, ".tab", "fill", PRINT))).toBe("#E6E6E6");
+    expect(hexOf(declIn(page, "ul.list li.on", "background", PRINT))).toBe("#E6E6E6");
+    expect(hexOf(declIn(page, ".code-tab", "background", PRINT))).toBe("#E6E6E6");
+    expect(declIn(page, "ul.list li::before", "display", PRINT)).toBe("none");
+  });
+
+  it("holds only black, white and grays in its print rules, and sets the margin of the printed sheet", () => {
+    const page = html();
+    expect(hexesIn(printRules(page)).filter((hex) => !isGray(hex))).toEqual([]);
+    expect(styleOf(page)).toContain("@page{margin:52px 60px}");
+  });
+});
+
+// ---------------------------------------------------------------------------------------------------------
+// The mends of tasks 7.23 and 7.24 (spec 07, L9.4 to L9.9): one legend, a tab that touches its plot, and one
+// drawing for a narrow screen and one for a wide screen. The numbers below are worked by hand from the rules in
+// L9: a tab is 24 high, its bottom edge meets the top of its plot within 2 px and is centred on it, and a walk
+// band is 12 wide, so a box must keep 6 px from the middle of a walk.
+// ---------------------------------------------------------------------------------------------------------
+import { TAB_HEIGHT, placeTab } from "../../template/src/map/labels";
+import type { Scene } from "../../template/src/map/labels";
+import { availabilityMapSvg } from "../../template/src/output/availabilityMap";
+
+describe("7.23 where the tab of a plot goes (L9.5, L9.6)", () => {
+  const scene = (over: Partial<Scene> = {}): Scene => ({ width: 320, height: 400, hard: [], lines: [], soft: [], plots: [], ...over });
+  const plot: Box = { x0: 100, y0: 150, x1: 140, y1: 200 };
+  const centre = (b: Box): number => (b.x0 + b.x1) / 2;
+
+  it("sets the tab on the top of its plot, centred, when the place above is clear", () => {
+    const spot = placeTab(plot, 48, scene());
+    expect(spot.edge).toBe("top");
+    expect(Math.abs(spot.box.y1 - 150)).toBeLessThanOrEqual(2);
+    expect(spot.box.y1 - spot.box.y0).toBe(TAB_HEIGHT);
+    expect(TAB_HEIGHT).toBe(24);
+    expect(Math.abs(centre(spot.box) - 120)).toBeLessThanOrEqual(0.5);
+    expect(spot.box.x1 - spot.box.x0).toBe(48);
+  });
+
+  it("sets the tab on the bottom edge when the walk band lies where the top place would be", () => {
+    // The walk runs along y = 140. A tab above the plot would stand from 126 to 150 and cover the band.
+    const spot = placeTab(plot, 48, scene({ lines: [{ points: [[0, 140], [320, 140]], clear: 6 }] }));
+    expect(spot.edge).toBe("bottom");
+    expect(Math.abs(spot.box.y0 - 200)).toBeLessThanOrEqual(2);
+    expect(Math.abs(centre(spot.box) - 120)).toBeLessThanOrEqual(0.5);
+  });
+
+  it("sets the tab on the bottom edge when the top of the plot has no room in the drawing", () => {
+    const high: Box = { x0: 100, y0: 20, x1: 140, y1: 70 };
+    const spot = placeTab(high, 48, scene());
+    expect(spot.edge).toBe("bottom");
+    expect(Math.abs(spot.box.y0 - 70)).toBeLessThanOrEqual(2);
+  });
+
+  it("goes to the bottom edge for each of the north arrow, the gate, a name and another plot above", () => {
+    const above: Box = { x0: 108, y0: 120, x1: 132, y1: 146 };
+    for (const [what, over] of [
+      ["the north arrow", { hard: [{ box: above, gap: 4 }] }],
+      ["the gate", { hard: [{ box: above, gap: 4 }] }],
+      ["a name", { hard: [{ box: above, gap: 2 }] }],
+      ["another plot", { plots: [{ x0: 100, y0: 100, x1: 140, y1: 140 }] }],
+    ] as [string, Partial<Scene>][]) {
+      const spot = placeTab(plot, 48, scene(over));
+      expect(spot.edge, what).toBe("bottom");
+      expect(Math.abs(spot.box.y0 - 200), what).toBeLessThanOrEqual(2);
+    }
+  });
+
+  it("keeps clear of what it must when neither the top nor the bottom is clear", () => {
+    const blocks: Box[] = [
+      { x0: 90, y0: 120, x1: 150, y1: 148 },
+      { x0: 90, y0: 202, x1: 150, y1: 230 },
+    ];
+    const spot = placeTab(plot, 48, scene({ hard: blocks.map((box) => ({ box, gap: 2 })) }));
+    expect(spot.edge).not.toBe("top");
+    expect(spot.edge).not.toBe("bottom");
+    for (const b of blocks) expect(overlap(spot.box, b)).toBe(false);
+  });
+});
+
+/** One drawing read back as plain data, independent of the code that drew it. */
+interface ReadMap {
+  width: number;
+  height: number;
+  svg: string;
+  tabs: { code: string; plot: Box; tab: Box }[];
+  plots: Box[];
+  walks: [number, number][][];
+  gate: Box | undefined;
+  north: Box | undefined;
+  names: DrawnText[];
+  fontSizes: number[];
+}
+
+function readMap(svg: string): ReadMap {
+  const view = /viewBox="0 0 ([\d.]+) ([\d.]+)"/.exec(svg);
+  const num = (value: string | undefined): number => Number(value);
+  const plots: Box[] = [];
+  const tabs: ReadMap["tabs"] = [];
+  for (const chunk of svg.split('<g class="plotg"').slice(1)) {
+    const arch = /<path class="arch" d="M([\d.-]+) ([\d.-]+)L([\d.-]+) ([\d.-]+)A([\d.-]+) [\d.-]+ 0 0 1 ([\d.-]+) [\d.-]+L/.exec(chunk);
+    const bed = /<polygon class="bed" points="([^"]*)"/.exec(chunk);
+    let plot: Box | undefined;
+    if (arch !== null) plot = { x0: num(arch[1]), y0: num(arch[4]) - num(arch[5]), x1: num(arch[6]), y1: num(arch[2]) };
+    else if (bed !== null) {
+      const list = (bed[1] as string).trim().split(/\s+/).map((pair) => pair.split(",").map(Number) as [number, number]);
+      plot = { x0: Math.min(...list.map((p) => p[0])), y0: Math.min(...list.map((p) => p[1])), x1: Math.max(...list.map((p) => p[0])), y1: Math.max(...list.map((p) => p[1])) };
+    }
+    if (plot === undefined) continue;
+    plots.push(plot);
+    const rect = /<rect class="tab" x="([\d.-]+)" y="([\d.-]+)" width="([\d.-]+)" height="([\d.-]+)"\/><text class="tab-text"[^>]*>([^<]*)<\/text>/.exec(chunk);
+    if (rect !== null) tabs.push({ code: rect[5] as string, plot, tab: { x0: num(rect[1]), y0: num(rect[2]), x1: num(rect[1]) + num(rect[3]), y1: num(rect[2]) + num(rect[4]) } });
+  }
+  // The plain outlines of the other plots, which have no group and no tab, are plots too.
+  for (const m of svg.matchAll(/<polygon class="outline" points="([^"]*)"/g)) {
+    const list = (m[1] as string).trim().split(/\s+/).map((pair) => pair.split(",").map(Number) as [number, number]);
+    plots.push({ x0: Math.min(...list.map((p) => p[0])), y0: Math.min(...list.map((p) => p[1])), x1: Math.max(...list.map((p) => p[0])), y1: Math.max(...list.map((p) => p[1])) });
+  }
+  const walks = [...svg.matchAll(/<polyline class="walk" points="([^"]*)"/g)].map((m) => (m[1] as string).trim().split(/\s+/).map((pair) => pair.split(",").map(Number) as [number, number]));
+  const g = /<rect class="gate" x="([\d.-]+)" y="([\d.-]+)" width="12" height="12"/.exec(svg);
+  const n = /<g class="north" transform="translate\(([\d.-]+) ([\d.-]+)\)/.exec(svg);
+  const drawn = readDrawing(svg);
+  return {
+    width: num(view?.[1]),
+    height: num(view?.[2]),
+    svg,
+    tabs,
+    plots,
+    walks,
+    gate: g === null ? undefined : { x0: num(g[1]), y0: num(g[2]), x1: num(g[1]) + 12, y1: num(g[2]) + 12 },
+    north: n === null ? undefined : { x0: num(n[1]) - 7, y0: num(n[2]) - 15, x1: num(n[1]) + 7, y1: num(n[2]) + 9 },
+    names: drawn.texts.filter((t) => !t.tab),
+    fontSizes: [...svg.matchAll(/font-size="([\d.]+)"/g)].map((m) => Number(m[1])),
+  };
+}
+
+/**
+ * What a box lies on that a tab must keep off. Empty when it is clear. Independent of `placeTab`. With `room` the box
+ * must also keep the margins of L9.5 (2 px from a walk band, a name or a plot, 4 px from the gate and the north arrow);
+ * without it the box must only not cover them.
+ */
+function blockers(map: ReadMap, box: Box, own: Box, others: Box[] = [], room = false): string[] {
+  const found: string[] = [];
+  const grow = (b: Box, by: number): Box => ({ x0: b.x0 - by, y0: b.y0 - by, x1: b.x1 + by, y1: b.y1 + by });
+  for (const walk of map.walks) if (distanceToLine(box, walk) < WALK_BAND / 2 + (room ? 2 : 0)) found.push("the walk band");
+  if (map.gate !== undefined && overlap(box, grow(map.gate, room ? 4 : 0))) found.push("the gate");
+  if (map.north !== undefined && overlap(box, grow(map.north, room ? 4 : 0))) found.push("the north arrow");
+  for (const name of map.names) if (overlap(box, grow(name.box, room ? 2 : 0))) found.push(`the name ${name.text}`);
+  for (const plot of map.plots) if (plot !== own && overlap(box, grow(plot, room ? 2 : 0))) found.push("another plot");
+  for (const other of others) if (overlap(box, grow(other, room ? 4 : 0))) found.push("another tab");
+  if (box.x0 < (room ? 8 : 0) || box.x1 > map.width - (room ? 8 : 0) || box.y0 < (room ? 8 : 0)) found.push("the edge of the drawing");
+  return found;
+}
+
+/** Every fault of the tabs of one drawing. Empty when each touches its plot, or has a reason not to, and keeps clear. */
+function tabFaults(map: ReadMap, apart: boolean): string[] {
+  const faults: string[] = [];
+  expect(map.tabs.length, "the drawing holds tabs").toBeGreaterThan(0);
+  map.tabs.forEach(({ code, plot, tab }, i) => {
+    const others = apart ? map.tabs.filter((_, j) => j !== i).map((t) => t.tab) : [];
+    const cx = Math.abs((tab.x0 + tab.x1) / 2 - (plot.x0 + plot.x1) / 2);
+    const onTop = Math.abs(tab.y1 - plot.y0) <= 2;
+    const onBottom = Math.abs(tab.y0 - plot.y1) <= 2;
+    if (tab.y1 - tab.y0 < 20 || tab.y1 - tab.y0 > 26) faults.push(`${code}: the tab is ${tab.y1 - tab.y0} high`);
+    for (const b of blockers(map, tab, plot, others)) faults.push(`${code}: the tab lies on ${b}`);
+    if (tab.y1 > map.height) faults.push(`${code}: the tab leaves the bottom of the drawing`);
+    if (onTop) {
+      if (cx > 1) faults.push(`${code}: the tab is not centred on its plot`);
+    } else if (onBottom) {
+      if (cx > 1) faults.push(`${code}: the tab is not centred on its plot`);
+      const top: Box = { x0: tab.x0, x1: tab.x1, y0: plot.y0 - TAB_HEIGHT, y1: plot.y0 };
+      if (blockers(map, top, plot, others, true).length === 0) faults.push(`${code}: the tab is at the bottom although the top was clear`);
+    } else faults.push(`${code}: the tab touches neither the top nor the bottom of its plot`);
+  });
+  return faults;
+}
+
+const drawingsOf = (html: string): ReadMap[] => [...html.matchAll(/<svg class="map[^"]*"[\s\S]*?<\/svg>/g)].map((m) => readMap(m[0]));
+
+describe("7.23 the family file draws one drawing for a narrow screen and one for a wide screen (L9.6, L9.7)", () => {
+  const page = (): string => buildFamilyHtml(built().file, FAMILY_WORDS);
+
+  it("holds two drawings, 320 and 640 wide, with every tab drawn and no id written twice", () => {
+    const html = page();
+    const maps = drawingsOf(html);
+    expect(maps.map((m) => m.width)).toEqual([320, 640]);
+    expect(html.match(/<svg /g)).toHaveLength(2);
+    const ids = [...html.matchAll(/\sid="([^"]+)"/g)].map((m) => m[1]);
+    expect(new Set(ids).size, `ids: ${ids.join(", ")}`).toBe(ids.length);
+    expect(html.match(/<script>/g)).toHaveLength(1);
+    expect(html.match(/<script type="application\/json"/g)).toHaveLength(1);
+    for (const m of maps) expect(m.tabs.length).toBe(built().file.plots.length);
+  });
+
+  it("shows the narrow drawing in a narrow frame and the wide drawing in a wide one, one at a time, by the room of the frame", () => {
+    const html = page();
+    expect(declIn(html, ".frame", "container-type")).toBe("inline-size");
+    expect(declIn(html, '.map[data-view="wide"]', "display")).toBe("none");
+    expect(declIn(html, '.map[data-view="wide"]', "display", "@container (min-width:600px)")).toBe("block");
+    expect(declIn(html, '.map[data-view="narrow"]', "display", "@container (min-width:600px)")).toBe("none");
+    expect(declIn(html, ".frame", "max-width")).toBe("680px");
+  });
+
+  it("sets every tab on the top of its plot within 2 px, or on the bottom edge for a reason, and clear of what it must keep off", async () => {
+    for (const outlines of [true, false]) {
+      await env.must([settings({ outlines }), ...["LF-01", "LF-04", "LF-06", "LF-09"].map((ref) => withLine(ref))]);
+      const [narrow, wide] = drawingsOf(page()) as [ReadMap, ReadMap];
+      expect(tabFaults(narrow, false), `narrow, outlines ${outlines}`).toEqual([]);
+      expect(tabFaults(wide, true), `wide, outlines ${outlines}`).toEqual([]);
+    }
+  });
+
+  it("puts the tab of the first plot on its top, where the place is clear", () => {
+    const [narrow, wide] = drawingsOf(page()) as [ReadMap, ReadMap];
+    for (const m of [narrow, wide]) {
+      const y07 = m.tabs.find((t) => t.code === "Y07");
+      expect(y07, "Y07 has a tab").toBeDefined();
+      expect(Math.abs((y07?.tab.y1 ?? 0) - (y07?.plot.y0 ?? 99))).toBeLessThanOrEqual(2);
+    }
+  });
+
+  it("draws every word at 11 to 15 px, the tab 20 to 26 px high and its code at 14 px bold", () => {
+    const html = page();
+    for (const m of drawingsOf(html)) {
+      for (const size of m.fontSizes) {
+        expect(size).toBeGreaterThanOrEqual(11);
+        expect(size).toBeLessThanOrEqual(15);
+      }
+      for (const t of m.tabs) {
+        expect(t.tab.y1 - t.tab.y0).toBeGreaterThanOrEqual(20);
+        expect(t.tab.y1 - t.tab.y0).toBeLessThanOrEqual(26);
+      }
+      expect(m.svg).toMatch(/class="tab-text"[^>]*font-size="14"/);
+    }
+    expect(declIn(html, ".tab-text", "font-weight")).toBe("700");
+  });
+
+  it("writes each code once among the shown parts: tabs only, and none beside a plot", () => {
+    for (const m of drawingsOf(page())) {
+      const codes = m.tabs.map((t) => t.code);
+      expect(new Set(codes).size).toBe(codes.length);
+      expect(m.names.map((n) => n.text).filter((t) => codes.includes(t))).toEqual([]);
+    }
+  });
+
+  it("leaves a name with no clear place to the legend, and draws no row and no sample under the drawing", async () => {
+    await env.must([settings({ outlines: true, gateName: "The old lych gate by the yew tree at the end of the lane", pathNames: { [WALK_PATH_ID]: "The long gravel walk to the far east side" } })]);
+    const file = built().file;
+    const own = familyMapSvg(file, { width: 320, label: "Map" });
+    expect(own, "the register keeps its rows").toMatch(/gate-sample/);
+    const visitor = familyMapSvg(file, { width: 320, label: "Map", namesToLegend: true });
+    expect(visitor).not.toMatch(/gate-sample|walk-sample|section-sample/);
+    expect(readMap(visitor).height, "no caption row under the drawing").toBeLessThan(readMap(own).height);
+    for (const m of drawingsOf(buildFamilyHtml(file, FAMILY_WORDS))) {
+      expect(m.svg).not.toMatch(/gate-sample|walk-sample|section-sample/);
+      expect(labelFaults(m.svg), "what is written is clear").toEqual([]);
+      for (const name of [file.gate.name, ...file.paths.map((p) => p.name)]) expect(m.names.filter((t) => t.text === name).length, name).toBeLessThanOrEqual(1);
+    }
+    expect(buildFamilyHtml(file, FAMILY_WORDS)).toContain('<span class="key-gate"></span>The old lych gate by the yew tree at the end of the lane');
+  });
+
+  it("keeps the rows of a register print, as they were", () => {
+    const print = buildFamilyPrint(built().file, FAMILY_WORDS, { paper: "A4", orientation: "portrait" });
+    expect(print).toMatch(/class="map"/);
+    expect(labelFaults(print)).toEqual([]);
+  });
+
+  it("keeps every tab of the print of the whole map off every other tab, the walk band and every other plot", () => {
+    // The print draws the same geometry without the group a script needs, so the group is asked for here to read it back.
+    const map = readMap(familyMapSvg(built().file, { width: 640, label: "Map", allTabs: true, selectable: true }));
+    expect(tabFaults(map, true)).toEqual([]);
+  });
+
+  it("scrolls to the drawing that is shown, and marks a plot in both", () => {
+    const script = /<script>([\s\S]*?)<\/script>/.exec(page())?.[1] ?? "";
+    expect(script).toContain("getClientRects");
+    expect(script).toContain("querySelectorAll('.plotg')");
+  });
+});
+
+describe("7.24 the plot seeker file draws one drawing for a narrow screen and one for a wide screen (L9.4 to L9.8)", () => {
+  beforeEach(async () => {
+    garden = await GardenEnv.create();
+    await buildThimble(garden, { geometry: true });
+    await garden.must([gardenSettings()]);
+  });
+  const page = (): string => buildAvailabilityHtml(gbuilt().file, AVAILABILITY_WORDS);
+
+  it("holds two drawings, 320 and 640 wide, a tab for each listed bed and no id written twice", () => {
+    const html = page();
+    const maps = drawingsOf(html);
+    expect(maps.map((m) => m.width)).toEqual([320, 640]);
+    const ids = [...html.matchAll(/\sid="([^"]+)"/g)].map((m) => m[1]);
+    expect(new Set(ids).size).toBe(ids.length);
+    for (const m of maps) expect(m.tabs.map((t) => t.code).sort()).toEqual(["B03", "B05"]);
+    expect(declIn(html, ".frame", "container-type")).toBe("inline-size");
+    expect(declIn(html, '.map[data-view="wide"]', "display", "@container (min-width:600px)")).toBe("block");
+  });
+
+  it("sets each tab on the top of its bed within 2 px, or on the bottom edge for a reason, so B03 does not sit on Grass Walk", () => {
+    const [narrow, wide] = drawingsOf(page()) as [ReadMap, ReadMap];
+    expect(tabFaults(narrow, false)).toEqual([]);
+    expect(tabFaults(wide, true)).toEqual([]);
+  });
+
+  it("draws every word at 11 to 15 px", () => {
+    for (const m of drawingsOf(page())) for (const size of m.fontSizes) expect(size >= 11 && size <= 15, `${size}`).toBe(true);
+  });
+
+  it("shows a code once: the code on the peg is hidden while the tab of that plot shows, and the peg stays", () => {
+    const html = page();
+    const css = styleOf(html);
+    expect(declIn(html, ".plotg.on .peg-code", "display")).toBe("none");
+    for (const m of drawingsOf(html)) {
+      expect(m.svg.match(/class="peg"/g)).toHaveLength(2);
+      expect(m.svg.match(/class="peg-code"/g)).toHaveLength(2);
+    }
+    expect(css).not.toMatch(/\.plotg\.on \.peg\{[^}]*display:none/);
+    // Drawn with a plot chosen in the markup, the code is written once, on the tab.
+    const file = gbuilt().file;
+    const chosen = file.freePlots.find((p) => p.code === "B03");
+    const svg = availabilityMapSvg(file, { width: 640, label: "Map", selectedPlotId: chosen?.id });
+    expect((svg.match(/>B03</g) ?? []).length).toBe(1);
+    expect(svg).toMatch(/class="peg"/);
+  });
+
+  it("leaves a name with no clear place to the legend", async () => {
+    await garden.must([gardenSettings({ gateName: "The very long gate at the bottom of the lane by the thimble beds" })]);
+    const file = gbuilt().file;
+    const maps = drawingsOf(buildAvailabilityHtml(file, AVAILABILITY_WORDS));
+    for (const m of maps) {
+      expect(labelFaults(m.svg), `drawing ${m.width}`).toEqual([]);
+      expect(m.names.filter((t) => t.text === file.gate.name).length).toBeLessThanOrEqual(1);
+    }
+  });
+
+  it("keeps a name that finds a clear place in the drawing, so each walk is told from the others, and names it once in the legend", () => {
+    const file = gbuilt().file;
+    const wide = drawingsOf(buildAvailabilityHtml(file, AVAILABILITY_WORDS))[1] as ReadMap;
+    const written = wide.names.map((n) => n.text);
+    expect(written).toContain(file.gate.name);
+    expect(written).toContain("Grass Walk");
+    for (const name of [file.gate.name, "Grass Walk"]) expect(written.filter((t) => t === name)).toHaveLength(1);
+    const legend = /<ul class="legend">([\s\S]*?)<\/ul>/.exec(buildAvailabilityHtml(file, AVAILABILITY_WORDS))?.[1] ?? "";
+    for (const name of [file.gate.name, "Grass Walk"]) expect(legend.split(name).length - 1, name).toBe(1);
+  });
+
+  it("keeps the names of a register print, which has no legend", () => {
+    const file = gbuilt().file;
+    expect(availabilityMapSvg(file, { width: 640, label: "Map" })).toContain(file.gate.name);
+  });
+});
+
+describe("7.25 the printed visitor files in the layout of the printed sheet (L10.4)", () => {
+  const family = (): string => buildFamilyHtml(built().file, FAMILY_WORDS);
+
+  it("puts the date on the right end of the title row, on the baseline of the title, and joins the legend with a rule", () => {
+    const page = family();
+    expect(declIn(page, ".sky .in", "display", PRINT)).toBe("flex");
+    expect(declIn(page, ".sky .in", "justify-content", PRINT)).toBe("space-between");
+    expect(declIn(page, ".sky .in", "align-items", PRINT)).toBe("baseline");
+    expect(declIn(page, ".legend", "border-top", PRINT)).toMatch(/^2px solid #000/);
+  });
+
+  it("starts every block at the left edge of the title, and sets Entrance and Directions in two columns", () => {
+    const page = family();
+    expect(declIn(page, "main", "padding", PRINT)).toBe("0");
+    // One column on paper, so the map has the width of the page and shows its wide drawing.
+    expect(declIn(page, ".cols", "display", PRINT)).toBe("block");
+    expect(declIn(page, ".entry", "display", PRINT)).toBe("grid");
+    expect(declIn(page, ".entry", "grid-template-columns", PRINT)).toBe("minmax(0,1fr) minmax(0,2fr)");
+    expect(page).toMatch(/<div class="entry"><div class="entry-a"><h2 id="entrance-heading">Entrance<\/h2><p>Lantern Gate<\/p><\/div><div class="entry-b"><h3>Directions<\/h3>/);
+    expect(page.indexOf('<div class="entry">')).toBeLessThan(page.indexOf('<div class="col-map">'));
+  });
+
+  it("sets the plot seeker file the same way: the date at the right end and every block at the left edge", async () => {
+    garden = await GardenEnv.create();
+    await buildThimble(garden, { geometry: true });
+    await garden.must([gardenSettings()]);
+    const page = buildAvailabilityHtml(gbuilt().file, AVAILABILITY_WORDS);
+    expect(declIn(page, ".day .in", "display", PRINT)).toBe("flex");
+    expect(declIn(page, ".day .in", "justify-content", PRINT)).toBe("space-between");
+    expect(declIn(page, ".day .in", "align-items", PRINT)).toBe("baseline");
+    expect(declIn(page, "main", "padding", PRINT)).toBe("0");
+    expect(declIn(page, ".cols", "display", PRINT)).toBe("block");
+    expect(declIn(page, ".legend", "border-top", PRINT)).toMatch(/^2px solid #000/);
   });
 });

@@ -9,7 +9,7 @@ import { expect, test } from "@playwright/test";
 import type { Page } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import { measureLayout, trackRequests } from "../helpers/measureLayout";
-import { CHURCH, sizeOf, startOwn, storedEvents } from "../helpers/routes";
+import { CHURCH, restPointer, sizeOf, startOwn, storedEvents } from "../helpers/routes";
 import { BOOK_GRID, fixturePath, generateGrid, readDownload, upload } from "../helpers/screens";
 
 const APP = CHURCH.origin;
@@ -45,6 +45,7 @@ async function proof(page: Page, name: string): Promise<void> {
   await noViolations(page);
   // Scroll after the measure, which leaves the page at the top.
   await counts(page).evaluate((list) => list.scrollIntoView({ block: "start" }));
+  await restPointer(page);
   await page.screenshot({ path: `${SHOTS}/${name}-${sizeOf(page)}.png`, type: "png" });
 }
 

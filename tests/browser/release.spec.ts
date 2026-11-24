@@ -587,8 +587,109 @@ test.describe("the registers and the Desk, from the hub", () => {
   });
 });
 
-// The fonts of the new look (spec 07, L2). Two families, ten woff2 files, from the site's own origin.
+// The built site, as the files lie on disk.
 const SITE_DIR = fileURLToPath(new URL("../../dist/site", import.meta.url));
+
+// The Review Desk preview that the site serves (spec 07, task 7.27, L8.3 and L12). The Desk is built in its own
+// repository and pinned by `release/desk-preview.lock.json`. The lock is the expected value. These two checks read the
+// lock and compare it with what the site serves, and read the screen from its first frame. They do not run the Desk's
+// own tests, which are in its repository.
+const DESK_LOCK = JSON.parse(readFileSync(fileURLToPath(new URL("../../release/desk-preview.lock.json", import.meta.url)), "utf8")) as {
+  revision: string;
+  entry: string;
+  files: Record<string, string>;
+};
+
+test.describe("the Review Desk preview that the site serves", () => {
+  test("is the preview the lock names: each pinned file is served with its pinned hash, and the site serves no other file of the Desk", async ({ page }) => {
+    expect(DESK_LOCK.revision, "the lock names a Desk commit").toMatch(/^[0-9a-f]{40}$/);
+    for (const [rel, hash] of Object.entries(DESK_LOCK.files)) {
+      const response = await page.request.get(`${SITE}review/${rel}`);
+      expect(response.status(), rel).toBe(200);
+      expect(createHash("sha256").update(await response.body()).digest("hex"), `${rel} differs from the lock`).toBe(hash);
+    }
+    const onDisk: string[] = [];
+    const walk = (dir: string, prefix: string): void => {
+      for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        if (entry.isDirectory()) walk(join(dir, entry.name), `${prefix}${entry.name}/`);
+        else onDisk.push(`${prefix}${entry.name}`);
+      }
+    };
+    walk(join(SITE_DIR, "review"), "");
+    expect(onDisk.sort(), "the files of the Desk in the built site").toEqual(Object.keys(DESK_LOCK.files).sort());
+    // The page that the lock names as its entry is the page that the site opens at /review/.
+    const entry = await page.request.get(`${SITE}review/`);
+    expect(createHash("sha256").update(await entry.body()).digest("hex")).toBe(DESK_LOCK.files[DESK_LOCK.entry]);
+  });
+
+  test("opens at full strength from its first frame, with no animation, no transition and no opacity under one", async ({ page }) => {
+    await watchFrames(page);
+    await page.goto(`${SITE}review/`);
+    await expect(page.getByText("Bring the checks from your registers to one meeting.")).toBeVisible();
+    const frames = await readFrames(page);
+    const drawn = frames.filter((f) => f.elements > 3);
+    expect(drawn.length, "frames with the Desk on the page").toBeGreaterThan(10);
+    expect(Math.min(...drawn.map((f) => f.opacity)), `the least opacity in any frame: ${JSON.stringify(drawn.slice(0, 6))}`).toBe(1);
+    expect(Math.max(...frames.map((f) => f.animations)), "animations that run").toBe(0);
+    expect(await page.evaluate(() => document.getAnimations().length)).toBe(0);
+  });
+
+  // The control: the same reading of a page that does fade in. If the reading could not see a fade, the test above
+  // would pass for any Desk.
+  test("the reading of the frames sees a fade when there is one", async ({ page }) => {
+    await page.route(`${SITE}fade-control`, (route) =>
+      route.fulfill({
+        contentType: "text/html",
+        body: `<!doctype html><title>x</title><style>@keyframes in{from{opacity:.35}to{opacity:1}}#root{animation:in 600ms ease-out both}</style><div id="root"><p>a</p><p>b</p><p>c</p><p>d</p><p>e</p><p>f</p></div>`,
+      }),
+    );
+    await watchFrames(page);
+    await page.goto(`${SITE}fade-control`);
+    const frames = (await readFrames(page)).filter((f) => f.elements > 3);
+    expect(Math.min(...frames.map((f) => f.opacity))).toBeLessThan(0.6);
+    expect(Math.max(...frames.map((f) => f.animations))).toBeGreaterThan(0);
+  });
+});
+
+interface Frame {
+  opacity: number;
+  animations: number;
+  elements: number;
+}
+
+/**
+ * From the start of the next page, read every frame for 90 frames: the least opacity of any element that holds words (the
+ * opacity of an element and of everything above it, multiplied) and the number of animations that run. A fade shows as a value under 1
+ * in an early frame, and a screen read at that moment looks washed out.
+ */
+async function watchFrames(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    const frames: Frame[] = [];
+    (window as unknown as { __frames: Frame[] }).__frames = frames;
+    const sample = (): void => {
+      let least = 1;
+      let count = 0;
+      for (const el of document.querySelectorAll("body *")) {
+        // Only what shows words. The Desk has a file input laid over its Choose file button with opacity 0, on purpose.
+        if (![...el.childNodes].some((n) => n.nodeType === Node.TEXT_NODE && (n.textContent ?? "").trim() !== "")) continue;
+        count += 1;
+        let product = 1;
+        for (let node: Element | null = el; node !== null; node = node.parentElement) product *= Number(getComputedStyle(node).opacity);
+        least = Math.min(least, product);
+      }
+      frames.push({ opacity: least, animations: document.getAnimations().length, elements: count });
+      if (frames.length < 90) requestAnimationFrame(sample);
+    };
+    requestAnimationFrame(sample);
+  });
+}
+
+async function readFrames(page: Page): Promise<Frame[]> {
+  await page.waitForFunction(() => (window as unknown as { __frames: unknown[] }).__frames.length >= 90);
+  return page.evaluate(() => (window as unknown as { __frames: Frame[] }).__frames);
+}
+
+// The fonts of the new look (spec 07, L2). Two families, ten woff2 files, from the site's own origin.
 
 function fontFilesOf(dir: string, out: string[] = []): string[] {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {

@@ -8,7 +8,7 @@ import { readFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 import { measureLayout, trackRequests } from "../helpers/measureLayout";
 import { CONTACT, INSCRIPTION_WORD, LIVING_HOLDERS, OTHER_OCCUPANT, PAGE_IMAGE_FILENAME, VISITOR_CANARIES } from "../helpers/privacyCanaries";
-import { siteIdOf, storedEvents } from "../helpers/routes";
+import { restPointer, siteIdOf, storedEvents } from "../helpers/routes";
 import { expectNoNameInAddress, expectSearchOutOfAddress } from "../helpers/screens";
 
 const APP = "http://127.0.0.1:4176/";
@@ -23,7 +23,10 @@ const sizeOf = (page: Page): string => ((page.viewportSize()?.width ?? 0) < 600 
 async function check(page: Page, name?: string): Promise<void> {
   const violations = await measureLayout(page);
   expect(violations, JSON.stringify(violations, null, 1)).toEqual([]);
-  if (name !== undefined) await page.screenshot({ path: `${SHOTS}/${name}-${sizeOf(page)}.png`, type: "png" });
+  if (name !== undefined) {
+    await restPointer(page);
+    await page.screenshot({ path: `${SHOTS}/${name}-${sizeOf(page)}.png`, type: "png" });
+  }
 }
 
 async function openFold(page: Page): Promise<void> {
@@ -474,7 +477,7 @@ test.describe("the family map, the file and the visitor", () => {
     await file.getByLabel("Name or plot code", { exact: true }).fill("quillmoss");
     await expect(file.getByRole("listitem").filter({ hasText: "Mirel Quillmoss" })).toBeVisible();
     await file.getByRole("button", { name: "Show location" }).click();
-    await expect(file.locator(".plotg.on")).toHaveCount(1);
+    await expect(file.locator(".plotg.on:visible")).toHaveCount(1);
     await expect(file.getByText("Selected plot: Y07")).toBeVisible();
     await check(file, "family-file");
     await file.getByLabel("Name or plot code", { exact: true }).fill("Torin");

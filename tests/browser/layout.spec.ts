@@ -8,7 +8,7 @@ import type { Page } from "@playwright/test";
 import { findLabelCollisions, measureLayout, readSheetScene, trackRequests } from "../helpers/measureLayout";
 import { APPS, CHURCH, GARDEN, LIBRARY_ROUTES, focusedName, openPractice, plotIdOf, proof, routeName, routesOf, settle, sizeOf, startOwn, storedEvents, storedSites, tabTo } from "../helpers/routes";
 import type { AppUnderTest } from "../helpers/routes";
-import { SITE, hubCard } from "../helpers/siteOrigin";
+import { SITE, hubCard, saveProof } from "../helpers/siteOrigin";
 
 const SHOTS = "docs/acceptance/layout/routes";
 
@@ -1719,6 +1719,31 @@ test.describe("Allotment Register, the screens with cards of their own (7.20, 7.
   });
 });
 
+// A proof picture is taken with the pointer off every control (spec 07, task 7.29, the mend of the lead's review). After
+// a click the pointer rests on the control, and its hover colour would be in the picture as if it were its own colour.
+test.describe("proof pictures", () => {
+  const BUTTON = `<style>button{position:fixed;left:40px;top:40px;width:200px;height:60px;background:#ffffff;transition:background-color 120ms}button:hover{background:#ff0000}</style><button type="button">Reserve a space</button>`;
+
+  async function clickedPage(page: Page): Promise<void> {
+    await page.setContent(BUTTON);
+    await page.getByRole("button", { name: "Reserve a space" }).click();
+    // The pointer rests on the button, and its colour changes to the hover colour.
+    await expect(page.getByRole("button")).toHaveCSS("background-color", "rgb(255, 0, 0)");
+  }
+  const look = (page: Page) => page.getByRole("button").evaluate((b) => ({ fill: getComputedStyle(b).backgroundColor }));
+
+  test("proof leaves the pointer off every control and waits for the colour to settle", async ({ page }, testInfo) => {
+    await clickedPage(page);
+    await proof(page, testInfo.outputPath("."), "route-home");
+    expect(await look(page)).toEqual({ fill: "rgb(255, 255, 255)" });
+  });
+
+  test("saveProof does the same", async ({ page }, testInfo) => {
+    await clickedPage(page);
+    await saveProof(page, "pointer-rest", testInfo.outputPath("."));
+    expect(await look(page)).toEqual({ fill: "rgb(255, 255, 255)" });
+  });
+});
 // Print the sizes the spec ran at, so a reader of the log can see both.
 test("runs at a known size", ({ page }) => {
   const size = page.viewportSize() as { width: number; height: number };

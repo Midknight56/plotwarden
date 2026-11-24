@@ -14,6 +14,7 @@ import { scanForCanaries } from "../../template/src/output/privacy";
 import { REVIEW_CANARIES as GARDEN_CANARIES } from "../helpers/gardenCanaries";
 import { measureLayout, trackRequests } from "../helpers/measureLayout";
 import { REVIEW_CANARIES as CHURCH_CANARIES, INSCRIPTION_WORD } from "../helpers/privacyCanaries";
+import { restPointer } from "../helpers/routes";
 
 const CHURCH = "http://127.0.0.1:4176/";
 const GARDEN = "http://127.0.0.1:4178/";
@@ -26,6 +27,7 @@ const sizeOf = (page: Page): string => ((page.viewportSize()?.width ?? 0) < 600 
 async function check(page: Page, name: string): Promise<void> {
   const violations = await measureLayout(page);
   expect(violations, JSON.stringify(violations, null, 1)).toEqual([]);
+  await restPointer(page);
   await page.screenshot({ path: `${SHOTS}/${name}-${sizeOf(page)}.png`, type: "png", fullPage: true });
 }
 

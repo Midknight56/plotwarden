@@ -1,6 +1,6 @@
 # 07 Look: tasks
 
-Each task writes its test first, sees it fail on the missing behaviour, then writes the smallest complete code. A task is ticked only when its test passes. Expected values are the floors of `requirements.md`, not the output of the code. The work is in four slices. Slices 1, 2 and 3 are built.
+Each task writes its test first, sees it fail on the missing behaviour, then writes the smallest complete code. A task is ticked only when its test passes. Expected values are the floors of `requirements.md`, not the output of the code. The work is in four slices. All four are built.
 
 For each held back value, the line names the slice and task that turns it on (design L-D3).
 
@@ -48,13 +48,13 @@ Held back in slice 1 (design L-D3):
 
 ## Slice 4: visitor files, print, the market example and the Review Desk
 
-- [ ] 7.23 The family file: tab, gate and walk, system fonts, still sealed. Files: `template/src/output/visitorHtml.ts`, `tests/unit/visitor.test.ts`. L9.
-- [ ] 7.24 The plot seeker file, the same. Files: `template/src/output/availabilityHtml.ts`, `tests/unit/visitor.test.ts`. L9.
-- [ ] 7.25 Print rules and the grayscale check. Files: `template/src/ui/print.css`, `tests/unit/lookPrint.test.ts`, `tests/browser/share-print.spec.ts`. L10.
-- [ ] 7.26 The market example values. Files: `examples/market/src/theme.css`, `tests/unit/lookTokens.test.ts`, `tests/browser/market-example.spec.ts`. L11.
-- [ ] 7.27 The Review Desk in its own repository, no entry fade, then `npm run lock:desk` here. Files: `release/desk-preview.lock.json`. L12.
-- [ ] 7.28 Pictures at 360, 1440 and 1920 and a grayscale print. Files: `docs/acceptance/**`.
-- [ ] 7.29 Evidence rows, log row, release notes. Files: `docs/kiro-evidence.md`, `docs/kiro-log.md`.
+- [x] 7.23 The family file: tab, gate and walk, system fonts, still sealed; one legend, the tab that touches its plot, one drawing for a narrow frame and one for a wide frame. Files: `template/src/output/{visitorHtml,familyMap}.ts`, `template/src/map/labels.ts`, `tests/unit/visitor.test.ts`, `tests/helpers/{cssRules,measureLayout}.ts`, `tests/browser/share-print.spec.ts`. L9.1 to L9.8.
+- [x] 7.24 The plot seeker file, the same, and the code on a peg hidden while its tab shows. Files: `template/src/output/{availabilityHtml,availabilityMap}.ts`, `tests/unit/visitor.test.ts`. L9.
+- [x] 7.25 Print rules and the grayscale check, and the printed visitor files (the title row, one column, the two columns of Entrance and Directions, the rule above the legend). Files: `template/src/ui/print.css`, `template/src/output/{visitorHtml,availabilityHtml}.ts`, `tests/unit/{lookPrint,visitor}.test.ts`, `tests/browser/share-print.spec.ts`. L10.
+- [x] 7.26 The market example values. Files: `examples/market/src/theme.css`, `tests/unit/lookTokens.test.ts`, `tests/browser/market-example.spec.ts`. L11.
+- [x] 7.27 The Review Desk in its own repository, no entry fade, then `npm run lock:desk` here. Files: `release/desk-preview.lock.json`. L12.
+- [x] 7.28 Pictures at 360, 1440 and 1920 and a grayscale print. Files: `docs/acceptance/**`.
+- [x] 7.29 Evidence rows, log row, release notes. Files: `docs/kiro-evidence.md`, `docs/kiro-log.md`.
 
 ## Not settled in spec 07
 
@@ -62,7 +62,7 @@ Held back in slice 1 (design L-D3):
 - **The optional maps are not built.** Neither the map beside Record a burial nor the plan beside Make an offer.
 - **The foot band is on the churchyard screens that are built as sheets.** The desk and each `.page`. The library, the lists and the other forms have none.
 - **The proof pictures are at 360 and 1920 wide.** The checks at 1440 are measures and not pictures.
-- **The Review Desk preview and the visitor files are still the old look.** They are slice 4.
+- **The Review Desk preview and the visitor files were the old look until slice 4.** Both are built. The Desk is built in its own repository and pinned by `release/desk-preview.lock.json`.
 
 - **The fonts are measured by file, not by glyph.** The `unicode-range` of each rule is the one the package declares, and the test checks that range. The browser spec checks that each family loads. No test opens the font files to list their glyphs.
 - **The size limit counts the files of the site.** The ten files are 148,228 bytes. The built site holds each of them once, in the `assets/` folder of the hub, and the styles of the two apps point at that copy. The standalone app builds in `dist/apps/` keep their own copies, so each of them works alone.

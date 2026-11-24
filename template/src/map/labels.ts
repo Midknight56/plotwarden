@@ -266,6 +266,62 @@ export function spotsAlongLine(points: readonly (readonly [number, number])[], s
   return spots;
 }
 
+// ---- The code tab of a chosen plot (spec 07, L9.5) --------------------------------------------------------------------
+// A tab is 24 high, and its code is 14 px bold. It touches its plot: its bottom edge meets the top of the plot, centred
+// on it, as on the field sheet. When that place would cover the walk band, the gate, the north arrow, a name, another
+// plot or the edge of the drawing, the tab touches the bottom edge of its plot instead, centred. Only when neither is
+// clear does it try the other places that touch the plot, and then two that stand 12 px off it.
+
+/** The height of a tab. */
+export const TAB_HEIGHT = 24;
+/** The size of the code on a tab. */
+export const TAB_TEXT_SIZE = 14;
+/** How far a tab keeps from the middle of a walk: half the band of 12 and 2 more. */
+export const TAB_WALK_CLEAR = 8;
+
+/** The width of a tab for a code: the code at 14 px bold and 8 px of room on each side. */
+export function tabWidth(code: string): number {
+  return Math.max(40, Math.ceil(codeWidth(code, TAB_TEXT_SIZE)) + 16);
+}
+
+export interface TabSpot {
+  box: Box;
+  /** `top` and `bottom` mean the tab is centred on that edge of its plot. `other` is any place that is not. */
+  edge: "top" | "bottom" | "other";
+}
+
+/**
+ * Where the tab of a plot goes. `scene.hard` holds the gate, the north arrow, the names and, when the tabs of the whole
+ * map show, the tabs placed before. `scene.lines` holds the walks, each with the distance to keep. `scene.plots` holds
+ * every other plot. The height of the scene is not used: the drawing grows to hold a tab below its last plot.
+ */
+export function placeTab(plot: Box, width: number, scene: Scene): TabSpot {
+  const h = TAB_HEIGHT;
+  const centred = (plot.x0 + plot.x1) / 2 - width / 2;
+  const middle = (plot.y0 + plot.y1 - h) / 2;
+  const open: Scene = { ...scene, height: 1e6 };
+  const candidates: { x: number; y: number; edge: TabSpot["edge"] }[] = [
+    { x: centred, y: plot.y0 - h, edge: "top" },
+    { x: centred, y: plot.y1, edge: "bottom" },
+    { x: plot.x0, y: plot.y0 - h, edge: "other" },
+    { x: plot.x1 - width, y: plot.y0 - h, edge: "other" },
+    { x: plot.x0, y: plot.y1, edge: "other" },
+    { x: plot.x1 - width, y: plot.y1, edge: "other" },
+    { x: plot.x1, y: middle, edge: "other" },
+    { x: plot.x0 - width, y: middle, edge: "other" },
+    { x: centred, y: plot.y0 - h - 12, edge: "other" },
+    { x: centred, y: plot.y1 + 12, edge: "other" },
+  ];
+  let best: { spot: TabSpot; cost: number } | undefined;
+  for (const c of candidates) {
+    const box = { x0: c.x, y0: c.y, x1: c.x + width, y1: c.y + h };
+    const total = cost(box, open);
+    if (best === undefined || total < best.cost) best = { spot: { box, edge: c.edge }, cost: total };
+    if (total === 0) break;
+  }
+  return (best as { spot: TabSpot }).spot;
+}
+
 // ---- Leader lines (spec 02, P19.8 to P19.10) -------------------------------------------------------------------------
 // A name that has no clear place beside its feature stands outside the block, and a thin line joins it to the feature.
 // These are the exact tests the sheet uses to choose a route. All of them are pure.

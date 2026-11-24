@@ -1,16 +1,24 @@
 // The map of a family file, drawn from its public geometry alone. Pure text: it builds SVG as a string.
 // It imports only the visitor types and the label rules of `map/labels.ts`. Text is drawn at real pixel size, so a
-// drawing that is shown at its own width keeps 12 px labels. Colours come from the page that holds the drawing, by
-// class name.
+// drawing that is shown at its own width keeps its sizes: every word 11 to 15 px, a tab 24 high with its code at
+// 14 px bold. A page that shows the drawing wider than it was made would stretch them, so a visitor file holds two
+// drawings, one made at 320 and one at 640, and shows the one that fits its frame (spec 07, L9.7). Colours come from
+// the page that holds the drawing, by class name.
 //
-// What goes where (spec 03, C5.12):
+// What goes where (spec 03, C5.12 and spec 07, L9.4 to L9.6):
 //  - A plot code is never written beside its plot. It is written on a tab, and a tab is drawn for the selected plot.
 //  - A name (the gate, a path, a section) takes the first clear place: inside the drawing, off the walk band, off every
 //    plot and outline, off the north arrow, the gate mark and every earlier name. A name with no clear place is written
-//    under the drawing, beside a small sample of its mark, as the field sheet does.
-//  - A tab takes the first clear place above, below or beside its own plot, with the same rules, and keeps off every
-//    other tab. A place under the lowest plot may reach past the drawing, and the drawing then grows to hold it.
-import { CAPTION_COST, SHEET_MARGIN, bestSpot, cost, spotsAlongLine, spotsAlongTop, spotsAround, textWidth } from "../map/labels";
+//    under the drawing, beside a small sample of its mark, as the field sheet does. A visitor file sets `namesToLegend`:
+//    its legend joins the bottom of the map and names the gate and each walk, so a name with no clear place is left to
+//    the legend and the drawing writes no row and no sample under itself. A name with a clear place stays in the
+//    drawing, so a site with more than one walk still shows which walk is which.
+//  - A tab touches its plot. Its bottom edge meets the top of the plot's outline (within 2 px), centred on the plot.
+//    It no longer stands off the plot. When that place would cover the walk band, the gate, the north arrow, a name,
+//    another plot or the edge of the drawing, the tab touches the bottom edge of its plot instead, centred, and the
+//    drawing grows to hold it. Only when neither place is clear does it take another place (`placeTab`). Tabs that all
+//    show at once (a print of the whole map) also keep off every other tab.
+import { CAPTION_COST, SHEET_MARGIN, TAB_HEIGHT, TAB_TEXT_SIZE, TAB_WALK_CLEAR, bestSpot, placeTab, spotsAlongLine, spotsAlongTop, spotsAround, tabWidth, textWidth } from "../map/labels";
 import type { Box, Scene, Spot } from "../map/labels";
 import type { FamilyFile, Point, PublicPlot } from "./privacy";
 
@@ -34,6 +42,15 @@ export interface MapOptions {
   sectionBoxes?: boolean;
   /** Give each plot a group and a tab that a script can show. */
   selectable?: boolean;
+  /**
+   * Leave a name with no clear place to the legend that joins the map in a visitor file: write no row and no sample
+   * under the drawing. Default false, as the register's own prints keep their rows.
+   */
+  namesToLegend?: boolean;
+  /** Keep every tab off every other tab, for tabs that show together. Default: the same as `allTabs`. */
+  tabsApart?: boolean;
+  /** Which of the two drawings of a visitor file this is. Written as `data-view`, for the page to show one at a time. */
+  view?: "narrow" | "wide";
 }
 
 export function escapeHtml(text: string): string {
@@ -48,6 +65,15 @@ export function jsonForScript(value: unknown): string {
     .replace(/&/g, "\\u0026")
     .replace(/\u2028/g, "\\u2028")
     .replace(/\u2029/g, "\\u2029");
+}
+
+/**
+ * The legend that joins the bottom of the map in a visitor file: the gate, then each walk, each beside a sample of its
+ * mark. The names are the public names of the file, never a catalog word. The marks are drawn by the page's own style.
+ */
+export function legendHtml(gateName: string, pathNames: readonly string[]): string {
+  const walks = [...new Set(pathNames)].map((name) => `<li><span class="key-walk"></span>${escapeHtml(name)}</li>`).join("");
+  return `<ul class="legend"><li><span class="key-gate"></span>${escapeHtml(gateName)}</li>${walks}</ul>`;
 }
 
 /** Put each value in once. A missing value throws, so a missing word never reaches a page. */
@@ -91,10 +117,6 @@ const PAD_X = 24;
 const PAD_TOP = 64;
 const PAD_BOTTOM = 24;
 const LABEL_SIZE = 12;
-const TAB_SIZE = 14;
-const TAB_HEIGHT = 28;
-/** How far a tab stands from its plot. The double outline of a selected plot reaches 6.5 px. */
-const TAB_GAP = 8;
 /** How far a name keeps from the middle of a walk: half the band and a margin. */
 const NAME_CLEAR = WALK_BAND / 2 + 4;
 /** The line height of a name written under the drawing, and where its text starts after the sample of its mark. */
@@ -192,7 +214,7 @@ export function familyMapSvg(file: FamilyFile, options: MapOptions): string {
   const place = (text: string, mark: Caption["mark"], spots: Spot[], lines: Scene["lines"]): void => {
     const best = bestSpot(text, LABEL_SIZE, spots, sceneOf(lines));
     if (best.cost >= CAPTION_COST) {
-      captions.push({ mark, lines: wrap(text, width - CAPTION_TEXT_X - SHEET_MARGIN) });
+      if (options.namesToLegend !== true) captions.push({ mark, lines: wrap(text, width - CAPTION_TEXT_X - SHEET_MARGIN) });
       return;
     }
     hard.push({ box: best.box, gap: 2 });
@@ -232,38 +254,15 @@ export function familyMapSvg(file: FamilyFile, options: MapOptions): string {
   const showAll = options.allTabs === true;
   const tabbed = arches.filter((a) => a.plot.id === selectedId || showAll || options.selectable === true);
   const tabs = new Map<string, { x: number; y: number; width: number; height: number }>();
+  const apart = options.tabsApart ?? showAll;
   const tabHard: Scene["hard"] = [...hard];
-  const tabScene = (own: Box | undefined): Scene => ({
-    width,
-    height: height + TAB_HEIGHT + TAB_GAP + 2 * SHEET_MARGIN,
-    hard: tabHard,
-    lines: walkLines.map((points) => ({ points, clear: NAME_CLEAR })),
-    soft: [],
-    plots: plotBoxes.filter((b) => b !== own),
-  });
+  const tabLines: Scene["lines"] = walkLines.map((points) => ({ points, clear: TAB_WALK_CLEAR }));
   for (const a of tabbed) {
-    const w = Math.max(48, [...a.plot.code].length * 9 + 16);
-    const h = TAB_HEIGHT;
-    const own = archBoxes[arches.indexOf(a)];
-    const mid = (a.y0 + a.y1 - h) / 2;
-    const cx = a.cx - w / 2;
-    const aboveY = a.y0 - TAB_GAP - h;
-    const belowY = a.y1 + TAB_GAP;
-    const candidates: [number, number][] = [
-      [cx, aboveY], [a.x0, aboveY], [a.x1 - w, aboveY],
-      [cx, belowY], [a.x0, belowY], [a.x1 - w, belowY],
-      [a.x1 + TAB_GAP, mid], [a.x0 - TAB_GAP - w, mid],
-      [cx, aboveY - 12], [cx, belowY + 12],
-    ];
-    let best: { x: number; y: number; cost: number } | undefined;
-    for (const [x, y] of candidates) {
-      const c = cost({ x0: x, y0: y, x1: x + w, y1: y + h }, tabScene(own));
-      if (best === undefined || c < best.cost) best = { x, y, cost: c };
-      if (c === 0) break;
-    }
-    const at = best as { x: number; y: number };
-    tabs.set(a.plot.id, { x: at.x, y: at.y, width: w, height: h });
-    tabHard.push({ box: { x0: at.x, y0: at.y, x1: at.x + w, y1: at.y + h }, gap: 4 });
+    const own = archBoxes[arches.indexOf(a)] as Box;
+    const spot = placeTab(own, tabWidth(a.plot.code), { width, height, hard: tabHard, lines: tabLines, soft: [], plots: plotBoxes.filter((b) => b !== own) });
+    const { box } = spot;
+    tabs.set(a.plot.id, { x: box.x0, y: box.y0, width: box.x1 - box.x0, height: TAB_HEIGHT });
+    if (apart) tabHard.push({ box, gap: 4 });
   }
   const tabEnd = Math.max(0, ...[...tabs.values()].map((t) => t.y + t.height + SHEET_MARGIN));
   const body = Math.max(height, tabEnd);
@@ -274,7 +273,7 @@ export function familyMapSvg(file: FamilyFile, options: MapOptions): string {
 
   const out: string[] = [];
   out.push(
-    `<svg class="map" viewBox="0 0 ${num(width)} ${num(total)}" width="${num(width)}" height="${num(total)}" role="img" aria-label="${escapeHtml(options.label)}" font-family="system-ui, Arial, sans-serif">`,
+    `<svg class="map"${options.view === undefined ? "" : ` data-view="${options.view}"`} viewBox="0 0 ${num(width)} ${num(total)}" width="${num(width)}" height="${num(total)}" role="img" aria-label="${escapeHtml(options.label)}" font-family="system-ui, Arial, sans-serif">`,
   );
 
   for (const o of plain) out.push(`<polygon class="outline" points="${pts(o)}"/>`);
@@ -305,7 +304,7 @@ export function familyMapSvg(file: FamilyFile, options: MapOptions): string {
     if (tab !== undefined) {
       const shown = selected || showAll;
       out.push(
-        `<g${shown ? "" : ` class="selbits"`}><rect class="tab" x="${num(tab.x)}" y="${num(tab.y)}" width="${num(tab.width)}" height="${num(tab.height)}"/><text class="tab-text" x="${num(tab.x + tab.width / 2)}" y="${num(tab.y + 19)}" font-size="${TAB_SIZE}" text-anchor="middle">${escapeHtml(plot.code)}</text></g>`,
+        `<g${shown ? "" : ` class="selbits"`}><rect class="tab" x="${num(tab.x)}" y="${num(tab.y)}" width="${num(tab.width)}" height="${num(tab.height)}"/><text class="tab-text" x="${num(tab.x + tab.width / 2)}" y="${num(tab.y + 17)}" font-size="${TAB_TEXT_SIZE}" text-anchor="middle">${escapeHtml(plot.code)}</text></g>`,
       );
     }
     out.push("</g>");

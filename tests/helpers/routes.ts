@@ -154,11 +154,45 @@ export async function routesOf(page: Page, app: AppUnderTest, siteId: string): P
 }
 
 /**
+ * Take the pointer off every control, and wait until the colour of each has settled. After a click the pointer rests on
+ * the control it pressed, and a proof picture would show that control in its hover colour as if it were its own. The
+ * pointer goes to a corner of the page where no control lies, and each corner is tried in turn.
+ */
+export async function restPointer(page: Page): Promise<void> {
+  const size = page.viewportSize() ?? { width: 360, height: 640 };
+  const corners = [
+    { x: 0, y: 0 },
+    { x: size.width - 1, y: 0 },
+    { x: size.width - 1, y: size.height - 1 },
+    { x: 0, y: size.height - 1 },
+  ];
+  for (const corner of corners) {
+    const bare = await page.evaluate(({ x, y }) => {
+      const el = document.elementFromPoint(x, y);
+      return el === null || el.closest("a, button, input, select, textarea, summary, label, [role='button'], [tabindex]") === null;
+    }, corner);
+    if (!bare) continue;
+    await page.mouse.move(corner.x, corner.y);
+    break;
+  }
+  // The colour change of a control is 120 ms. A picture is taken after it, and after any fade has ended.
+  await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
+  await page.waitForFunction(() =>
+    document.getAnimations().every((a) => {
+      const timing = a.effect?.getComputedTiming();
+      return timing === undefined || timing.iterations === Infinity || a.playState === "finished" || a.playState === "idle";
+    }),
+  );
+}
+
+/**
  * Save one small picture of a whole page, as proof of how it looked. JPEG keeps the folder small. The phone size is
  * the tight one, so every route has a phone picture. A desktop picture is kept only for the routes in `DESKTOP_PROOF`.
+ * The pointer is off every control first.
  */
 export async function proof(page: Page, folder: string, name: string): Promise<void> {
   if (sizeOf(page) === "desktop" && !DESKTOP_PROOF.test(name)) return;
+  await restPointer(page);
   await page.screenshot({ path: `${folder}/${name}-${sizeOf(page)}.jpg`, type: "jpeg", quality: 50, fullPage: true });
 }
 

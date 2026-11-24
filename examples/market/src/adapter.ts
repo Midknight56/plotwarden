@@ -63,7 +63,7 @@ export const marketAdapter: RegisterAdapter<MarketState, MarketCommand, MarketEv
   reports: [],
   reviewFacts: () => [],
   labels: MARKET_COPY,
-  theme: { ink: "#2B2118", paper: "#F6EFE3", accent: "#8A4B1F" },
+  theme: { ink: "#2A2320", paper: "#FBF6EE", accent: "#8E3B2F" },
 };
 
 export function marketRegister(): Register<MarketState, MarketCommand, MarketEvent> {

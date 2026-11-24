@@ -125,6 +125,25 @@ test("walks the guide: four stalls, a width, the rule, a backup and a restore", 
   expect(requests.external).toEqual([]);
 });
 
+test("wears the values of the new look that its own theme file gives: the paper, the ink and the brick red main action (spec 07, task 7.26)", async ({ page }) => {
+  const requests = trackRequests(page, MARKET);
+  await page.goto("/");
+  await expect(page.getByRole("heading", { level: 1, name: "Stall Register" })).toBeVisible();
+  const read = (selector: string, properties: readonly string[]) =>
+    page.locator(selector).first().evaluate((el, props) => Object.fromEntries(props.map((p) => [p, getComputedStyle(el).getPropertyValue(p)])), properties);
+  expect(await read("body", ["background-color", "color"])).toEqual({ "background-color": "rgb(251, 246, 238)", color: "rgb(42, 35, 32)" });
+  expect(await read("header.app", ["border-bottom-width", "border-bottom-color"])).toEqual({ "border-bottom-width": "4px", "border-bottom-color": "rgb(142, 59, 47)" });
+  expect((await read("h1", ["font-family"]))["font-family"]).toMatch(/^Georgia,/);
+  await check(page, "library");
+  await startRegister(page, "Stall Look");
+  await generateGrid(page, { section: "Row A", prefix: "S", first: "1", digits: "1", rows: "1", columns: "2", width: "40", height: "30", east: "100", north: "100" });
+  await openStall(page, "S1");
+  // The one main action of the screen is the brick red button with white text, and its edge is brick red too.
+  const primary = page.locator(".button.primary, button.primary").first();
+  expect(await primary.evaluate((el) => ({ fill: getComputedStyle(el).backgroundColor, text: getComputedStyle(el).color, edge: getComputedStyle(el).borderTopColor }))).toEqual({ fill: "rgb(142, 59, 47)", text: "rgb(255, 255, 255)", edge: "rgb(142, 59, 47)" });
+  await check(page, "stall with the new values");
+  expect(requests.external).toEqual([]);
+});
 test("the stall panel is laid out well on the plot screen of an empty and a full stall, and says nothing about a trader to a visitor", async ({ page }) => {
   await startRegister(page, "Stall Check");
   await generateGrid(page, { section: "Row A", prefix: "S", first: "1", digits: "1", rows: "1", columns: "2", width: "40", height: "30", east: "100", north: "100" });

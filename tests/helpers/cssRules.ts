@@ -19,7 +19,7 @@ export interface Rule {
 
 const stripComments = (css: string): string => css.replace(/\/\*[\s\S]*?\*\//g, "");
 
-/** Every rule of a stylesheet, with the rules of `@media` and `@supports` flattened. `@keyframes` and `@font-face` are left out. */
+/** Every rule of a stylesheet, with the rules of `@media`, `@supports` and `@container` flattened. `@keyframes` and `@font-face` are left out. */
 export function rulesOf(css: string): Rule[] {
   const text = stripComments(css);
   const out: Rule[] = [];
@@ -43,7 +43,7 @@ export function rulesOf(css: string): Rule[] {
       }
       const head = text.slice(i, open).trim().replace(/\s+/g, " ");
       const inner = text.slice(open + 1, j - 1);
-      if (head.startsWith("@media") || head.startsWith("@supports")) walk(open + 1, j - 1, at === "" ? head : `${at} ${head}`);
+      if (head.startsWith("@media") || head.startsWith("@supports") || head.startsWith("@container")) walk(open + 1, j - 1, at === "" ? head : `${at} ${head}`);
       else if (!head.startsWith("@")) {
         for (const selector of head.split(/,(?![^(]*\))/).map((s) => s.trim().replace(/\s+/g, " "))) out.push({ at, selector, body: inner, order: order++ });
       }

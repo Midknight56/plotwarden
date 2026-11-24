@@ -2,7 +2,7 @@
 import { expect } from "@playwright/test";
 import type { Locator, Page, Response } from "@playwright/test";
 import { measureLayout } from "./measureLayout";
-import { sizeOf } from "./routes";
+import { restPointer, sizeOf } from "./routes";
 
 /** The assembled site, served by `npm run preview`. */
 export const SITE = "http://127.0.0.1:4174/";
@@ -91,8 +91,9 @@ export async function settleMotion(page: Page): Promise<void> {
   );
 }
 
-/** Save one small picture of a whole page, as proof of how it looked. Phone and desktop are both kept. */
-export async function saveProof(page: Page, name: string): Promise<void> {
+/** Save one small picture of a whole page, as proof of how it looked. Phone and desktop are both kept. The pointer is off every control first. */
+export async function saveProof(page: Page, name: string, folder = "docs/acceptance/layout/site"): Promise<void> {
   await settleMotion(page);
-  await page.screenshot({ path: `docs/acceptance/layout/site/${name}-${sizeOf(page)}.jpg`, type: "jpeg", quality: 60, fullPage: true });
+  await restPointer(page);
+  await page.screenshot({ path: `${folder}/${name}-${sizeOf(page)}.jpg`, type: "jpeg", quality: 60, fullPage: true });
 }

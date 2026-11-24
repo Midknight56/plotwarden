@@ -25,10 +25,30 @@ describe("addressHoldsWord", () => {
     expect(addressHoldsWord(`${SITE}#B03`, "B03")).toBe(true);
   });
 
-  it("finds a name that stands alone in a longer value, and not one that is only part of a longer word", () => {
+  it("finds a name that stands alone in a longer value", () => {
     expect(addressHoldsWord(`${SITE}?note=see-B03-today`, "B03")).toBe(true);
-    expect(addressHoldsWord(`${SITE}?note=B039`, "B03")).toBe(false);
-    expect(addressHoldsWord(`${SITE}?note=xB03`, "B03")).toBe(false);
+  });
+
+  // The app writes no code or name into an address once the register and plot IDs are taken out, so a word that is
+  // joined to other letters or digits is a leak too.
+  it("finds a word that is joined to other letters or digits, once the IDs are taken out", () => {
+    expect(addressHoldsWord(`${SITE}?note=B039`, "B03")).toBe(true);
+    expect(addressHoldsWord(`${SITE}?note=xB03`, "B03")).toBe(true);
+    expect(addressHoldsWord(`${SITE}?q=MirelQuillmoss`, "Quillmoss")).toBe(true);
+    expect(addressHoldsWord(`${SITE}?q=MirelQuillmoss`, "Mirel")).toBe(true);
+    expect(addressHoldsWord(`${SITE}?ref=quillmoss2026`, "Quillmoss")).toBe(true);
+    expect(addressHoldsWord(`${SITE}?ref=Quillmoss2026`, "quillmoss")).toBe(true);
+    expect(addressHoldsWord(`${SITE}/Mirel%20Quillmoss`, "Mirel Quillmoss")).toBe(true);
+    expect(addressHoldsWord(`${SITE}?q=Mirel%2520Quillmoss`, "Mirel Quillmoss")).toBe(true);
+  });
+
+  it("takes every register and plot ID out first, so a word is not found inside an ID and not made by taking one out", () => {
+    const plot = "0f1e2d3c-b03a-4b5c-9d8e-7f6a5b4c3d2e";
+    expect(addressHoldsWord(`${SITE}/plot/${plot}`, "B03")).toBe(false);
+    expect(addressHoldsWord(`${SITE}/plot/${plot}`, "b03a")).toBe(false);
+    // Taking an ID out must not join the letters on each side of it into a word.
+    expect(addressHoldsWord(`http://127.0.0.1:4178/#/r/Quil${plot}lmoss`, "Quillmoss")).toBe(false);
+    expect(addressHoldsWord(`http://127.0.0.1:4178/#/r/${plot}/Quillmoss`, "Quillmoss")).toBe(true);
   });
 
   it("reads an address that is not valid percent coding as it stands", () => {
