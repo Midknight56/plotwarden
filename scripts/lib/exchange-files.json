@@ -1,0 +1,10 @@
+[
+  ["template/src/exchange/schema.ts", "exchange/schema.ts"],
+  ["template/src/exchange/packet.ts", "exchange/packet.ts"],
+  ["template/src/exchange/compare.ts", "exchange/compare.ts"],
+  ["template/src/exchange/slip.ts", "exchange/slip.ts"],
+  ["template/src/calendar.ts", "calendar.ts"],
+  ["template/src/limits.ts", "limits.ts"],
+  ["template/src/types.ts", "types.ts"],
+  ["tests/fixtures/exchange-vectors.json", "vectors.json"]
+]

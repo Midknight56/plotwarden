@@ -18,6 +18,9 @@ Every production file has a test listed in `tasks.md`.
 | `tools/inspector/cli.ts` | A command line over the same `callTool`, for people | T33 |
 | `tools/inspector/vite.config.ts` | The build of `dist/inspector/server.mjs` and `cli.mjs` | T33 |
 | `powers/plot-checks/plugin.json`, `powers/plot-checks/skills/review-adapter/SKILL.md` | The skills only power | T33 |
+| `powers/review-desk-drift/plugin.json`, `powers/review-desk-drift/skills/compare-desk-copy/SKILL.md`, `powers/review-desk-drift/skills/compare-desk-copy/scripts/compare.mjs` | The second power: the drift check of the Desk copy against the register | none |
+| `scripts/lib/exchange-files.json` | The eight file pairs of the exchange copy, read by `scripts/export-exchange.mjs` and by `compare.mjs` | none |
+| `tests/helpers/proofLog.ts` | The check of a saved session record for the second power | none |
 | `examples/market/*` | The market stall register: source of the third use recipe | T34 |
 | `scripts/create-app.mjs`, `scripts/lib/scaffold.mjs` | The generator: arguments, refusal, copy with rewritten import paths | T34 |
 | `docs/make-your-own.md` | The guide | T34 |
@@ -436,6 +439,16 @@ Why the guide and not the template for Z23.6: `register.css` imports the font fi
 
 Why the app is not changed for Z23.12: the plot width and height have no honest default, because they are in map units that the keeper chooses. An empty field with an error is the right start. The guide was the part that was wrong.
 
+## Z-D18 The review-desk-drift power (Z24)
+
+The Desk keeps a copy of eight register files in `vendor/exchange/` and a record of it, `provenance.json`, with a byte count and a SHA 256 for each. The Desk's own check reads only its own copy, so a change in the register is not seen. `compare.mjs` checks both sides against the record. The two copies are never compared with each other, because a change made to both would then pass.
+
+- `scripts/lib/exchange-files.json` is a list of eight pairs, `[path in the register, path in the Desk copy]`. The exporter takes the `.ts` pairs as the files it reads for imports and the other pair as the vectors. Its output is the same as before.
+- An installed power is a copy and cannot reach the register's `scripts/lib`. So `compare.mjs` reads the list from the register folder it is given, at `scripts/lib/exchange-files.json`.
+- Every entry of the record and the list is checked before a file is read: a path that is empty, absolute, or climbs out of its folder is refused, then a repeat, then an entry that is not one of the eight, then a pair with no entry. A link that leads out of its folder is refused the same way. Each refusal is exit 2 with one line on the error stream, and nothing on the output stream.
+- The output lines are in this order: the Desk count, the register count, the lines for the Desk, then the lines for the register. The Desk path is shown under `vendor/exchange/`. A register path is shown as it is in the list.
+- The skill tells the agent to run the script, report both counts, and say what changed in the file. Bytes alone do not say that return slips behave differently. It tells the agent not to run the exporter.
+- The test runs the script from a copy of the power folder in a temporary folder, with a register and a Desk built there. `tests/helpers/proofLog.ts` is written for the saved record of the one session run on the real folders. Its record shape is read loosely, because the saved form was not known when it was written.
 ## Z-D11 Evidence
 
 Each task row in `docs/kiro-log.md` names its red run and its green run. The log holds no local absolute path. Browser results say headless Chromium on one Windows machine. Results from a unit test, a browser assertion and a person's review of a picture are labelled apart. No claim about users, speed on other machines or other browsers is made.

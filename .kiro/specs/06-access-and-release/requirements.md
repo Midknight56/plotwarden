@@ -283,6 +283,18 @@ Tests: `tests/unit/{familyForm,offer,tenancy,storage,makeYourOwn,visitor,churchC
 11. (B12) When this tab saves, it shall not show "This register changed in another tab", not even for a moment. A save that another tab made shall still show it. The tab that commits a revision remembers it, and does not take the channel's message of that revision, or of an earlier one, as news. The message itself is as it was.
 12. (B13) The guide's step 2 and the map setup shall agree: the guide names "Plot width" `40` and "Plot height" `30` with the other fields, and a test shall fill the fields exactly as the guide says, press "Preview plots" and see "Apply layout".
 
+## Z24 The review-desk-drift power
+
+Tests: `tests/unit/reviewDeskDrift.test.ts`. Built in task 6.35. The power is not installed by this task. The person who installs it runs it once from a Kiro session and keeps the record.
+
+1. When the power folder is read, `powers/review-desk-drift/plugin.json` shall use the `$schema`, `version`, `author` and `license` of `powers/plot-checks/plugin.json`, the name `review-desk-drift`, the description "Compare the committee file rules in Plotwarden and Review Desk and report which files differ." and the keywords `Review Desk copy`, `committee file rules`, `return slip rules`. The folder shall hold no `mcp.json`.
+2. When the skill is read, `skills/compare-desk-copy/SKILL.md` shall have the name `compare-desk-copy` and the description "Use when someone asks whether the Review Desk copy of the committee file rules matches the current Plotwarden register.", and shall tell the agent to run the script `scripts/compare.mjs` next to it with `--register` and `--desk`.
+3. When the eight file pairs are listed, `scripts/lib/exchange-files.json` shall hold them, and `scripts/export-exchange.mjs` and `compare.mjs` shall both read that list. The files the exporter writes, and its `provenance.json`, shall be byte for byte what they were before the list moved.
+4. When `compare.mjs` runs with `--register <folder>` and `--desk <folder>`, it shall check each file of both folders against the byte count and SHA 256 in `vendor/exchange/provenance.json` of the Desk, and print `Desk matches N/8`, `Register matches N/8` and one `Register differs <path> (<bytes> bytes, expected <bytes>)` or `Desk differs <path> (<bytes> bytes, expected <bytes>)` line for each file that differs. It shall exit 0 when every file matches and 1 when one differs. A file that differs in one byte and not in size shall be found. A Desk file that was changed to be the same as a changed register file shall still be found, because both are checked against the record and not against each other.
+5. When a file is missing, a record entry is listed twice or is not one of the eight, a record entry or list entry has a path outside its folder, an argument is missing or unknown, or a folder does not exist, `compare.mjs` shall exit 2 with a message that names the input, print no count, and read no file for a path that it refused.
+6. `compare.mjs` shall change no file or folder in either project, use Node built in modules only, and need no new package and no tool server.
+7. When a saved session record is checked, it shall be accepted only when it holds a read of the skill `compare-desk-copy` of the power `review-desk-drift`, after it a command that runs the installed `compare.mjs` with both folders, and after that the output of the command with both match lines. A chat reply that says the check passed holds none of these and shall be refused. The check is `tests/helpers/proofLog.ts`. It reads the record as JSON of any shape, so the person who runs the session confirms that it reads a real saved record.
+
 ---
 
 ## Not claimed

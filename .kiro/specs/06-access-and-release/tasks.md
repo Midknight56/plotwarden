@@ -49,6 +49,7 @@ For the browser specs the screens already existed, so the first run is a run aga
   - [x] 6.34.10 B10 Print this location is disabled until a location is chosen.
   - [x] 6.34.11 B12 a save from this tab never raises the other tab warning, and a save from another tab does.
   - [x] 6.34.12 B13 the guide names the plot width and height, and a test follows its step 2.
+- [x] 6.35 The power review-desk-drift: "Desk matches N/8" and "Register matches N/8" for the eight file pairs, checked against the Desk's saved record, read only. Spec first (Z24, Z-D18), then 	ests/unit/reviewDeskDrift.test.ts seen to fail for the right reason against a placeholder that prints "unchecked", then the code. The eight pairs move from scripts/export-exchange.mjs into scripts/lib/exchange-files.json, which the exporter and the checker both read, and the exporter output stays byte for byte the same. Files: `.kiro/specs/06-access-and-release/*`, `powers/review-desk-drift/plugin.json`, `powers/review-desk-drift/skills/compare-desk-copy/SKILL.md`, `powers/review-desk-drift/skills/compare-desk-copy/scripts/compare.mjs`, `scripts/lib/exchange-files.json`, `scripts/export-exchange.mjs`, `tests/helpers/proofLog.ts`, `tests/unit/reviewDeskDrift.test.ts`, `docs/write-up.md`. T IDs: none new. Z24.
 
 ## Not settled in spec 06
 

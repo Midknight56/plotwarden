@@ -90,6 +90,25 @@ The turn end row was read from the log after that turn ended, and added then. It
 
 `powers/plot-checks/` is a skills only power with one skill, `review-adapter`. It tells an agent to check a new adapter with the three inspector tools on the market fixture, and says the keeper's own records are never an input. The install command, after `npm run build:inspector`, is `kiro-cli powers install ./powers/plot-checks`. "Live session record" below says what was seen of the install and of the skill. No activation of the power is claimed.
 
+## The second power
+
+`powers/review-desk-drift/` is a power with one skill, `compare-desk-copy`. It compares the committee file rules in the Review Desk checkout with the rules in this register, and reports which files differ. It has a checker script, `compare.mjs`.
+
+What was seen of it comes from one Kiro CLI session on 24 November 2026. The default agent ran it, in the folder that holds both checkouts. The facts below are read from the record of that session. The revision of either checkout is not in that record.
+
+- **Install command.** `kiro-cli powers install ./plotwarden/powers/review-desk-drift`.
+- **Prompt.** "Check the committee file rules. Use the installed power and load its skill. Compare the Review Desk copy in ./plotwarden-review-desk with the register in ./plotwarden. Report both match counts and explain each difference. Keep both folders read only."
+- **What the record shows, in order.**
+  1. A Kiro Powers tool call that loaded the skill `compare-desk-copy`.
+  2. A search for `compare.mjs`.
+  3. A read of the installed copy of `compare.mjs`.
+  4. `node` running the installed copy in the Kiro powers folder, with `--register` set to the register checkout and `--desk` set to the Desk checkout.
+- **What the checker printed.** `Desk matches 8/8.` `Register matches 7/8.` `Register differs template/src/limits.ts (4530 bytes, expected 4162).` It exited with 1.
+- **What the session then did.** It compared the two copies of `limits.ts`. It found that the register copy has `checkRecordRoom` and the Desk copy does not.
+- **Both checkouts.** The session changed neither.
+
+How this was produced: a reading of the session record. The checker's output and the comparison of the two files are what the record shows the session received. They were not run again for this page. The session shows the skill loaded by a tool call. It does not show who installed the power beyond the command above, and it does not show a second run. One machine and one session were used. The Desk copy lacking `checkRecordRoom` is a difference between two checkouts on that day. It does not say which copy is right.
+
 ## Tests that failed first
 
 Each of these is in `docs/kiro-log.md`, with its task number.
@@ -171,4 +190,4 @@ The `churchyard` and `allotment` adapters were not run in this session. A pass o
 - It does not show a comparison of Kiro with any other way of building this. None was run.
 - It does not show how long anything took, or how many people used the result. No person has used the registers.
 - It does not show which of Kiro's surfaces other than the command line were used. None is claimed.
-- It does not show that the stop hook fired in a Kiro session, or that the power started itself. The save hook is shown by the hook log under "Hooks". See "Live session record".
+- It does not show that the stop hook fired in a Kiro session, or that the first power started itself. The save hook is shown by the hook log under "Hooks". See "Live session record".

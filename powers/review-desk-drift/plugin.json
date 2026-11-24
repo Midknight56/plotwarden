@@ -1,0 +1,11 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "review-desk-drift",
+  "version": "1.0.0",
+  "description": "Compare the committee file rules in Plotwarden and Review Desk and report which files differ.",
+  "author": {
+    "name": "Adrian Ferguson"
+  },
+  "keywords": ["Review Desk copy", "committee file rules", "return slip rules"],
+  "license": "MIT"
+}

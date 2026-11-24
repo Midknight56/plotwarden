@@ -20,17 +20,13 @@ import { resolveImport, scanSource } from "./lib/imports.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 
-/** [path in the repository, path in the copy]. The four exchange files first, then what they import. */
-const PURE = [
-  ["template/src/exchange/schema.ts", "exchange/schema.ts"],
-  ["template/src/exchange/packet.ts", "exchange/packet.ts"],
-  ["template/src/exchange/compare.ts", "exchange/compare.ts"],
-  ["template/src/exchange/slip.ts", "exchange/slip.ts"],
-  ["template/src/calendar.ts", "calendar.ts"],
-  ["template/src/limits.ts", "limits.ts"],
-  ["template/src/types.ts", "types.ts"],
-];
-const VECTORS = ["tests/fixtures/exchange-vectors.json", "vectors.json"];
+/**
+ * [path in the repository, path in the copy], read from scripts/lib/exchange-files.json, the one list that the
+ * Review Desk drift check reads too. The four exchange files come first, then what they import, then the vectors.
+ */
+const PAIRS = JSON.parse(readFileSync(join(here, "lib", "exchange-files.json"), "utf8"));
+const PURE = PAIRS.filter(([from]) => from.endsWith(".ts"));
+const VECTORS = PAIRS.find(([from]) => !from.endsWith(".ts"));
 const FORMAT = "plot.exchange.vendor.v1";
 const ALLOWED_PACKAGE = "zod";
 
