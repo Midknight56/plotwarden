@@ -74,3 +74,7 @@ pm run assemble:site refused on this machine: the sibling Desk checkout is at an
 - A released reservation still shows the reason as typed. A reason that ends in a full stop reads with two. The release form does not strip it.
 - A plot with a reservation and no burial shows the reservation line in the same list as the burials under the heading "Burials". The heading was not changed.
 - The plot screen words are checked by drawing `ChurchPlotExtras` to static markup with a fake register and shell. The browser spec was not given a new step for the plot screen. Only the family file line has a browser assertion.
+
+## Task 18: the worn stone beside the inscription in the practice register
+
+- [x] 3.26 The burial of Mirel Quillmoss in the practice register shows a picture of the worn stone beside its inscription, on the keeper's burial screen only. The picture is a file of the app's artwork (`assets/stone-face.webp`), not a stored photo, so no family file, committee file or backup holds it. Files: `assets/{stone-face.webp,origins.md}`, `docs/rights.md`, `apps/churchyard-register/src/{practiceStone.ts,Memorial.tsx,copy.ts,theme.css}`, `tests/unit/{practiceStone,lookLayout}.test.ts`, `tests/browser/stone-picture.spec.ts`. T IDs: none.

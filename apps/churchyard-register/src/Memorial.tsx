@@ -8,6 +8,7 @@ import { Button, ButtonLink, RadioGroup, TextArea, TextField } from "../../../te
 import { useShell } from "../../../template/src/ui/shellContext";
 import { Status } from "../../../template/src/ui/Status";
 import { useIntent, useChurch } from "./intent";
+import { practiceStoneFor } from "./practiceStone";
 import type { Burial } from "./types";
 
 function Photo({ blobId, alt }: { blobId: string; alt: string }) {
@@ -29,6 +30,8 @@ export function StoneSection({ burial }: { burial: Burial }) {
   const photos = burial.plotId === undefined ? [] : livePhotos(open.state.notes, burial.plotId);
   const linked = photos.filter((p) => memorial?.photoIds.includes(p.photoId) === true);
   const unlinked = photos.filter((p) => memorial?.photoIds.includes(p.photoId) !== true);
+  // The practice register brings one picture of its own with this burial. It is shown, and it is not a photo of the register.
+  const practiceStone = memorial === undefined ? undefined : practiceStoneFor(open.site.workspace, burial);
 
   const save = async (event: FormEvent) => {
     event.preventDefault();
@@ -81,7 +84,7 @@ export function StoneSection({ burial }: { burial: Burial }) {
           <ButtonLink href={`#/r/${open.site.id}/plot/${burial.plotId}`}>{t("addStonePhoto")}</ButtonLink>
         </div>
       )}
-      {photos.length === 0 ? <p>{t("noStonePhotos")}</p> : null}
+      {photos.length === 0 && practiceStone === undefined ? <p>{t("noStonePhotos")}</p> : null}
       {memorial !== undefined && unlinked.length > 0 ? (
         <ul className="plain stack">
           {unlinked.map((p) => (
@@ -96,11 +99,20 @@ export function StoneSection({ burial }: { burial: Burial }) {
           ))}
         </ul>
       ) : null}
-      {linked.length === 0 ? null : (
+      {linked.length === 0 && practiceStone === undefined ? null : (
         <section className="stack" aria-label={t("comparePhoto")}>
           <h3>{t("comparePhoto")}</h3>
+          {practiceStone === undefined ? null : (
+            <div className="stone-compare">
+              <figure className="stone-figure">
+                <img className="photo" src={practiceStone} alt={t("practiceStonePhoto")} />
+                <figcaption>{t("practiceStoneNote")}</figcaption>
+              </figure>
+              <p className="inscription">{memorial?.reading}</p>
+            </div>
+          )}
           {linked.map((p) => (
-            <div key={p.photoId} className="stack">
+            <div key={p.photoId} className="stone-compare">
               <Photo blobId={p.blobId} alt={"text" in p.caption ? p.caption.text : t("stonePhoto")} />
               <p className="inscription">{memorial?.reading}</p>
             </div>

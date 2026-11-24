@@ -6,7 +6,7 @@ The code is MIT licensed. See `LICENSE`. Notices for the packages that ship are 
 
 ## Art
 
-Every drawing in `assets/` was drawn for this project as SVG paths. None is traced from a photograph, a stock library, a logo or a font. `assets/origins.md` lists each file with its origin and where it is used, and `tests/unit/copy.test.ts` fails if a file in `assets/` is not listed. The drawings hold no text and no script.
+Every drawing in `assets/` was drawn for this project as SVG paths, and one picture, `stone-face.webp`, is a render of an invented headstone made for this project in Blender. None is traced from a photograph, a stock library, a logo or a font. `assets/origins.md` lists each file with its origin and where it is used, and `tests/unit/copy.test.ts` fails if a file in `assets/` is not listed. The drawings hold no text and no script. The render shows no real stone and no real person.
 
 No real grave, scanned official form, personal record or stock logo is used anywhere.
 

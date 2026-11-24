@@ -71,8 +71,8 @@ describe.each(NAMES)("assets/%s.svg (L7.3)", (name) => {
 });
 
 describe("the three drawings together (L7.3)", () => {
-  it("leaves the folder with the three band drawings, the app mark, the mark symbols and the notes", () => {
-    expect(readdirSync(join(ROOT, "assets")).sort()).toEqual(["churchyard-margin.svg", "garden-margin.svg", "gate-lantern.svg", "mark.svg", "origins.md", "plot-symbols.svg"]);
+  it("leaves the folder with the three band drawings, the app mark, the mark symbols, the practice stone picture and the notes", () => {
+    expect(readdirSync(join(ROOT, "assets")).sort()).toEqual(["churchyard-margin.svg", "garden-margin.svg", "gate-lantern.svg", "mark.svg", "origins.md", "plot-symbols.svg", "stone-face.webp"]);
   });
 
   it("keeps the garden ids, more than ten uses, and none of the churchyard colours", () => {

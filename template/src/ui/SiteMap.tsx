@@ -3,6 +3,7 @@
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode, RefObject } from "react";
 import { codeWidth } from "../map/labels";
+import { pickPlot, pickRadius } from "../map/pick";
 import { CODE_PAD, LABEL_BAND, LABEL_SIZE, buildSheet } from "../map/sheet";
 import type { KeyState, SheetModel, SheetPlot } from "../map/sheet";
 import { AsAtField, AsAtHeading } from "./AsAtField";
@@ -155,12 +156,14 @@ export function SheetSvg({
   label,
   image,
   onSurface,
+  onSurfaceDown,
   extra,
 }: {
   model: SheetModel;
   label: string;
   image?: { href: string };
   onSurface?: (event: React.MouseEvent<SVGSVGElement>) => void;
+  onSurfaceDown?: (event: React.PointerEvent<SVGSVGElement>) => void;
   extra?: ReactNode;
 }) {
   const { north } = model;
@@ -175,6 +178,7 @@ export function SheetSvg({
       width={model.width}
       height={model.height}
       onClick={onSurface}
+      onPointerDown={onSurfaceDown}
     >
       {model.backdrop !== undefined && image !== undefined ? (
         <image
@@ -210,7 +214,7 @@ export function SheetSvg({
         </g>
       ))}
       {model.plots.map((plot) => (
-        <g key={plot.plotId}>
+        <g key={plot.plotId} data-plot-id={onSurface === undefined ? undefined : plot.plotId}>
           {arched ? (
             <>
               <Turf box={plot.box} />
@@ -266,6 +270,9 @@ export function SheetSvg({
     </svg>
   );
 }
+
+/** A pointer that moves further than this between going down and coming up is a drag, not a tap. */
+const DRAG_LIMIT = 8;
 
 const KEY_WORDS: Record<KeyState, { word: string; shape: string }> = {
   free: { word: "legendFree", shape: "free" },
@@ -344,6 +351,28 @@ export function SiteMap() {
   );
   const chosen = rows.find((r) => r.plot.plotId === selected);
 
+  /** The same choice as the list makes: the plot goes into the address with the date kept, and nothing is saved. */
+  const choose = (plotId: string) => navigate(`/r/${open.site.id}/map${queryOf({ plot: plotId, asAt })}`, { replace: true, search: route.search });
+
+  // Where the pointer went down, so that a drag is not read as a tap.
+  const down = useRef<{ x: number; y: number; type: string } | null>(null);
+  const pressed = (event: React.PointerEvent<SVGSVGElement>) => {
+    down.current = { x: event.clientX, y: event.clientY, type: event.pointerType };
+  };
+  /** A tap or a click on a drawn plot chooses it. A drag, a tap on ground or a path, or a tap between plots changes nothing. */
+  const tapped = (event: React.MouseEvent<SVGSVGElement>) => {
+    const start = down.current;
+    down.current = null;
+    if (start !== null && Math.hypot(event.clientX - start.x, event.clientY - start.y) > DRAG_LIMIT) return;
+    const bounds = event.currentTarget.getBoundingClientRect();
+    if (bounds.width === 0 || bounds.height === 0) return;
+    const kind = start?.type ?? (event.nativeEvent as Partial<PointerEvent>).pointerType ?? "";
+    const at: [number, number] = [((event.clientX - bounds.left) * sheet.width) / bounds.width, ((event.clientY - bounds.top) * sheet.height) / bounds.height];
+    const shape = app.adapter.theme.plotShape === "arch" ? "arch" : "polygon";
+    const picked = pickPlot(sheet.plots, at, { shape, radius: pickRadius(kind) });
+    if (picked !== undefined && picked !== selected) choose(picked);
+  };
+
   const print = () => {
     setPrintStatus("preparing");
     window.setTimeout(() => {
@@ -373,7 +402,7 @@ export function SiteMap() {
       <div className="map-layout">
         <div className="stack map-main">
           <div ref={holder} className="sheet-scroll" role="region" aria-label={t("siteMap")} tabIndex={0}>
-            <SheetSvg model={sheet} label={t("mapDescription")} />
+            <SheetSvg model={sheet} label={t("mapDescription")} onSurface={tapped} onSurfaceDown={pressed} />
           </div>
           <MapKey />
         </div>
@@ -388,7 +417,7 @@ export function SiteMap() {
           <SelectField
             label={t("choosePlot")}
             value={selected}
-            onChange={(value) => navigate(`/r/${open.site.id}/map${queryOf({ plot: value, asAt })}`, { replace: true, search: route.search })}
+            onChange={choose}
             options={[{ value: "", label: t("noPlotChosen") }, ...rows.map((r) => ({ value: r.plot.plotId, label: r.line }))]}
           />
           {chosen === undefined ? null : (

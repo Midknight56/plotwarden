@@ -488,6 +488,41 @@ svg.sheet .path-line {
   overflow-wrap: anywhere;
 }
 
+/* A stone photo with the words read from it. On a phone the photo stands over the words, and on a wide screen beside them. */
+.photo {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border: 2px solid var(--ink);
+}
+
+.stone-compare {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.stone-compare > * {
+  min-width: 0;
+}
+
+.stone-figure {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+
+.stone-figure .photo {
+  width: 100%;
+}
+
+@media (min-width: 48rem) {
+  .stone-compare {
+    grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  }
+}
+
 .preview-frame {
   padding: 16px;
   border: 2px dashed var(--ink);

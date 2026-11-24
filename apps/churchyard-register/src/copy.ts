@@ -78,6 +78,8 @@ export const CHURCH_COPY: Readonly<Record<string, string>> = {
   readingSettled: "Reading checked.",
   noReadingYet: "No reading yet.",
   noStonePhotos: "No stone photos.",
+  practiceStonePhoto: "The worn stone of this practice burial. Its third line reads OF HOLLOWMERE.",
+  practiceStoneNote: "A practice picture. It comes with the app and is not part of your records.",
   photoLinked: "Photo linked to this reading.",
   choosePhoto: "Choose photo",
   burialHistory: "History of this burial",

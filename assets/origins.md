@@ -1,6 +1,6 @@
 # Where the art comes from
 
-Every drawing in this folder was drawn for this project as flat SVG shapes: paths, circles, rectangles, gradients and one mask. None of it is traced from a photograph, a stock library, a logo or a font. There is no real grave, no real site plan and no real person in any of it.
+Every drawing in this folder was drawn for this project as flat SVG shapes: paths, circles, rectangles, gradients and one mask. None of it is traced from a photograph, a stock library, a logo or a font. The one other file is a rendered picture of an invented headstone, `stone-face.webp`, made for this project and kept as it was made. There is no real grave, no real site plan and no real person in any of it.
 
 | File | What it shows | Where it is used | What moves and what stands still |
 |---|---|---|---|
@@ -9,6 +9,7 @@ Every drawing in this folder was drawn for this project as flat SVG shapes: path
 | `garden-margin.svg` | Clouds, a sun, a tool shed, a garden gate, three bean poles, and a strip of soil with furrow lines and seedlings. 1200 by 72, and it tiles sideways without a seam | The first row of the header of the Allotment Register (`header.app::before`), tiled sideways at the height of the band. It is also the art band of the allotment door of the start page (`.door.garden .door-art`) | It stands still. A separate pale haze (`.mist`, a gradient and not a file) drifts very slowly over it. The haze stops for reduced motion and is hidden in high contrast. In high contrast the garden band is plain white and carries no art |
 | `mark.svg` | The mark of Plotwarden: a rounded square in the night blue, with an arch (a headstone) with a lantern lit in it, and a bed with one line of hatching, drawn in ivory lines. 64 by 64 | The start page, beside the brand in the bar (`.brand::before` in `site/src/site.css`), 28 px. No other page loads it | It stands still |
 | `plot-symbols.svg` | The five marks of the map key as symbols: Free (open arch), Reserved (slash), Taken (solid centre), Unusable (cross), Needs checking (dotted arch) | The master drawing of the marks. The key and the state mark beside the selected plot draw the same arch and marks in code, so the register loads no extra file for them | It stands still |
+| `stone-face.webp` | The invented headstone of Mirel Quillmoss of Hollowmere, keeper of the Lantern Fold, in grass, with one worn line, "OF HOLLOWMERE". A rendered picture made in Blender for this project, not a photograph and not a real stone. It is the same picture as `docs/film/stone-face.webp`, byte for byte | The burial screen of the practice churchyard only, for the burial of Mirel Quillmoss (`practiceStone.ts`), in the Compare photo and words section beside the inscription. It is a file of the app, and it is never a record: no family file, committee file or backup holds it | It stands still |
 
 Colours in each file, read from the file. Nothing in the art carries meaning by colour alone: each map mark has its word beside it.
 
