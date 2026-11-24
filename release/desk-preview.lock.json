@@ -2,7 +2,7 @@
   "lock": 1,
   "name": "plotwarden-review-desk",
   "version": "0.1.0",
-  "revision": "edeb3419030219c6c2af4fc98b72545309a593d0",
+  "revision": "8b8a15638e175a5d3add25989861dcb6c8507816",
   "entry": "index.html",
   "files": {
     "asset-manifest.json": "0502c7eb0dec390ad5311b5243e9dc0718490b8211b058173cb1f4422b069459",
