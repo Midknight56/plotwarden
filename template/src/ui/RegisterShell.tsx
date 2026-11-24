@@ -9,7 +9,7 @@ import type { BaseState } from "../base";
 import { localDateOf, writeTime } from "../calendar";
 import { openRegisterDb } from "../data/db";
 import { keySourceOfDraft, uniqueKeysFor } from "../data/importBatch";
-import { commit, onRevision, readEvents, readSite } from "../data/transaction";
+import { commit, heardFromOtherTab, onRevision, readEvents, readSite } from "../data/transaction";
 import type { SiteRow } from "../data/transaction";
 import type { DraftEvent, StoredEvent } from "../events";
 import { loadSettings, saveSettings, themeAttributes } from "../preferences";
@@ -210,7 +210,7 @@ function RegisterFrame({ siteId, children }: { siteId: string; children: ReactNo
   useEffect(
     () =>
       onRevision((message) => {
-        if (message.siteId === siteId && latest.current !== null && message.revision > latest.current.revision) setStale(true);
+        if (message.siteId === siteId && latest.current !== null && heardFromOtherTab(message, latest.current.revision)) setStale(true);
       }),
     [siteId],
   );

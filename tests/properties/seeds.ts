@@ -36,6 +36,10 @@ export const SEEDS = {
   INV_EXCHANGE_COMPARE: 20261152,
   INV_EXCHANGE_SLIP: 20261153,
   INV_EXCHANGE_LABEL: 20261154,
+  // Faults found on the live site (spec 06, Z23)
+  INV_OFFER_AFTER_JOINED: 20261160,
+  INV_FAMILY_SAVE_ROWS: 20261161,
+  INV_FAMILY_SAVE_TICKS: 20261162,
 } as const;
 
 export interface FailingSeed {

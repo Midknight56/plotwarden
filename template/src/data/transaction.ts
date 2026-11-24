@@ -88,6 +88,9 @@ interface UniqueKeyRow {
 const COMMIT_STORES = ["sites", "events", "indexes", "uniqueKeys", "blobs", "operations"] as const;
 const CHANNEL = "plotwarden.revisions";
 
+/** The newest revision of each site that this tab committed. It is per page, so another tab never shares it. */
+const ownRevisions = new Map<Uuid, number>();
+
 /** Save a new site at revision 0. Refuses a site that already exists. */
 export async function saveNewSite(db: IDBDatabase, site: Site): Promise<Result<true>> {
   if (site.revision !== 0) return err("bad_revision", { revision: site.revision });
@@ -217,6 +220,7 @@ export async function commit(db: IDBDatabase, input: CommitInput): Promise<Commi
   if (!outcome.ok) return failure({ code: outcome.error.code });
   // The transaction has completed. Only now may the screen say "Saved on this device." and other tabs hear of it.
   if (outcome.value.ok && !outcome.value.replayed) {
+    ownRevisions.set(input.siteId, Math.max(ownRevisions.get(input.siteId) ?? 0, outcome.value.revision));
     broadcastRevision({ siteId: input.siteId, revision: outcome.value.revision });
   }
   return outcome.value;
@@ -232,6 +236,15 @@ export function broadcastRevision(message: RevisionMessage): void {
   } catch {
     // A failed notice must never undo a saved change.
   }
+}
+
+/**
+ * Whether a message of the channel is news from another tab. The channel also reaches the other channel objects of
+ * the tab that sent the message, so a tab hears its own save. A revision that this tab holds, or wrote itself, is not
+ * news. A commit checks the expected revision, so a revision this tab wrote cannot also have come from another tab.
+ */
+export function heardFromOtherTab(message: RevisionMessage, known: number): boolean {
+  return message.revision > known && message.revision > (ownRevisions.get(message.siteId) ?? 0);
 }
 
 /** Hear revisions committed in other tabs. Returns a function that stops listening. */

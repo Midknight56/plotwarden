@@ -17,6 +17,7 @@ export const FAMILY_WORD_KEYS = [
   "plot",
   "directions",
   "printLocation",
+  "chooseLocationFirst",
   "printMap",
   "asAt",
   "noMatch",
@@ -103,6 +104,8 @@ ul.list li[hidden]{display:none}
 .code-tab{display:inline-block;padding:0 7px;border:2px solid ${ink};background:${tab};line-height:1.4}
 .js-only{display:none}
 html.has-script .js-only{display:inline-flex;align-items:center;justify-content:center}
+html.has-script .js-only[hidden]{display:none}
+button:disabled{border-color:#595D66;background:#EFE8D6;color:#595D66;cursor:not-allowed}
 .frame{max-width:680px;container-type:inline-size}
 .map{display:block;width:100%;height:auto;border:2px solid ${ink};border-bottom:0;background:${paper}}
 .map[data-view="wide"]{display:none}
@@ -151,7 +154,7 @@ const SCRIPT = `(function(){
 var d=document,root=d.documentElement;
 var data=JSON.parse(d.getElementById('plot-family').textContent);
 root.className+=' has-script';
-var q=d.getElementById('q'),list=d.getElementById('list'),none=d.getElementById('none'),sel=d.getElementById('sel'),code=d.getElementById('selcode');
+var q=d.getElementById('q'),list=d.getElementById('list'),none=d.getElementById('none'),sel=d.getElementById('sel'),code=d.getElementById('selcode'),pl=d.getElementById('printloc'),ph=d.getElementById('printloc-hint');
 var items=list?Array.prototype.slice.call(list.children):[];
 function fold(s){return s.normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').toLowerCase().replace(/\\s+/g,' ').trim();}
 function run(){var w=fold(q.value).split(' ').filter(function(x){return x;}),n=0;
@@ -159,14 +162,15 @@ items.forEach(function(li){var t=li.getAttribute('data-q')||'',ok=w.every(functi
 if(none){none.hidden=n>0||items.length===0;}}
 function mark(id){Array.prototype.forEach.call(d.querySelectorAll('.plotg'),function(g){g.classList.toggle('on',g.getAttribute('data-plot')===id);});
 items.forEach(function(li){li.classList.toggle('on',li.getAttribute('data-plot')===id);});
-var p=data.plots.filter(function(x){return x.id===id;})[0];sel.hidden=!p;if(p){code.textContent=p.code;}}
+var p=data.plots.filter(function(x){return x.id===id;})[0];sel.hidden=!p;if(p){code.textContent=p.code;}pl.disabled=!p;ph.hidden=!!p;}
+function printWith(cls){var v=q.value;q.value='';run();d.body.className=cls;window.print();d.body.className='';q.value=v;run();}
 q.addEventListener('input',run);
 q.addEventListener('keydown',function(e){if(e.key==='Enter'){run();}});
 d.getElementById('go').addEventListener('click',run);
 d.getElementById('clr').addEventListener('click',function(){q.value='';run();mark('');q.focus();});
 Array.prototype.forEach.call(d.querySelectorAll('button[data-plot]'),function(b){b.addEventListener('click',function(){mark(b.getAttribute('data-plot'));var m=Array.prototype.filter.call(d.querySelectorAll('.map'),function(x){return x.getClientRects().length>0;})[0];if(m&&m.scrollIntoView){m.scrollIntoView({block:'nearest'});}});});
-d.getElementById('printloc').addEventListener('click',function(){d.body.className='only-selected';window.print();d.body.className='';});
-d.getElementById('printmap').addEventListener('click',function(){d.body.className='all-tabs';window.print();d.body.className='';});
+pl.addEventListener('click',function(){printWith('only-selected');});
+d.getElementById('printmap').addEventListener('click',function(){printWith('all-tabs');});
 })();`;
 
 export function buildFamilyHtml(file: FamilyFile, words: FamilyWords, theme: PageTheme = DEFAULT_THEME): string {
@@ -213,7 +217,8 @@ ${list}
 <h2 id="map-heading">${escapeHtml(words.mapLabel)}</h2>
 ${svg === "" ? "" : `<div class="frame">${svg}${legendHtml(file.gate.name, file.paths.map((p) => p.name))}</div>`}
 <p id="sel" role="status" hidden>${escapeHtml(words.selected)}: <strong id="selcode"></strong></p>
-<div class="row"><button type="button" id="printloc" class="js-only">${escapeHtml(words.printLocation)}</button><button type="button" id="printmap" class="js-only">${escapeHtml(words.printMap)}</button></div>
+<p id="printloc-hint" class="js-only">${escapeHtml(words.chooseLocationFirst)}</p>
+<div class="row"><button type="button" id="printloc" class="js-only" disabled aria-describedby="printloc-hint">${escapeHtml(words.printLocation)}</button><button type="button" id="printmap" class="js-only">${escapeHtml(words.printMap)}</button></div>
 </section>
 </div>
 </div>

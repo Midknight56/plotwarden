@@ -14,6 +14,7 @@ export const FAMILY_WORDS: FamilyWords = {
   plot: "Plot",
   directions: "Directions",
   printLocation: "Print this location",
+  chooseLocationFirst: "Show a location first.",
   printMap: "Print site map",
   asAt: "As at {date}",
   noMatch: "No published burial matches that search.",

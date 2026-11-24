@@ -10,6 +10,7 @@ import { MIGRATIONS, STORE_NAMES, latestVersion, type Migration } from "../../te
 import {
   broadcastRevision,
   commit,
+  heardFromOtherTab,
   listSites,
   onRevision,
   readEvents,
@@ -625,6 +626,59 @@ describe("T09 telling other tabs", () => {
     await new Promise((r) => setTimeout(r, 80));
     stop();
     expect(messages).toEqual([{ siteId: "s", revision: 7 }]);
+  });
+});
+
+describe("T09 a save from this tab is not news from another tab (spec 06, Z23.11, B12)", () => {
+  /** Commit in this tab and return what the channel said, as the shell hears it. */
+  async function ownSave(): Promise<{ site: Site; heard: RevisionMessage[]; db: IDBDatabase }> {
+    const { db, site } = await freshSite();
+    const heard: RevisionMessage[] = [];
+    const stop = onRevision((m) => void heard.push(m));
+    const saved = await commit(db, input(site));
+    expect(saved.ok).toBe(true);
+    await new Promise((r) => setTimeout(r, 80));
+    stop();
+    return { site, heard, db };
+  }
+
+  it("does not take the message of its own commit as news, even before it has loaded the new revision", async () => {
+    const { site, heard } = await ownSave();
+    // The channel reaches the other channel objects of the same tab, so the shell hears its own save.
+    expect(heard).toEqual([{ siteId: site.id, revision: 1 }]);
+    // The shell still holds revision 0 while it reloads. That is the moment the warning showed.
+    expect(heardFromOtherTab(heard[0] as RevisionMessage, 0)).toBe(false);
+  });
+
+  it("takes the message of a save by another tab as news, also after this tab saved", async () => {
+    const { site } = await ownSave();
+    // Another tab commits revision 2. This tab did not write it, so nothing here has noted it.
+    expect(heardFromOtherTab({ siteId: site.id, revision: 2 }, 1)).toBe(true);
+    expect(heardFromOtherTab({ siteId: site.id, revision: 2 }, 0)).toBe(true);
+  });
+
+  it("does not take a revision that this tab already holds as news", async () => {
+    const { site } = await ownSave();
+    expect(heardFromOtherTab({ siteId: site.id, revision: 1 }, 1)).toBe(false);
+    expect(heardFromOtherTab({ siteId: site.id, revision: 0 }, 1)).toBe(false);
+  });
+
+  it("notes revisions per site, so a save of one register does not hide another register's news", async () => {
+    const { site } = await ownSave();
+    expect(heardFromOtherTab({ siteId: "another-site", revision: 1 }, 0)).toBe(true);
+    expect(heardFromOtherTab({ siteId: site.id, revision: 1 }, 0)).toBe(false);
+  });
+
+  it("notes nothing when the commit fails, and nothing for a repeat of an operation", async () => {
+    const { db, site } = await freshSite();
+    const bad = await commit(db, input(site, { expectedRevision: 5 }));
+    expect(bad.ok).toBe(false);
+    expect(heardFromOtherTab({ siteId: site.id, revision: 1 }, 0)).toBe(true);
+    const first = input(site);
+    expect((await commit(db, first)).ok).toBe(true);
+    const again = await commit(db, first);
+    expect(again).toMatchObject({ ok: true, replayed: true });
+    expect(heardFromOtherTab({ siteId: site.id, revision: 2 }, 1)).toBe(true);
   });
 });
 

@@ -504,6 +504,8 @@ function makeOffer(state: AllotState, c: Cmd<"make_offer">, on: LocalDate): Resu
   if (application === undefined) return err("no_such_application", { applicationId: c.applicationId });
   if (application.state === "offered") return err("offer_open", { applicationId: c.applicationId, offerId: application.offerId });
   if (application.state !== "waiting") return err("not_waiting", { applicationId: c.applicationId });
+  // An applicant cannot be offered a plot on a day before they joined the list.
+  if (on < application.joinedOn) return err("offer_before_joined", { applicationId: c.applicationId, joinedOn: application.joinedOn });
   const plot = findPlotOfSpace(state, c.spaceId);
   if (plot === undefined) return err("no_such_space", { spaceId: c.spaceId });
   if (!blank(c.replyBy) && (c.replyBy as string) < on) return err("invalid_input", undefined, { fields: [{ field: "replyBy", code: "bad_interval" }] });
@@ -604,6 +606,22 @@ export function tenanciesCovering(state: AllotState, plotId: Uuid, date: LocalDa
   return Object.values(state.tenancies)
     .filter((t) => t.plotId === plotId && intervalCovers(spanOf(t), date))
     .sort((a, b) => (a.start < b.start ? -1 : a.start > b.start ? 1 : 0));
+}
+
+/**
+ * The tenancies of a register on a date, in three groups. Current: it has started and has not ended. Later: it starts
+ * after the date, so the plot's holder until then is still the one who holds it. Past: it ended on or before the date.
+ */
+export function tenancyGroups(state: AllotState, today: LocalDate): { current: Tenancy[]; later: Tenancy[]; past: Tenancy[] } {
+  const codeOf = (t: Tenancy): string => state.core.plots[t.plotId]?.code ?? "";
+  const byCode = (a: Tenancy, b: Tenancy): number => codeOf(a).localeCompare(codeOf(b), "en", { numeric: true }) || (a.start < b.start ? -1 : a.start > b.start ? 1 : 0);
+  const all = Object.values(state.tenancies);
+  const ended = (t: Tenancy): boolean => t.endExclusive !== undefined && t.endExclusive <= today;
+  return {
+    current: all.filter((t) => t.start <= today && !ended(t)).sort(byCode),
+    later: all.filter((t) => t.start > today).sort((a, b) => (a.start < b.start ? -1 : a.start > b.start ? 1 : 0) || byCode(a, b)),
+    past: all.filter(ended).sort((a, b) => ((a.endExclusive ?? "") < (b.endExclusive ?? "") ? 1 : (a.endExclusive ?? "") > (b.endExclusive ?? "") ? -1 : byCode(a, b))),
+  };
 }
 
 function spanOf(t: Tenancy): { start: LocalDate; endExclusive?: LocalDate } {

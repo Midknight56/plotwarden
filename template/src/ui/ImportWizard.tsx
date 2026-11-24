@@ -394,6 +394,9 @@ export function ImportWizard() {
             onChange={(v) => {
               setSeparator(v === "semicolon" ? "semicolon" : "comma");
               setStaged(undefined);
+              // The table was read with the other separator. Drop it, so the next review reads the text again.
+              setTable(undefined);
+              setParsedFrom("");
             }}
             options={[
               { value: "comma", label: t("comma") },

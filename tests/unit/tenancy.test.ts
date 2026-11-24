@@ -2,7 +2,8 @@
 // hand-totals.md sections 2.5 and 5.1. Spans are half open: a tenancy ends at the start of its end date.
 import { beforeEach, describe, expect, it } from "vitest";
 import { siteTotalsAt, spaceStateAt } from "../../template/src/status";
-import { tenanciesCovering } from "../../apps/allotment-register/src/rules";
+import { ALLOT_COPY } from "../../apps/allotment-register/src/copy";
+import { tenanciesCovering, tenancyGroups } from "../../apps/allotment-register/src/rules";
 import type { AllotCommand } from "../../apps/allotment-register/src/types";
 import { GardenEnv, id, plotId, spaceId } from "../helpers/gardenEnv";
 import { buildTenanted, claim, person, tenancy } from "../helpers/thimbleBeds";
@@ -243,5 +244,53 @@ describe("tenure at a date is replayed, not stored", () => {
     expect(reloaded).toEqual(env.state);
     expect(tenanciesCovering(reloaded, plotId("B02"), "2026-04-30")).toHaveLength(1);
     expect(tenanciesCovering(reloaded, plotId("B02"), "2026-05-01")).toHaveLength(0);
+  });
+});
+
+describe("a tenancy that starts after today is listed as starting later (spec 06, Z23.4, B4)", () => {
+  const NEW = id("tenancy:B02:new");
+  const hand = (): AllotCommand => ({
+    type: "hand_over",
+    tenancyId: tenancy("B02"),
+    newTenancyId: NEW,
+    claimId: claim("tenancy:B02:new"),
+    personId: person("May Holder"),
+    holderName: "May Holder",
+  });
+  const codes = (list: { plotId: string; tenancyId: string }[]) => list.map((x) => `${env.state.core.plots[x.plotId]?.code}:${x.tenancyId === NEW ? "new" : "old"}`);
+
+  it("keeps Ada the one current holder of B02 until 2026-05-01, and lists May Holder as starting later", async () => {
+    await env.must([hand()], "2026-05-01");
+    const groups = tenancyGroups(env.state, "2026-04-20");
+    expect(codes(groups.current)).toEqual(["B01:old", "B02:old", "B04:old"]);
+    expect(codes(groups.later)).toEqual(["B02:new"]);
+    expect(groups.past).toEqual([]);
+    expect(groups.later.map((x) => x.start)).toEqual(["2026-05-01"]);
+  });
+
+  it("moves May Holder to current and Ada to past on the day, and lists nothing as later", async () => {
+    await env.must([hand()], "2026-05-01");
+    const groups = tenancyGroups(env.state, "2026-05-01");
+    expect(codes(groups.current)).toEqual(["B01:old", "B02:new", "B04:old"]);
+    expect(codes(groups.past)).toEqual(["B02:old"]);
+    expect(groups.later).toEqual([]);
+  });
+
+  it("calls a tenancy current on its first day, and not before it", async () => {
+    await env.must([record("B05", "Wick Dunmore", "2026-06-01", { sourceRef: "TB-T9" })]);
+    expect(tenancyGroups(env.state, "2026-05-31").later.map((x) => x.start)).toEqual(["2026-06-01"]);
+    expect(tenancyGroups(env.state, "2026-06-01").later).toEqual([]);
+    expect(tenancyGroups(env.state, "2026-06-01").current.map((x) => env.state.core.plots[x.plotId]?.code)).toContain("B05");
+  });
+
+  it("puts a tenancy that has an end date in the future and has started in current, and one that has ended in past", async () => {
+    await env.must([record("B05", "Wick Dunmore", "2025-04-01", { endExclusive: "2026-09-01", sourceRef: "TB-T9" })]);
+    expect(codes(tenancyGroups(env.state, "2026-08-31").current)).toContain("B05:old");
+    expect(codes(tenancyGroups(env.state, "2026-09-01").past)).toEqual(["B05:old"]);
+  });
+
+  it("has words for the group and for the day", () => {
+    expect(ALLOT_COPY["tenanciesLater"]).toBe("Starts later");
+    expect(ALLOT_COPY["tenancyStarts"]).toBe("Starts {date}");
   });
 });

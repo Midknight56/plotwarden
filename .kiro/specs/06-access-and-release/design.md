@@ -418,6 +418,24 @@ Each group is `<nav aria-labelledby="group-<name>">` over an `<h2 id="group-<nam
 
 `docs/write-up.md` has one title, a short opening, and eight second level sections, each named for the question it answers: "Kiro IDE, CLI, Web, Crew", "Custom agents", "Agent hooks", "Spec driven development", "Steering docs", "MCP", "Property based testing (PBT)", "Kiro powers". Each section holds two paragraphs that start with a bold label: "Done." and "Effect." There is no "Not done." paragraph. The page answers what each heading asks, and stops. The effect names a file by a relative link, or a log row by the start of its "Spec and task" text in quotation marks after the word "row". The test reads the page as text with no markdown library: it takes the lines that start with `## `, the relative links of the form `](path)` and the quoted row names, and checks each against the files. A link that has a heading part is also checked against the headings of its target, made the way `check-links.mjs` makes them. The test for dates reads the first cell of each row of the log and compares it with the local date of the machine that runs the test, so a row dated after today fails the day it is written, and a row cannot be dated ahead.
 
+## Z-D17 Repairs of the faults on the live site (Z23)
+
+Files and what each owns.
+
+- `apps/churchyard-register/src/familyForm.ts`: the family form without React. `fromState` (the form for a register as saved), `clearedForm` (the form after "Clear public details") and `saveCommands` (the commands that a save sends). `FamilySheet.tsx` uses them. A row in review is unticked, shows the current recorded name, and sends nothing unless the keeper changed it (Z23.1). A row that is approved and unchanged sends nothing.
+- `apps/allotment-register/src/rules.ts`: `makeOffer` refuses `offer_before_joined` (Z23.3). `tenancyGroups(state, today)` splits tenancies into current, later and past (Z23.4).
+- `apps/allotment-register/src/copy.ts`: `err_offer_before_joined`, `tenanciesLater`, `tenancyStarts`. `allotError` fills the date.
+- `apps/allotment-register/src/Tenancy.tsx`: the group "Starts later". `SeekerSheet.tsx` and `FamilySheet.tsx`: Download and Print wait for saved changes (Z23.2), and clear resets the form (Z23.7).
+- `apps/churchyard-register/src/ChurchyardHome.tsx`: the search box follows the search of the route when the route changes (Z23.8).
+- `template/src/ui/ImportWizard.tsx`: a new separator drops the table that was read with the old one (Z23.5).
+- `template/src/output/visitorHtml.ts`: the print buttons clear the filter for the length of the print and put it back, and "Print this location" starts disabled (Z23.9, Z23.10). One new word key, `chooseLocationFirst`, is in `FAMILY_WORD_KEYS`, `apps/churchyard-register/src/copy.ts` and `tests/helpers/familyWords.ts`.
+- `template/src/data/transaction.ts` and `template/src/ui/RegisterShell.tsx`: `commit` notes the revision it wrote, per site, before it tells the channel. The channel also reaches the other channel objects of the same tab, so the shell used to hear its own save before its reload had finished. `heardFromOtherTab(message, known)` is true only when the revision is newer than what the shell holds and newer than any revision this tab wrote. The message on the channel does not change. Revisions rise by one and a commit checks the expected one, so a revision this tab wrote cannot also have come from another tab (Z23.11).
+- `docs/make-your-own.md`: the copy list of "Use it in another repository" names `template/` and `fonts/`, and step 2 of the walk through names the plot width and height (Z23.6, Z23.12). `tests/unit/makeYourOwn.test.ts` reads those two parts of the guide and follows them.
+
+Why the guide and not the template for Z23.6: `register.css` imports the font file by a path above `template/`, and the licences and the file list of the fonts belong to the repository root. Copying one more folder keeps one copy of each font.
+
+Why the app is not changed for Z23.12: the plot width and height have no honest default, because they are in map units that the keeper chooses. An empty field with an error is the right start. The guide was the part that was wrong.
+
 ## Z-D11 Evidence
 
 Each task row in `docs/kiro-log.md` names its red run and its green run. The log holds no local absolute path. Browser results say headless Chromium on one Windows machine. Results from a unit test, a browser assertion and a person's review of a picture are labelled apart. No claim about users, speed on other machines or other browsers is made.

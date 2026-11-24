@@ -56,7 +56,7 @@ The finished copy is at `http://127.0.0.1:4180/`.
 ## 3. Walk through the rule
 
 1. Choose **Start a register**. Name it `Stall Row`. Choose **Create register**.
-2. Choose **Add your map**. In **Map setup**, fill in one row of four stalls: Section name `Row A`, Prefix `S`, First number `1`, Digits `1`, Rows `1`, Columns `4`. Choose **Preview plots**, then **Apply layout**. The register now has stalls S1 to S4.
+2. Choose **Add your map**. In **Map setup**, fill in one row of four stalls: Section name `Row A`, Prefix `S`, First number `1`, Digits `1`, Rows `1`, Columns `4`, Plot width `40`, Plot height `30`. The width and the height are the size of each stall on the drawing. Leave every other field as it is. Choose **Preview plots**, then **Apply layout**. The register now has stalls S1 to S4.
 3. Choose **Back to register**, then **Plot list**, then open stall S4. Choose **Check plot**, then **Confirm change**. Enter `S4B` in **New plot code** and choose **Rename plot**. The old code `S4` stays searchable.
 4. Do the same check on S1, S2 and S3: open the stall from the plot list, choose **Check plot**, then **Confirm change**. A stall that has not been checked is never read as free.
 5. On each of S1, S2 and S3, the **Stall** panel says *No frontage is set for this stall.* Enter `200` for S1, `250` for S2 and `300` for S3 in **Frontage in cm**, and choose **Save frontage**. Leave S4B with no frontage.
@@ -116,9 +116,9 @@ The answer is `pass: true` and no mismatches. The arguments are data. The comman
 
 ## Use it in another repository
 
-This part was **not tested**. The generator and the generated app were run only inside this checkout, at two levels below the root and deeper. Steps to try:
+Steps 1, 2 and 5 below are run by `tests/unit/makeYourOwn.test.ts`. It reads the folders from step 1 of this guide, copies exactly those folders into a new folder inside this checkout, makes the app from that copy as step 2 says, and builds it. The packages came from this checkout, so step 3 and step 4 were not tried in a repository of your own. Steps:
 
-1. Copy the `template/` folder into your repository, next to where the app will go. Keep its licence.
+1. Copy two folders of this checkout into your repository, side by side: `template/` and `fonts/`. The file `template/src/ui/register.css` imports `@import "../../../fonts/atkinson.css"`, so `fonts/` must sit next to `template/`. Without it the build stops at that import. Keep their licences: the one for the code in `LICENSE` and the ones for the fonts in `THIRD_PARTY_NOTICES.md`.
 2. Run the generator from this checkout, pointing at your copy of the template:
 
    ```
@@ -136,7 +136,6 @@ This part was **not tested**. The generator and the generated app were run only 
 5. Build and run it with the two `npx vite` commands above, with your own `--config` path.
 
 The generated `vite.config.ts` lets the dev server read the folder that holds both the app and the template. If your template is far from the app, check that line first.
-
 ## Make a rule of your own
 
 1. Copy `examples/market/` to a new folder of your own under `examples/`.

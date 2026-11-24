@@ -170,6 +170,8 @@ describe("the words of an error (A10.2)", () => {
     ["not_waiting", {}, "This applicant is not waiting."],
     ["offer_open", {}, "This plot or this applicant already has an open offer."],
     ["offer_closed", {}, "This offer is already closed."],
+    ["offer_before_joined", { joinedOn: "2027-01-01" }, "This applicant joined on 2027-01-01. An offer cannot come before that."],
+    ["offer_before_joined", {}, "This applicant joined after the day of this offer."],
     ["no_such_offer", {}, "That offer is not in this register."],
     ["not_overdue", {}, "This offer is not overdue."],
     ["skip_reason_required", {}, "Say why this applicant is skipped."],

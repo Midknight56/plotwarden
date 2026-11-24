@@ -114,7 +114,11 @@ export function SeekerSheet() {
 
   const clearPublic = async () => {
     const outcome = await intent.send([{ type: "set_public", siteName: "", gateName: "", instructions: "", sectionNames: {}, pathNames: {}, plotCodes: {}, listed: [] }], { done: t("publicDetailsSaved") });
-    if (outcome.ok) setPreview(undefined);
+    if (outcome.ok) {
+      // The form says what the register now says. The old values must not stay in the fields.
+      setEdit(fromState({ ...open.state, pub: { sectionNames: {}, pathNames: {}, plotCodes: {}, listed: {} } }));
+      setPreview(undefined);
+    }
   };
 
   const makePreview = () => {
@@ -233,9 +237,9 @@ export function SeekerSheet() {
 
       <section className="card stack" aria-labelledby="preview-heading">
         <h2 id="preview-heading">{t("previewAsVisitor")}</h2>
-        {dirty ? <p className="notice info">{t("saveFirst")}</p> : null}
+        {dirty ? <p id="save-first" className="notice info">{t("saveFirst")}</p> : null}
         <div className="actions">
-          <Button onClick={makePreview} disabled={dirty}>
+          <Button onClick={makePreview} disabled={dirty} aria-describedby={dirty ? "save-first" : undefined}>
             {t("previewAsVisitor")}
           </Button>
         </div>
@@ -282,10 +286,10 @@ export function SeekerSheet() {
               ]}
             />
             <div className="actions">
-              <Button primary onClick={download} disabled={stale === true}>
+              <Button primary onClick={download} disabled={stale === true || dirty} aria-describedby={dirty ? "save-first" : undefined}>
                 {t("downloadAvailabilityCopy")}
               </Button>
-              <Button onClick={print} disabled={stale === true}>
+              <Button onClick={print} disabled={stale === true || dirty} aria-describedby={dirty ? "save-first" : undefined}>
                 {t("printAvailabilityMap")}
               </Button>
               <Button onClick={() => setPreview(undefined)}>{t("cancel")}</Button>

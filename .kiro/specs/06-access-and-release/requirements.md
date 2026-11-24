@@ -266,6 +266,23 @@ Tests: `tests/unit/release.test.ts` (group "T36 the write-up"), `check:links`, `
 9. Facts that come from a person's own observation and not from a file (the profile of each step, the spec against short prompt run, the live host) shall be labelled so. The Crew version shall be labelled by where it is recorded: the host record `docs/acceptance/host/README.md` in the Desk repository, written as code and not as a link. Nothing in the page claims use by a person or time saved.
 10. When the write-up is read, no line shall hold "not used", "not on record", "no activation", "not in this repository", "does not say which" or "not a browser assertion".
 
+## Z23 Faults a reviewer proved on the live site
+
+Tests: `tests/unit/{familyForm,offer,tenancy,storage,makeYourOwn,visitor,churchCopy,gardenCopy}.test.ts`, `tests/properties/bugFixes.test.ts`, browser `tests/browser/bug-fixes.spec.ts`. Built in task 6.34. The reviewer proved each fault by steps on the live site, and the bug number in brackets is the reviewer's. There was no bug 11. Each requirement was written before its test. The log rows of task 6.34 say which tests were seen to fail first and why, and which were not.
+
+1. (B1) When the keeper corrects a burial so that its approval returns to review, saving the family map shall not approve that burial, whether or not the row is on screen. A row in review shows unticked, with the current recorded name as the name shown. It is approved again only when the keeper ticks it and saves. Saving other fields shall write no `burial_approved` and no `approval_withdrawn` for a row the keeper did not change. The family file shall not hold the old name or the new name of a burial that is in review.
+2. (B2) When the family map or the availability map has unsaved changes, "Download family copy" and "Download availability copy" shall be disabled, with the reason "Save public details first." that "Preview as a visitor" already shows. The print buttons of the same preview wait the same way, because they build the same file.
+3. (B3) When an offer is dated before the day the applicant joined, `make_offer` shall refuse it with the code `offer_before_joined` and the joined date in its detail, in the register's own rules, and change nothing. The screen shall say "This applicant joined on {date}. An offer cannot come before that." An offer on the joined day is allowed.
+4. (B4) When a tenancy starts after today, the screen "Current tenancies" shall list it under "Starts later", with "Starts {date}", with no hand over action and no end form. A tenancy that has started and has not ended is current. The holder of a plot until that day stays the one current holder.
+5. (B5) When the keeper changes the separator after a review, the next review shall read the file again with the new separator, and the columns shall be those of the new reading.
+6. (B6) The guide "Use it in another repository" shall list every folder of this checkout that the template needs, which are `template/` and `fonts/`, side by side, and shall say why. A test shall copy exactly the folders that the guide lists into a new folder, generate the market app from that copy and build it.
+7. (B7) When the keeper presses "Clear public details" and it saves, the fields of the form shall show the cleared values at once, and "Save public details" shall be disabled until something changes.
+8. (B8) When the keeper goes back to an earlier search, the search box and the results shall show the same search.
+9. (B9) When "Print site map" is pressed in the family file, the print shall hold the full published list and the map, whatever the search box holds. The search box keeps its text afterwards.
+10. (B10) When no location is chosen in the family file, "Print this location" shall be disabled, with the reason "Show a location first." beside it. It is enabled when a location is shown and disabled again when the search is cleared. A print of a location holds that burial, whatever the search box holds.
+11. (B12) When this tab saves, it shall not show "This register changed in another tab", not even for a moment. A save that another tab made shall still show it. The tab that commits a revision remembers it, and does not take the channel's message of that revision, or of an earlier one, as news. The message itself is as it was.
+12. (B13) The guide's step 2 and the map setup shall agree: the guide names "Plot width" `40` and "Plot height" `30` with the other fields, and a test shall fill the fields exactly as the guide says, press "Preview plots" and see "Apply layout".
+
 ---
 
 ## Not claimed

@@ -1822,3 +1822,26 @@ describe("7.25 the printed visitor files in the layout of the printed sheet (L10
     expect(declIn(page, ".legend", "border-top", PRINT)).toMatch(/^2px solid #000/);
   });
 });
+
+describe("Z23.10 Print this location waits for a location (B10)", () => {
+  const page = () => buildFamilyHtml(built().file, FAMILY_WORDS);
+  const button = (text: string) => new RegExp(`<button[^>]*id="printloc"[^>]*>${text}</button>`);
+
+  it("has the word that says why, in the list of words", () => {
+    expect(FAMILY_WORD_KEYS).toContain("chooseLocationFirst");
+    expect(FAMILY_WORDS.chooseLocationFirst).toBe("Show a location first.");
+    expect(() => buildFamilyHtml(built().file, { ...FAMILY_WORDS, chooseLocationFirst: "" })).toThrow("chooseLocationFirst");
+  });
+
+  it("starts with the button disabled, and ties its reason to it", () => {
+    const tag = /<button[^>]*id="printloc"[^>]*>/.exec(page())?.[0] ?? "";
+    expect(tag).toContain(" disabled");
+    expect(tag).toContain('aria-describedby="printloc-hint"');
+    expect(page()).toMatch(button("Print this location"));
+    expect(page()).toMatch(/<p id="printloc-hint" class="js-only">Show a location first\.<\/p>/);
+  });
+
+  it("leaves the other print button enabled, because the site map needs no location", () => {
+    expect(/<button[^>]*id="printmap"[^>]*>/.exec(page())?.[0]).not.toContain("disabled");
+  });
+});

@@ -403,3 +403,51 @@ describe("history is only ever added to (undo only through an event)", () => {
     expect(reloaded).toEqual(env.state);
   });
 });
+
+describe("an offer dated before the applicant joined (spec 06, Z23.3, B3)", () => {
+  const LATE = app("late");
+  const LATE_JOINED = "2027-01-01";
+  const skips = { [app("tavi")]: "Late applicant first", [app("olin")]: "Late applicant first" };
+  const lateOffer = (extra: Partial<Extract<AllotCommand, { type: "make_offer" }>> = {}): AllotCommand => OFFER("b03-late", { applicationId: LATE, replyBy: undefined, skipReasons: skips, ...extra });
+
+  beforeEach(async () => {
+    env = await GardenEnv.create();
+    await buildBeds(env);
+    await env.must([{ type: "add_applicant", applicationId: LATE, personId: person("Late Joiner"), name: "Late Joiner", joinedOn: LATE_JOINED }], "2026-04-20");
+  });
+
+  it("refuses an offer on 2026-04-20 to an applicant who joined on 2027-01-01, names the joined date, and changes nothing", async () => {
+    const revision = env.revision;
+    const events = (await env.events()).length;
+    const out = await env.dispatch([lateOffer()], "2026-04-20");
+    expect(out.ok).toBe(false);
+    if (!out.ok) {
+      expect(out.error.code).toBe("offer_before_joined");
+      expect(out.error.detail).toMatchObject({ joinedOn: LATE_JOINED });
+    }
+    expect(env.revision).toBe(revision);
+    expect((await env.events()).length).toBe(events);
+    expect(Object.keys(env.state.offers)).toEqual([]);
+    expect(env.state.applications[LATE]?.state).toBe("waiting");
+    expect(spaceStateAt(env.state.core, spaceId("B03"), "2026-04-20")?.state).toBe("free");
+  });
+
+  it("refuses the day before the applicant joined and allows the day they joined", async () => {
+    const before = await env.dispatch([lateOffer()], "2026-12-31");
+    expect(before.ok).toBe(false);
+    if (!before.ok) expect(before.error.code).toBe("offer_before_joined");
+    const on = await env.dispatch([lateOffer()], LATE_JOINED);
+    expect(on).toMatchObject({ ok: true });
+    expect(env.state.offers[id("offer:b03-late")]).toMatchObject({ offeredOn: LATE_JOINED, state: "open" });
+  });
+
+  it("allows an offer to an applicant who joined earlier, as before", async () => {
+    await env.must([OFFER()], "2026-04-04");
+    expect(env.state.offers[id("offer:b03-tavi")]?.offeredOn).toBe("2026-04-04");
+  });
+
+  it("is a refusal of the rules, so it holds outside the browser too: the register's own run says no", () => {
+    const decided = env.register.run(env.state, lateOffer(), "2026-04-20");
+    expect(decided.ok).toBe(false);
+  });
+});

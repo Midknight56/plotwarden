@@ -9,6 +9,7 @@ import { Status } from "../../../template/src/ui/Status";
 import { tenancyBalance } from "./fees";
 import { useAllot, useIntent, useMoney } from "./intent";
 import { freePlotsAt } from "./projection";
+import { tenancyGroups } from "./rules";
 import type { Tenancy } from "./types";
 
 function EndForm({ tenancy, name, code }: { tenancy: Tenancy; name: string; code: string }) {
@@ -46,9 +47,8 @@ export function TenancyScreen() {
   const today = open.today;
   const natural = (a: string, b: string) => a.localeCompare(b, "en", { numeric: true });
 
-  const all = Object.values(open.state.tenancies);
-  const current = all.filter((x) => x.endExclusive === undefined || x.endExclusive > today).sort((a, b) => natural(open.state.core.plots[a.plotId]?.code ?? "", open.state.core.plots[b.plotId]?.code ?? ""));
-  const past = all.filter((x) => x.endExclusive !== undefined && x.endExclusive <= today).sort((a, b) => (a.endExclusive ?? "") < (b.endExclusive ?? "") ? 1 : -1);
+  // A tenancy that starts after today is not current yet. Its plot has the holder it has today until that day.
+  const { current, later, past } = tenancyGroups(open.state, today);
   const nameOf = (x: Tenancy) => open.state.people[x.personId]?.displayName ?? "";
   const codeOf = (x: Tenancy) => open.state.core.plots[x.plotId]?.code ?? "";
   const plots = Object.values(open.state.core.plots).sort((a, b) => natural(a.code, b.code));
@@ -108,7 +108,7 @@ export function TenancyScreen() {
         <ButtonLink href={base}>{t("backToRegister")}</ButtonLink>
         <ButtonLink href={`${base}/payments`}>{t("seasonFees")}</ButtonLink>
       </div>
-      {current.length === 0 ? <p>{t("noTenancies")}</p> : null}
+      {current.length === 0 && later.length === 0 ? <p>{t("noTenancies")}</p> : null}
       <ul className="cards plain">
         {current.map((x) => (
           <li key={x.tenancyId} className="card">
@@ -123,6 +123,22 @@ export function TenancyScreen() {
           </li>
         ))}
       </ul>
+
+      {later.length === 0 ? null : (
+        <section className="stack" aria-labelledby="later-heading">
+          <h2 id="later-heading">{t("tenanciesLater")}</h2>
+          <ul className="cards plain">
+            {later.map((x) => (
+              <li key={x.tenancyId} className="card">
+                <h3>{t("tenancyOf", { plot: codeOf(x), name: nameOf(x) })}</h3>
+                <p>{t("tenancyStarts", { date: x.start })}</p>
+                {x.endExclusive === undefined ? null : <p>{t("tenancySpanTo", { start: x.start, end: x.endExclusive })}</p>}
+                {x.sourceRef === undefined ? null : <p>{t("sourceOf", { ref: x.sourceRef })}</p>}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {past.length === 0 ? null : (
         <section className="stack" aria-labelledby="past-heading">

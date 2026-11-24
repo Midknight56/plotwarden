@@ -45,6 +45,13 @@ export function ChurchyardHome() {
   const query = route.search;
   const plotParam = route.query.get("plot") ?? "";
   const [text, setText] = useState(query);
+  // The box follows the search of the route. After Back or Forward the route holds an earlier search, and the box must
+  // say that one, not the last thing that was typed. Text that was typed and not searched stays while the route stays.
+  const [shownQuery, setShownQuery] = useState(query);
+  if (shownQuery !== query) {
+    setShownQuery(query);
+    setText(query);
+  }
   const holder = useRef<HTMLDivElement>(null);
   const heading = useRef<HTMLHeadingElement>(null);
   const width = useElementWidth(holder);

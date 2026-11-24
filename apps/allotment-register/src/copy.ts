@@ -140,6 +140,8 @@ export const ALLOT_COPY: Readonly<Record<string, string>> = {
   sourceRefLabel: "Source ref",
   choosePlot: "Choose a plot",
   moreTenancies: "Past tenancies",
+  tenanciesLater: "Starts later",
+  tenancyStarts: "Starts {date}",
   // Season setup
   newSeason: "New season",
   seasonName: "Season name",
@@ -313,6 +315,8 @@ export const ALLOT_COPY: Readonly<Record<string, string>> = {
   err_not_waiting: "This applicant is not waiting.",
   err_offer_open: "This plot or this applicant already has an open offer.",
   err_offer_closed: "This offer is already closed.",
+  err_offer_before_joined: "This applicant joined after the day of this offer.",
+  err_offer_before_joined_on: "This applicant joined on {joinedOn}. An offer cannot come before that.",
   err_no_such_offer: "That offer is not in this register.",
   err_not_overdue: "This offer is not overdue.",
   err_skip_reason_required: "Say why this applicant is skipped.",
@@ -449,6 +453,10 @@ export function allotError(t: T, error: DomainError): string {
       const start = text(d?.["start"]);
       const base = error.code === "plot_not_free" ? "err_plot_not_free" : "err_tenancy_overlap";
       return sourceRef === undefined || start === undefined ? t(base) : t(`${base}_ref`, { sourceRef, start });
+    }
+    case "offer_before_joined": {
+      const joinedOn = text(d?.["joinedOn"]);
+      return joinedOn === undefined ? t("err_offer_before_joined") : t("err_offer_before_joined_on", { joinedOn });
     }
     case "invalid_input": {
       const first = error.fields?.[0];

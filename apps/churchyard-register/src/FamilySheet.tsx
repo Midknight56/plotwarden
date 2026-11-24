@@ -14,59 +14,9 @@ import { plotChoices } from "./history";
 import { printHtml, useIntent, useChurch } from "./intent";
 import { buildFamilyFile, isStalePreview } from "./projection";
 import type { FamilyBuild } from "./projection";
+import { clearedForm, fromState, saveCommands } from "./familyForm";
+import type { FormState, Row } from "./familyForm";
 import { approvalStatus } from "./rules";
-import type { ChurchState } from "./types";
-
-interface Row {
-  include: boolean;
-  shown: string;
-  year: boolean;
-  line: string;
-}
-
-interface FormState {
-  siteName: string;
-  gateName: string;
-  directions: string;
-  outlines: boolean;
-  sectionNames: Record<string, string>;
-  pathNames: Record<string, string>;
-  includePath: Record<string, boolean>;
-  plotCodes: Record<string, string>;
-  rows: Record<string, Row>;
-}
-
-/** What the form says for the register as it is saved. */
-function fromState(state: ChurchState): FormState {
-  const rows: Record<string, Row> = {};
-  for (const b of Object.values(state.burials)) {
-    if (b.voided === true || b.nameUnknown || b.recordedName === undefined) continue;
-    const approval = state.approvals[b.burialId];
-    const status = approvalStatus(state, b.burialId);
-    rows[b.burialId] = { include: status !== "none", shown: approval?.name ?? b.recordedName, year: approval?.includeYear === true, line: approval?.line ?? "" };
-  }
-  const pathNames: Record<string, string> = {};
-  const includePath: Record<string, boolean> = {};
-  for (const p of Object.values(state.map.paths)) {
-    pathNames[p.pathId] = state.pub.pathNames[p.pathId] ?? p.name;
-    includePath[p.pathId] = state.pub.pathNames[p.pathId] !== undefined;
-  }
-  const sectionNames: Record<string, string> = {};
-  for (const s of Object.values(state.map.sections)) sectionNames[s.sectionId] = state.pub.sectionNames[s.sectionId] ?? "";
-  const plotCodes: Record<string, string> = {};
-  for (const p of Object.values(state.core.plots)) plotCodes[p.plotId] = state.pub.plotCodes[p.plotId] ?? p.code;
-  return {
-    siteName: state.pub.siteName ?? "",
-    gateName: state.pub.gateName ?? "",
-    directions: state.pub.directions ?? "",
-    outlines: state.pub.outlines === true,
-    sectionNames,
-    pathNames,
-    includePath,
-    plotCodes,
-    rows,
-  };
-}
 
 const randomPublicId = (): string => `p${globalThis.crypto.randomUUID().replace(/-/g, "").slice(0, 12)}`;
 
@@ -103,40 +53,16 @@ export function FamilySheet() {
   const save = async (event: FormEvent) => {
     event.preventDefault();
     setNotice(undefined);
-    const commands: { type: string; [k: string]: unknown }[] = [];
-    const includedPlots = new Set(Object.entries(edit.rows).filter(([, r]) => r.include).map(([id]) => open.state.burials[id]?.plotId));
-    const plotCodes = Object.fromEntries(
-      Object.entries(edit.plotCodes).filter(([plotId, code]) => includedPlots.has(plotId) && code.trim() !== "" && code.trim() !== open.state.core.plots[plotId]?.code),
-    );
-    commands.push({
-      type: "set_public",
-      siteName: edit.siteName,
-      gateName: edit.gateName,
-      directions: edit.directions,
-      outlines: edit.outlines,
-      sectionNames: Object.fromEntries(Object.entries(edit.sectionNames).filter(([, v]) => v.trim() !== "")),
-      pathNames: Object.fromEntries(Object.entries(edit.pathNames).filter(([id, v]) => edit.includePath[id] === true && v.trim() !== "")),
-      plotCodes,
-    });
-    for (const [burialId, row] of Object.entries(edit.rows)) {
-      const approval = open.state.approvals[burialId];
-      const status = approvalStatus(open.state, burialId);
-      const hasYear = open.state.burials[burialId]?.date.p !== "unknown";
-      if (row.include) {
-        const wantYear = row.year && hasYear;
-        if (status !== "approved" || approval?.name !== row.shown.trim() || approval?.includeYear !== wantYear || (approval?.line ?? "") !== row.line.trim()) {
-          commands.push({ type: "approve_burial", burialId, ...(row.shown.trim() === "" ? {} : { name: row.shown.trim() }), includeYear: wantYear, ...(row.line.trim() === "" ? {} : { line: row.line.trim() }) });
-        }
-      } else if (approval !== undefined && approval.withdrawn !== true) {
-        commands.push({ type: "withdraw_approval", burialId });
-      }
-    }
-    await intent.send(commands, { done: t("familySettingsSaved") });
+    await intent.send(saveCommands(open.state, edit), { done: t("familySettingsSaved") });
   };
 
   const clearPublic = async () => {
     const outcome = await intent.send([{ type: "set_public", siteName: "", gateName: "", directions: "", outlines: false, sectionNames: {}, pathNames: {}, plotCodes: {} }], { done: t("familySettingsSaved") });
-    if (outcome.ok) setPreview(undefined);
+    if (outcome.ok) {
+      // The form says what the register now says. The old values must not stay in the fields.
+      setEdit(clearedForm(open.state));
+      setPreview(undefined);
+    }
   };
 
   const makePreview = () => {
@@ -285,9 +211,9 @@ export function FamilySheet() {
 
       <section className="card stack" aria-labelledby="preview-heading">
         <h2 id="preview-heading">{t("previewAsVisitor")}</h2>
-        {dirty ? <p className="notice info">{t("saveFirst")}</p> : null}
+        {dirty ? <p id="save-first" className="notice info">{t("saveFirst")}</p> : null}
         <div className="actions">
-          <Button onClick={makePreview} disabled={dirty}>
+          <Button onClick={makePreview} disabled={dirty} aria-describedby={dirty ? "save-first" : undefined}>
             {t("previewAsVisitor")}
           </Button>
         </div>
@@ -331,10 +257,10 @@ export function FamilySheet() {
               ]}
             />
             <div className="actions">
-              <Button primary onClick={download} disabled={stale === true}>
+              <Button primary onClick={download} disabled={stale === true || dirty} aria-describedby={dirty ? "save-first" : undefined}>
                 {t("downloadFamilyCopy")}
               </Button>
-              <Button onClick={print} disabled={stale === true}>
+              <Button onClick={print} disabled={stale === true || dirty} aria-describedby={dirty ? "save-first" : undefined}>
                 {t("printFamilyMap")}
               </Button>
             </div>
