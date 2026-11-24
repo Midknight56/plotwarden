@@ -253,17 +253,17 @@ A first time reader shall see what the product does and one thing to press in fi
 
 ## Z22 The write-up
 
-Tests: `tests/unit/release.test.ts` (group "T36 the write-up"), `check:links`, `check:public`. Implements the evidence rule of `.kiro/steering/evidence.md`. Built in task 12-write-up.
+Tests: `tests/unit/release.test.ts` (group "T36 the write-up"), `check:links`, `check:public`. Implements the evidence rule of `.kiro/steering/evidence.md`. Built in task 12-write-up. Task 6.31 changed its headings and its paragraphs.
 
-1. When the repository is read, `docs/write-up.md` shall exist and shall hold exactly eight second level headings, in this order: Surfaces, Custom agents, Hooks, Specs, Steering, MCP, Property tests, Powers.
-2. When a section is read, it shall say what was done ("Done."), give one effect that a reader can check ("Effect."), and say what was not done ("Not done."). The effect shall link to a file of this repository or cite a row of `docs/kiro-log.md`.
+1. When the repository is read, `docs/write-up.md` shall exist and shall hold exactly eight second level headings, in this order: "Kiro IDE, CLI, Web, Crew", "Custom agents", "Agent hooks", "Spec driven development", "Steering docs", "MCP", "Property based testing (PBT)", "Kiro powers".
+2. When a section is read, it shall hold two paragraphs that start with a bold label, "Done." and "Effect.", in that order, once each. There shall be no "Not done." paragraph. The page answers what each heading asks, and stops. The effect shall link to a file of this repository or cite a row of `docs/kiro-log.md`.
 3. When a link of the write-up is followed, it shall resolve to a file, a folder or a heading of this repository. A web address is written as code. A cited log row is the start of the text in the "Spec and task" column of a row that exists.
-4. When the Custom agents section is read, it shall tell the reviewer story: a read only profile reviewed the work and reported twelve findings. It shall name four of them with their log rows (a searched name left in the address, a burial with a year only date refused on a released space, a public name not checked against living people, a slip with a version above the open one), and shall say that the inspector tools were switched off on that run. It shall say which profile ran which step, and that this comes from the person who ran the sessions and not from a file.
-5. When the Surfaces section is read, it shall say that Kiro CLI built both repositories and that the Review Desk runs inside Kiro Crew 0.12.2. It shall not claim the IDE or the web app.
-6. When the Specs section is read, it shall give the result of the run of one feature built twice from the same starting code, once from a spec and once from a short prompt, with its numbers and its limits, and shall name the log rows of spec 07, which was built in slices with each slice's tests first.
+4. When the "Custom agents" section is read, it shall tell the reviewer story: a read only profile reviewed the work and reported twelve findings. It shall name four of them with their log rows (a searched name left in the address, a burial with a year only date refused on a released space, a public name not checked against living people, a slip with a version above the open one), and shall say that the inspector tools were switched off on that run. It shall say which profile ran which step, and that this comes from the person who ran the sessions and not from a file.
+5. When the "Kiro IDE, CLI, Web, Crew" section is read, it shall say which surfaces were used and how they differed here: that Kiro CLI wrote and tested both repositories and that the Review Desk runs inside Kiro Crew 0.12.2. It shall not claim the IDE or the web app.
+6. When the "Spec driven development" section is read, it shall give the result of the run of one feature built twice from the same starting code, once from a spec and once from a short prompt, with its numbers and its limits, and shall name the log rows of spec 07, which was built in slices with each slice's tests first.
 7. When `docs/kiro-log.md` is read, no row shall carry a date later than the day the check runs, and a row shall carry the day its work was done.
 8. When the README is read, the section "Technological Implementation" shall link to `docs/write-up.md`.
-9. Facts that come from a person's own observation and not from a file (the profile of each step, the Crew version, the spec against short prompt run, the live host) shall be labelled so. Nothing in the page claims use by a person, time saved or a browser other than the one named.
+9. Facts that come from a person's own observation and not from a file (the profile of each step, the Crew version, the spec against short prompt run, the live host) shall be labelled so. Nothing in the page claims use by a person or time saved.
 
 ---
 

@@ -82,7 +82,3 @@ This is the paper book of the Churchyard Register. It takes about two minutes an
 6. Choose **Back to register**, **Add records**, **Import spreadsheet**, pick `practice-book.csv` again and choose **Review import**. Fix row 117 as in step 5. The review says "Already in register 200" and "There is nothing new to import." Nothing is added a second time.
 7. Choose **Cancel import**, then **Back to register**. Choose **Unplaced burials · 2**. On the card "Sorrel Larkspur" choose **Section** `Paper` and **Plot** `C199 · Paper`, then choose **Confirm placement**. The register says "Sorrel Larkspur placed at C199."
 8. Choose **Back to register**. The link now reads **Unplaced burials · 1**. In **Name or plot code** type `Quill Fernhollow` and choose **Search**. The result reads "Quill Fernhollow · C117 · Paper". The summary reads "C117 · Paper · Taken" and the map shows C117 on its tab.
-
-## What this guide does not show
-
-No real warden, secretary, family member or committee used these screens. The steps were run in headless Chromium on one Windows machine. See `docs/verification.md` for what was tested and what was not.

@@ -6,7 +6,7 @@ The surface used was Kiro CLI. The log names it on every row. No other Kiro surf
 
 ## Specs
 
-Seven specs sit in `.kiro/specs/`, each with `requirements.md`, `design.md` and `tasks.md`:
+Eight specs sit in `.kiro/specs/`, each with `requirements.md`, `design.md` and `tasks.md`:
 
 | Spec | Covers |
 |---|---|
@@ -17,6 +17,7 @@ Seven specs sit in `.kiro/specs/`, each with `requirements.md`, `design.md` and 
 | `04-allotment` | Waiting list, offers, tenancies, fees, handovers, the availability file |
 | `05-exchange` | The review file and the return slip |
 | `06-access-and-release` | Preferences, practice registers, limits, the inspector and its power, the third use recipe, access and layout checks, the site, the offline cache, assembly and the release checks |
+| `07-look` | A new look for every screen: design values, two self hosted fonts, shared components, the map, the page layouts, the start page, the visitor files, print, the market example and the Review Desk. It changes how things look and where they sit |
 
 The Review Desk has its own spec, `review-desk`, in its own repository, with its own steering and one agent profile.
 

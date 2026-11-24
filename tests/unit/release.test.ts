@@ -1407,7 +1407,16 @@ describe("T36 check:public", () => {
 // runs, so a fixed clock would test nothing.
 
 describe("T36 the write-up (Z22)", () => {
-  const SECTIONS = ["Surfaces", "Custom agents", "Hooks", "Specs", "Steering", "MCP", "Property tests", "Powers"];
+  const SECTIONS = [
+    "Kiro IDE, CLI, Web, Crew",
+    "Custom agents",
+    "Agent hooks",
+    "Spec driven development",
+    "Steering docs",
+    "MCP",
+    "Property based testing (PBT)",
+    "Kiro powers",
+  ];
   const writeUpPath = join(repo, "docs", "write-up.md");
   /** The page, or an empty text when it is missing, so a missing page fails each check on its missing content. */
   const writeUp = (): string => (existsSync(writeUpPath) ? readFileSync(writeUpPath, "utf8") : "");
@@ -1482,11 +1491,17 @@ describe("T36 the write-up (Z22)", () => {
     expect(sectionsOf(writeUp()).map((s) => s.title)).toEqual(SECTIONS);
   });
 
-  it.each(SECTIONS)("%s says what was done, one effect and what was not done, in that order, once each", (title) => {
+  it.each(SECTIONS)("%s holds exactly the labels Done. and Effect., in that order, once each", (title) => {
     const labels = paragraphsOf(section(title))
-      .map((p) => /^\*\*(Done\.|Effect\.|Not done\.)\*\*\s+\S/.exec(p)?.[1])
+      .map((p) => /^\*\*([^*]+)\*\*/.exec(p)?.[1])
       .filter((label): label is string => label !== undefined);
-    expect(labels).toEqual(["Done.", "Effect.", "Not done."]);
+    expect(labels).toEqual(["Done.", "Effect."]);
+    for (const p of paragraphsOf(section(title)).filter((q) => q.startsWith("**"))) expect(p).toMatch(/^\*\*(?:Done|Effect)\.\*\*\s+\S/);
+  });
+
+  it("no line of the page starts with the label Not done.", () => {
+    expect(writeUp().length).toBeGreaterThan(0);
+    expect(writeUp().split("\n").filter((line) => line.startsWith("**Not done.**"))).toEqual([]);
   });
 
   it.each(SECTIONS)("%s gives its effect with a link to a file or a row of the log", (title) => {
@@ -1524,8 +1539,8 @@ describe("T36 the write-up (Z22)", () => {
   });
 
   describe("what each section must say", () => {
-    it("Surfaces: Kiro CLI built both repositories, the Review Desk runs inside Kiro Crew 0.12.2, no other surface is claimed", () => {
-      const body = section("Surfaces");
+    it("Kiro IDE, CLI, Web, Crew: Kiro CLI wrote and tested both repositories, the Review Desk runs inside Kiro Crew 0.12.2, no other surface is claimed", () => {
+      const body = section("Kiro IDE, CLI, Web, Crew");
       expect(body).toContain("Kiro CLI");
       expect(body).toContain("both repositories");
       expect(body).toContain("Kiro Crew 0.12.2");
@@ -1548,8 +1563,8 @@ describe("T36 the write-up (Z22)", () => {
       expect(cited.some((name) => name.startsWith("07 repair: slip, burial overlap, private names"))).toBe(true);
     });
 
-    it("Specs: the spec against short prompt result with its numbers, and the rows of the 07 slices", () => {
-      const body = section("Specs");
+    it("Spec driven development: the spec against short prompt result with its numbers, and the rows of the 07 slices", () => {
+      const body = section("Spec driven development");
       for (const text of ["22 minutes", "23 minutes", "58 tests", "54 passed", "4 failed", "asAt", "Back to today"]) expect(body, text).toContain(text);
       expect(body).toMatch(/one (?:run|feature|time)/i);
       const cited = rowCitationsOf(body);
@@ -1606,6 +1621,28 @@ describe("T36 the write-up (Z22)", () => {
       expect(text.split("\n").some((line) => line.startsWith("- **No live host"))).toBe(false);
       for (const word of ["plotwarden.pages.dev", "308", "fc0087dc2b2e0583", "Cache-Control", "default-src 'self'", "404"]) expect(text, word).toContain(word);
       expect(text).toMatch(/Not observed[^\n]*other browsers[^\n]*real phones/);
+    });
+
+    it("kiro-evidence.md says eight specs and lists each folder of .kiro/specs, 00 to 07", () => {
+      const text = doc("docs/kiro-evidence.md");
+      const folders = readdirSync(join(repo, ".kiro", "specs"), { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name).sort();
+      expect(folders).toHaveLength(8);
+      expect(text).toContain("Eight specs sit in `.kiro/specs/`");
+      expect(text).not.toContain("Seven specs");
+      for (const folder of folders) expect(text, folder).toContain(`| \`${folder}\` |`);
+    });
+
+    it("the header of kiro-log.md says each row was run on this checkout before it was committed, and names no commit", () => {
+      const header = doc("docs/kiro-log.md").split("\n").slice(0, 4).join("\n");
+      expect(header).toContain("each row was run on this checkout on the date shown, before that work was committed");
+      expect(header).not.toMatch(/\b[0-9a-f]{7,40}\b/);
+      expect(header).not.toMatch(/commit `/);
+    });
+
+    it("the judge guide has no heading 'What this guide does not show'", () => {
+      const headings = doc("docs/judge-guide.md").split("\n").filter((line) => /^#{1,6}\s/.test(line));
+      expect(headings.length).toBeGreaterThan(0);
+      expect(headings.filter((line) => /what this guide does not show/i.test(line))).toEqual([]);
     });
 
     it("the judge guide gives the live address", () => {
