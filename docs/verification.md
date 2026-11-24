@@ -6,7 +6,7 @@ What was tested, on what, with what result, and what was not. Each result says h
 
 - One Windows machine, Node 24.19.0, Playwright 1.65.1. Playwright lists Chromium 159.0.8154.6 for that release. The installed browser build was not read separately.
 - Headless Chromium only, one worker, at 360 by 640 and at 1920 by 1080. No window was opened and no browser was installed by a script.
-- Source revision for every row below: the working tree on top of commit `af7576b`, not committed.
+- Source revision: the rows for `typecheck`, `test:unit`, `check:public`, `check:links` and `check:release` were run again for task 6.30 on the working tree on top of commit `2470fc4`, not committed. Every other row below is from the earlier run, on the working tree on top of commit `af7576b`, not committed.
 - Fake IndexedDB in Node for unit tests, and the browser's own IndexedDB in browser specs.
 - Every place and person is invented.
 
@@ -18,7 +18,7 @@ Each command was run on its own, and its exit code was read.
 |---|---|---|---|---|
 | All | `npm run typecheck` | exit 0 | exit 0 | pass |
 | All | `npm run lint` | exit 0 | exit 0 | pass |
-| All | `npm run test:unit` | all pass | 4,716 passed in 74 files | pass |
+| All | `npm run test:unit` | all pass | 5,406 passed in 84 files | pass |
 | T01 to T36 | `npm run test:properties` | all pass | 51 passed in 7 files | pass |
 | T01, T34 | `npm run test:conformance` | all pass | 74 passed in 5 files | pass |
 | T20 and others | `npm run test:oracle` | all pass | 24 passed in 2 files | pass |
@@ -26,9 +26,9 @@ Each command was run on its own, and its exit code was read.
 | Structure | `node scripts/check-imports.mjs` | `check-imports: ok` | `check-imports: ok` | pass |
 | Z10 | `npm run build:apps` | exit 0 | exit 0 | pass |
 | Z10 | `npm run assemble:site -- --desk <preview>` | `assemble-site: ok` | ok, 25 files, 2,199,205 bytes | pass |
-| Z10, Z16 | `npm run check:public` | `check-public: ok` | `check-public: ok, 379 files` | pass |
+| Z10, Z16 | `npm run check:public` | `check-public: ok` | `check-public: ok, 414 files`, with the banned word lists set | pass |
 | Z10 | `npm run check:licenses` | `check-licenses: ok` | `check-licenses: ok, 9 shipped packages, each with its row` | pass |
-| Z18 | `npm run check:links` | `check-links: ok` | `check-links: ok, 11 pages` | pass |
+| Z18 | `npm run check:links` | `check-links: ok` | `check-links: ok, 14 pages` | pass |
 | Z10, Z16 | `npm run check:release` | `check-release: ok` | `check-release: ok (all)`, the site and the inventory | pass |
 | Browser | `npx playwright test` | all pass | 382 passed in 3.9 minutes (191 at each size) | pass |
 
@@ -36,7 +36,7 @@ The browser run is every spec: the entry, layout, accessibility and recovery spe
 
 ### Last checks
 
-The four `check:` commands read this page and the README, so they were run after both were written. Their output is in the table above and in the row "6.23 release exit gate" of `docs/kiro-log.md`.
+The four `check:` commands read this page and the README, so they were run after both were written. Their output is in the table above and in the rows "6.23 release exit gate" and "6.30 the write-up" of `docs/kiro-log.md`.
 
 ## What each new test failed on first
 
@@ -52,6 +52,9 @@ A test must fail on the missing behaviour before its code is written. The first 
 | `tests/browser/release.spec.ts` | 17 failed, 18 passed (phone) | A `Permissions-Policy` header named `interest-cohort`, which Chromium does not know, so every page logged a warning. The worker showed the 404 page for a reload at a register address. Three locators of mine were wrong. The update test tried to intercept the worker's own update request, which the browser does not allow | 70 of 70 |
 | `tests/browser/share-print.spec.ts` | 9 failed, 2 passed (phone) | The gray check read red and blue fringes that the screen's text smoothing puts on letters, so it now draws in a browser with that off. The garden report check named a word that the report does not hold. The printed sample family file left a tan map colour | 22 of 22 |
 | `tests/browser/judge-guide.spec.ts` | 2 failed, 1 passed (phone) | Two controls of the guide were a link and a button, not what the first draft said. One was named "Print this location", not "Print location" | 6 of 6 |
+| `tests/unit/release.test.ts`, group "T36 the write-up" (Z22) | 29 failed, 2 passed of 31 | The page `docs/write-up.md` did not exist, so its headings, labels, links and cited rows were empty. The README had no link to it. The log had five rows of the 07 repair dated a day late and no row for the spec against short prompt run. `docs/verification.md` still said there was no live host, the judge guide still said the address was not known, and the testing row of `docs/kiro-evidence.md` still said "by hand". The 2 that passed hold what was already true: no row of the log is dated after today, and the two rows written after midnight on 23 November keep that date | 31 of 31 |
+
+After the page was written, four faults were made on purpose, one at a time, and each was put back. A missing heading failed 3 of the 31 tests. A broken heading link, a link to a missing folder and a cited row that is not in the log failed 1 test each. A log row dated 24 November failed 2. These are unit assertions, run on one machine.
 
 ## What was tested
 
@@ -71,7 +74,7 @@ A test must fail on the missing behaviour before its code is written. The first 
 - **Chromium only.** No Firefox, no WebKit, no other Chromium build. The service worker was not tried in another browser.
 - **No person used any of it.** No warden, secretary, family member, plot seeker or committee reviewer. No time, adoption or saving claim is made.
 - **No paper.** Print is a PDF that the browser makes from the document. No print dialog was driven and no page was printed. Paper size is read from the PDF page boxes. Dense map sheets, repeated headings and page numbers were not measured in a browser.
-- **No live host.** Nothing was deployed. The headers were read by the local preview server. Whether a real static host sends the same headers was not observed.
+- **Live host, read once by a person and not by a test.** The lead read https://plotwarden.pages.dev on 23 November 2026 at about 10:43 PM, after the deploy of the current build branch. `/`, `/churchyard/`, `/allotments/` and `/review/` answer 200 with the content policy `default-src 'self'` (script, font, connect, worker and frame from `'self'` only), `cross-origin-opener-policy: same-origin`, a permissions policy that turns off camera, microphone, geolocation, payment and usb, `referrer-policy: no-referrer` and `x-content-type-options: nosniff`. `/sw.js` answers 200 with `Cache-Control: no-cache`. A family file at its `.html` address answers 308 to its clean address, with `default-src 'none'`, `form-action 'none'` and `base-uri 'none'`. `/visitor/family/` and `/visitor/seeker/` answer 200, and an unknown address answers 404. In a headless Chromium the site had one service worker, activated, and one cache of 38 files named for the shell version `fc0087dc2b2e0583`. With the network off, both registers and the family file at both of its addresses answered 200 with their own words, and the console showed no problem. These are one person's readings on one day. Not observed: other browsers than Chromium, and real phones.
 - **The worker's hand over.** The step where the old pages close and the new worker takes over is covered by unit tests with in memory fakes, and was not driven in a browser. The update itself was made by rewriting one file on disk for one test and restoring it.
 - **Speed.** Nothing about the speed of the site was measured. The measures in `docs/kiro-log.md` for a 200 row import are from fake storage in Node.
 - **The Review Desk's own checks.** Its unit and browser specs and its host test are in its own repository, and were not run here. The site holds a copy of its preview, pinned by `release/desk-preview.lock.json`. The preview was built about 30 seconds before the Desk's last commit, and was not rebuilt, so the lock does not show that the preview was built from that exact commit.

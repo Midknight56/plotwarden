@@ -414,6 +414,10 @@ The home screens read `open.site.workspace === "walkthrough"`. The button is `ty
 
 Each group is `<nav aria-labelledby="group-<name>">` over an `<h2 id="group-<name>" className="group-heading">`. The two old navigations named "Search this register" and "Links for this register" are gone, so no landmark repeats a name. The search form keeps the role `search`. The counts are one `<p className="tally">`: "2 free · 0 reserved · 3 taken · 1 unusable". It has no border and no fill, and it is not inside a navigation. The reports keep their `.counts` boxes, which are not on a desk.
 
+## Z-D16 The write-up (Z22)
+
+`docs/write-up.md` has one title, a short opening line, and eight second level sections. Each section holds three paragraphs that start with a bold label: "Done.", "Effect." and "Not done." The effect names a file by a relative link, or a log row by the start of its "Spec and task" text in quotation marks after the word "row". The test reads the page as text with no markdown library: it takes the lines that start with `## `, the relative links of the form `](path)` and the quoted row names, and checks each against the files. A link that has a heading part is also checked against the headings of its target, made the way `check-links.mjs` makes them. The test for dates reads the first cell of each row of the log and compares it with the local date of the machine that runs the test, so a row dated after today fails the day it is written, and a row cannot be dated ahead.
+
 ## Z-D11 Evidence
 
 Each task row in `docs/kiro-log.md` names its red run and its green run. The log holds no local absolute path. Browser results say headless Chromium on one Windows machine. Results from a unit test, a browser assertion and a person's review of a picture are labelled apart. No claim about users, speed on other machines or other browsers is made.

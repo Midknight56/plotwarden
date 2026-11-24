@@ -1399,3 +1399,225 @@ describe("T36 check:public", () => {
     expect(result.err).not.toContain("local-path");
   });
 });
+
+// ---- the write-up and the facts it corrects (spec 06, Z22) -----------------------------------------------------
+//
+// The page is read as text. Every expected value below is typed from the task and the plan, not read from the page.
+// The only clock in this group is the real one: Z22.7 says no row of the log may be dated after the day the check
+// runs, so a fixed clock would test nothing.
+
+describe("T36 the write-up (Z22)", () => {
+  const SECTIONS = ["Surfaces", "Custom agents", "Hooks", "Specs", "Steering", "MCP", "Property tests", "Powers"];
+  const writeUpPath = join(repo, "docs", "write-up.md");
+  /** The page, or an empty text when it is missing, so a missing page fails each check on its missing content. */
+  const writeUp = (): string => (existsSync(writeUpPath) ? readFileSync(writeUpPath, "utf8") : "");
+  const doc = (rel: string): string => readFileSync(join(repo, rel), "utf8");
+
+  interface Section {
+    title: string;
+    body: string;
+  }
+  function sectionsOf(text: string): Section[] {
+    const found: Section[] = [];
+    let fence = false;
+    for (const line of text.split("\n")) {
+      if (/^\s*(```|~~~)/.test(line)) fence = !fence;
+      const heading = fence ? null : /^## (.+?)\s*$/.exec(line);
+      const last = found[found.length - 1];
+      if (heading !== null) found.push({ title: heading[1] ?? "", body: "" });
+      else if (last !== undefined) last.body += `${line}\n`;
+    }
+    return found;
+  }
+  const paragraphsOf = (body: string): string[] => body.split(/\n\s*\n/).map((p) => p.trim()).filter((p) => p !== "");
+  const proseOf = (text: string): string => text.replace(/```[\s\S]*?```/g, "").replace(/`[^`\n]*`/g, "");
+  const linksOf = (text: string): string[] => [...proseOf(text).matchAll(/!?\[[^\]]*\]\(\s*<?([^)\s>]+)>?(?:\s+"[^"]*")?\s*\)/g)].map((m) => m[1] ?? "");
+  /** A log row is cited as: row "the start of its Spec and task text". */
+  const rowCitationsOf = (text: string): string[] => [...proseOf(text).matchAll(/\brow "([^"]{12,})"/gi)].map((m) => m[1] ?? "");
+
+  function anchorsOf(text: string): Set<string> {
+    const seen = new Map<string, number>();
+    const anchors = new Set<string>();
+    for (const line of proseOf(text).split("\n")) {
+      const heading = /^#{1,6}\s+(.*?)\s*#*\s*$/.exec(line);
+      if (heading === null) continue;
+      const base = (heading[1] ?? "")
+        .replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1")
+        .replace(/[`*_~]/g, "")
+        .toLowerCase()
+        .replace(/[^\p{L}\p{N}\s_-]/gu, "")
+        .trim()
+        .replace(/\s/g, "-");
+      const count = seen.get(base) ?? 0;
+      seen.set(base, count + 1);
+      anchors.add(count === 0 ? base : `${base}-${count}`);
+    }
+    return anchors;
+  }
+
+  interface LogRow {
+    date: string;
+    tool: string;
+    spec: string;
+  }
+  const logRows = (): LogRow[] =>
+    doc("docs/kiro-log.md")
+      .split("\n")
+      .filter((line) => /^\| \d{4}-\d{2}-\d{2} \|/.test(line))
+      .map((line) => {
+        const cells = line.split("|");
+        return { date: (cells[1] ?? "").trim(), tool: (cells[2] ?? "").trim(), spec: (cells[3] ?? "").trim() };
+      });
+  const localToday = (): string => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  };
+  const section = (title: string): string => sectionsOf(writeUp()).find((s) => s.title === title)?.body ?? "";
+
+  it("the page exists", () => {
+    expect(existsSync(writeUpPath)).toBe(true);
+  });
+
+  it("has the eight headings, in this order, and no other second level heading", () => {
+    expect(sectionsOf(writeUp()).map((s) => s.title)).toEqual(SECTIONS);
+  });
+
+  it.each(SECTIONS)("%s says what was done, one effect and what was not done, in that order, once each", (title) => {
+    const labels = paragraphsOf(section(title))
+      .map((p) => /^\*\*(Done\.|Effect\.|Not done\.)\*\*\s+\S/.exec(p)?.[1])
+      .filter((label): label is string => label !== undefined);
+    expect(labels).toEqual(["Done.", "Effect.", "Not done."]);
+  });
+
+  it.each(SECTIONS)("%s gives its effect with a link to a file or a row of the log", (title) => {
+    const effect = paragraphsOf(section(title)).find((p) => p.startsWith("**Effect.**")) ?? "";
+    expect(linksOf(effect).length + rowCitationsOf(effect).length).toBeGreaterThan(0);
+  });
+
+  it("every link resolves to a file, a folder or a heading of this repository, and none is a web address", () => {
+    const links = linksOf(writeUp());
+    expect(links.length).toBeGreaterThan(0);
+    const bad: string[] = [];
+    for (const target of links) {
+      if (/^[a-z][a-z0-9+.-]*:/i.test(target)) {
+        bad.push(`${target}: an address on the web`);
+        continue;
+      }
+      const [pathPart = "", fragment] = target.split("#");
+      const resolved = join(repo, "docs", decodeURIComponent(pathPart));
+      if (!existsSync(resolved)) {
+        bad.push(`${target}: no such file or folder`);
+        continue;
+      }
+      if (fragment !== undefined && fragment !== "" && statSync(resolved).isFile() && resolved.endsWith(".md")) {
+        if (!anchorsOf(readFileSync(resolved, "utf8")).has(fragment.toLowerCase())) bad.push(`${target}: no such heading`);
+      }
+    }
+    expect(bad).toEqual([]);
+  });
+
+  it("every row it cites is the start of the Spec and task text of a row of the log", () => {
+    const cited = rowCitationsOf(writeUp());
+    expect(cited.length).toBeGreaterThan(0);
+    const specs = logRows().map((row) => row.spec);
+    expect(cited.filter((name) => !specs.some((spec) => spec.startsWith(name)))).toEqual([]);
+  });
+
+  describe("what each section must say", () => {
+    it("Surfaces: Kiro CLI built both repositories, the Review Desk runs inside Kiro Crew 0.12.2, no other surface is claimed", () => {
+      const body = section("Surfaces");
+      expect(body).toContain("Kiro CLI");
+      expect(body).toContain("both repositories");
+      expect(body).toContain("Kiro Crew 0.12.2");
+      expect(body).toMatch(/IDE/);
+      expect(body).toMatch(/not (?:used|tried|run)/i);
+    });
+
+    it("Custom agents: the read only reviewer found twelve, four are named with their rows, and its inspector tools were off", () => {
+      const body = section("Custom agents");
+      for (const profile of ["register-builder", "register-reviewer", "desk-builder"]) expect(body, profile).toContain(profile);
+      expect(body).toMatch(/read only/);
+      expect(body).toMatch(/twelve findings/);
+      expect(body).toMatch(/inspector tools were switched off/);
+      expect(body).toContain("searched name");
+      expect(body).toContain("year only");
+      expect(body).toContain("living people");
+      expect(body).toMatch(/slip/);
+      const cited = rowCitationsOf(body);
+      expect(cited.some((name) => name.startsWith("07 repair: a search stays out of the address"))).toBe(true);
+      expect(cited.some((name) => name.startsWith("07 repair: slip, burial overlap, private names"))).toBe(true);
+    });
+
+    it("Specs: the spec against short prompt result with its numbers, and the rows of the 07 slices", () => {
+      const body = section("Specs");
+      for (const text of ["22 minutes", "23 minutes", "58 tests", "54 passed", "4 failed", "asAt", "Back to today"]) expect(body, text).toContain(text);
+      expect(body).toMatch(/one (?:run|feature|time)/i);
+      const cited = rowCitationsOf(body);
+      for (const slice of ["07-look 7.1 to 7.8", "07-look 7.9 to 7.14", "07-look 7.15 to 7.19", "07-look 7.20 to 7.22", "07-look 7.27", "07-look 7.23 to 7.29"]) {
+        expect(
+          cited.some((name) => name.startsWith(slice)),
+          slice,
+        ).toBe(true);
+      }
+    });
+  });
+
+  describe("the log", () => {
+    it("holds no row dated after today", () => {
+      const today = localToday();
+      expect(logRows().filter((row) => row.date > today).map((row) => `${row.date} ${row.spec}`)).toEqual([]);
+    });
+
+    it("dates the five rows of the 07 repair on the day the work was done, 2026-11-22", () => {
+      const repair = logRows().filter((row) => row.spec.startsWith("07 repair"));
+      expect(repair).toHaveLength(5);
+      expect(repair.map((row) => row.date)).toEqual(["2026-11-22", "2026-11-22", "2026-11-22", "2026-11-22", "2026-11-22"]);
+    });
+
+    it("leaves the rows written after midnight on 23 November with their date", () => {
+      const rows = logRows();
+      for (const start of ["07-look 7.27, the Review Desk", "07-look 7.23 to 7.29"]) {
+        const row = rows.find((r) => r.spec.startsWith(start));
+        expect(row?.date, start).toBe("2026-11-23");
+      }
+    });
+
+    it("has a row, dated 2026-11-23, for the spec against short prompt run, with its numbers", () => {
+      const lines = doc("docs/kiro-log.md").split("\n");
+      const line = lines.find((l) => /^\| 2026-11-23 \| [^|]+\| 02-paper-and-map 2\.27 to 2\.30 against a short prompt/.test(l)) ?? "";
+      expect(line).not.toBe("");
+      for (const text of ["22 minutes", "23 minutes", "58 tests", "54 passed", "4 failed", "asAt", "never merged"]) expect(line, text).toContain(text);
+    });
+  });
+
+  describe("the other pages", () => {
+    it("the README links the write-up under Technological Implementation", () => {
+      const readme = doc("README.md");
+      const start = readme.indexOf("### Technological Implementation");
+      expect(start).toBeGreaterThan(-1);
+      const rest = readme.slice(start + 1);
+      const end = rest.search(/\n### /);
+      const block = end === -1 ? rest : rest.slice(0, end);
+      expect(linksOf(block)).toContain("docs/write-up.md");
+    });
+
+    it("verification.md tells what was read on the live host and keeps what was not observed", () => {
+      const text = doc("docs/verification.md");
+      expect(text.split("\n").some((line) => line.startsWith("- **No live host"))).toBe(false);
+      for (const word of ["plotwarden.pages.dev", "308", "fc0087dc2b2e0583", "Cache-Control", "default-src 'self'", "404"]) expect(text, word).toContain(word);
+      expect(text).toMatch(/Not observed[^\n]*other browsers[^\n]*real phones/);
+    });
+
+    it("the judge guide gives the live address", () => {
+      const text = doc("docs/judge-guide.md");
+      expect(text).toContain("The live address is https://plotwarden.pages.dev.");
+      expect(text).not.toContain("set by the person who publishes the site");
+    });
+
+    it("the testing row of kiro-evidence.md says how the expected totals were made", () => {
+      const row = doc("docs/kiro-evidence.md").split("\n").find((line) => line.startsWith("| `testing.md` |")) ?? "";
+      expect(row).toContain("worked out line by line before any code, not read from the code");
+      expect(row).not.toContain("worked by hand");
+    });
+  });
+});

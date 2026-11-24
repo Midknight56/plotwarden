@@ -18,7 +18,7 @@ Wardens can enter a page beside its photograph or bring in a spreadsheet. Famili
 
 ### Technological Implementation
 
-Kiro worked from written rules for plot spaces, waiting order and visitor details. A reload of a register page with the network off showed the not found page until a test about the address fragment failed first, and then the offline worker was fixed. Check it in the [Kiro build record](docs/kiro-evidence.md).
+Kiro worked from written rules for plot spaces, waiting order and visitor details. A reload of a register page with the network off showed the not found page until a test about the address fragment failed first, and then the offline worker was fixed. Check it in the [Kiro build record](docs/kiro-evidence.md) and in the [answers to the eight Kiro questions](docs/write-up.md).
 
 ### Design
 

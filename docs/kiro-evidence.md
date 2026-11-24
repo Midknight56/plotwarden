@@ -28,7 +28,7 @@ Six files in `.kiro/steering/` are read on every task:
 
 | File | Rule it holds |
 |---|---|
-| `testing.md` | Tests first. Write the assertion, see it fail on the missing behaviour, write the smallest code, see it pass. A missing module or a failed install is not a red result. Never weaken a test. Expected totals come from `tests/fixtures/expected/hand-totals.md`, worked by hand before any code. Property tests run at least 1,000 cases with recorded seeds |
+| `testing.md` | Tests first. Write the assertion, see it fail on the missing behaviour, write the smallest code, see it pass. A missing module or a failed install is not a red result. Never weaken a test. Expected totals come from `tests/fixtures/expected/hand-totals.md`, worked out line by line before any code, not read from the code. Property tests run at least 1,000 cases with recorded seeds |
 | `records.md` | Three models kept apart. Living people never appear in visitor output. Every change is an appended event. Never infer a date, a holder, consent or a merge |
 | `structure.md` | Import direction, who owns which folder, exact versions only |
 | `product.md` | What each part is for and the fixed product choices |

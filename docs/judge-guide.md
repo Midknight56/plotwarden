@@ -6,7 +6,7 @@ This is a path through both registers and the Review Desk preview. It takes abou
 
 ## Open the site
 
-Open the site address. The live address is set by the person who publishes the site, and it is not in this repository yet.
+Open the site address. The live address is https://plotwarden.pages.dev.
 
 To run the same site from a checkout (Node 24 or later):
 
