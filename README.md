@@ -4,7 +4,7 @@ Plotwarden keeps plot registers on the keeper's own device. There is no server, 
 
 **Live site:** https://plotwarden.pages.dev
 
-**Film:** PLACEHOLDER. The person who publishes the film fills in its address here. There is no film yet.
+**Film:** https://youtu.be/emYYWQX-SLw (2 min 46 s, spoken and captioned)
 
 ## Judging criteria at a glance
 
@@ -30,7 +30,7 @@ A burial can stay in one place for generations. A garden plot can change hands e
 
 ### Presentation
 
-Follow a warden to a burial, watch a secretary offer a plot, then follow a committee check back to its source. Check it in the captioned film. The film link is the placeholder above.
+Follow a warden to a burial, watch a secretary offer a plot, then follow a committee check back to its source. Check it in the captioned film: https://youtu.be/emYYWQX-SLw
 
 ## What it is
 
