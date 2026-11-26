@@ -278,11 +278,15 @@ test.describe("the path in the guide", () => {
     await placement.getByRole("link", { name: say("Open matching record"), exact: true }).click();
     await expect(page.getByRole("heading", { level: 1, name: "Burials with no plot" })).toBeVisible();
 
-    // The unclear reading opens its own burial record.
+    // The unclear reading opens its own burial record. Back brings the same slip back, so the file is not picked again.
     await page.goBack();
     await expect(page.getByRole("heading", { level: 1, name: "Committee review" })).toBeVisible();
-    await page.getByLabel("Open return slip", { exact: true }).setInputFiles(slip.path);
-    await returned(page).getByRole("listitem").filter({ hasText: "Record 2 · Read the stone again" }).getByRole("link", { name: say("Open matching record"), exact: true }).click();
+    await expect(returned(page)).toBeVisible();
+    for (const kept of [placement, reading]) {
+      await expect(kept).toHaveCount(1);
+      await expect(kept.getByText(ready, { exact: true })).toBeVisible();
+    }
+    await reading.getByRole("link", { name: say("Open matching record"), exact: true }).click();
     await expect(page.getByRole("heading", { level: 1, name: "Burial record" })).toBeVisible();
     await expect(page.getByText("Marked for another reading.")).toBeVisible();
 

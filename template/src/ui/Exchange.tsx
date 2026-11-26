@@ -10,6 +10,7 @@ import { Button, ButtonLink, Notice, TextField, focusFirstInvalid } from "./cont
 import { downloadText } from "./download";
 import { checksAt, fileHolds, planExchange, readSlipFor } from "./exchangeFlow";
 import type { ExchangePlan, ReadResult, ReturnedRow } from "./exchangeFlow";
+import type { KeptSlip } from "./keptSlip";
 import { commitMessage, errorMessage } from "./messages";
 import { useRegister, useShell } from "./shellContext";
 import { Status } from "./Status";
@@ -74,7 +75,9 @@ export function Exchange() {
   const [done, setDone] = useState<Done | undefined>();
   const [note, setNote] = useState<string | undefined>();
   const [status, setStatus] = useState<StatusState>({ phase: "idle" });
-  const [slip, setSlip] = useState<{ bytes: Uint8Array; opId: string } | undefined>();
+  // The slip opened earlier in this visit to this register comes back after Back. Its rows are read again below (X14).
+  const [slip, setSlip] = useState<KeptSlip | undefined>(() => open.slips.recall(open.site.id));
+  const slipChosen = useRef(false);
   const [receiptStatus, setReceiptStatus] = useState<StatusState>({ phase: "idle" });
 
   const empty = open.revision < 1;
@@ -91,8 +94,9 @@ export function Exchange() {
   }, [plan]);
 
   useEffect(() => {
-    if (slip !== undefined && reading?.ok === true) returnedHeading.current?.focus();
-    // Focus moves once, when a slip is opened. Reading it again after a receipt does not move focus.
+    if (slipChosen.current && slip !== undefined && reading?.ok === true) returnedHeading.current?.focus();
+    // Focus moves once, when the keeper opens a slip. Reading it again after a receipt, or coming back to a kept slip,
+    // does not move focus: a new page puts focus on its heading.
   }, [slip]);
 
   /** Any change to an input takes the preview and the result away until a preview is made again. */
@@ -180,7 +184,10 @@ export function Exchange() {
     if (file === undefined) return;
     const bytes = new Uint8Array(await file.arrayBuffer());
     setReceiptStatus({ phase: "idle" });
-    setSlip({ bytes, opId: newId() });
+    const chosen: KeptSlip = { bytes, opId: newId() };
+    open.slips.keep(open.site.id, chosen);
+    slipChosen.current = true;
+    setSlip(chosen);
   };
 
   const record = async (): Promise<void> => {

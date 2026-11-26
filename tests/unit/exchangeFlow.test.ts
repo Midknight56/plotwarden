@@ -258,6 +258,22 @@ describe("reading a return slip in Lantern Fold (hand totals 6.5)", () => {
     }
   });
 
+  it("reads the same kept bytes again after the reading is reviewed: ready first, then closed, with no receipt for it (X14.4)", async () => {
+    const data = slipBytes([decision(1, placementKey), decision(2, readingKey)]);
+    const before = read(data);
+    expect(before.ok && before.rows.map((r) => r.status)).toEqual(["ready", "ready"]);
+    expect(before.ok && before.receipt?.decisions.map((d) => d.actionId)).toEqual([A(1), A(2)]);
+
+    await env.must([{ type: "settle_reading", memorialId: memorial }]);
+    const after = read(data);
+    expect(after.ok && after.rows.map((r) => r.status)).toEqual(["ready", "closed"]);
+    expect(after.ok && after.counts).toEqual({ ready: 1, changed: 0, closed: 1, received: 0 });
+    if (after.ok) {
+      expect(after.receipt?.decisions.map((d) => d.actionId)).toEqual([A(1)]);
+      expect(after.rows[1]?.label).toBe("Record 2");
+    }
+  });
+
   it("reads and writes nothing: the same state, the same revision, the same events (X5.6)", async () => {
     const state = JSON.stringify(env.state);
     const revision = env.revision;

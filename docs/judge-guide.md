@@ -48,7 +48,7 @@ The hub says what Plotwarden does in one line: Find a burial. Offer a garden plo
 4. Choose **Return slips**, then **Download return slip for Churchyard · Site 1**. The file is `committee-return-` and the date. The slip holds no name and no text.
 5. Open the hub again. On the Churchyard Register card choose **Try the practice register**.
 6. Choose **Committee review**, then **Open return slip** and pick the slip file from step 4. The rows "Record 1 · Check the location" and "Record 2 · Read the stone again" both read "Ready to check".
-7. On "Record 1 · Check the location" choose **Open matching record**. The list "Burials with no plot" opens. Go back, open the slip again, and on "Record 2 · Read the stone again" choose **Open matching record**. The "Burial record" opens.
+7. On "Record 1 · Check the location" choose **Open matching record**. The list "Burials with no plot" opens. Go back. The slip is still there with both rows, so you do not pick the file again. On "Record 2 · Read the stone again" choose **Open matching record**. The "Burial record" opens.
 
 Without a file, **Open walkthrough** on the Desk home shows invented sites.
 

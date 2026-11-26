@@ -157,6 +157,8 @@ Focus: after Preview, focus moves to the preview heading. After an invalid Previ
 
 Layout: one column on the phone. Buttons follow their form in normal flow. Rows are cards. Nothing is sticky.
 
+The kept slip (X14). `ui/keptSlip.ts` holds a `SlipKeeper`: the bytes of the opened file and the operation ID minted when it was opened, with the ID of the register they belong to. `keep(siteId, slip)` replaces whatever was held. `recall(siteId)` gives the slip only for the same register, else nothing. `clear()` empties it. `RegisterFrame` makes one keeper per visit with `useRef`, hands it to the screens as `open.slips`, and clears it when the register ID changes and when the frame goes away. The Exchange screen starts from `recall` and calls `keep` when a file is chosen, so a repeat of "Record receipt" after Back still carries the same operation ID. The keeper holds no state of its own beyond those bytes. It never touches storage, and the reading (`readSlipFor`) is made again from the current state each time the screen draws, so a row is never stored with a status.
+
 ## E9 The export script
 
 `scripts/export-exchange.mjs <dest>` (or `--to <dest>`, `--root <repo>` for tests):
@@ -184,3 +186,5 @@ Layout: one column on the phone. Buttons follow their form in normal flow. Rows 
 | `tests/unit/exportExchange.test.ts` | X9 |
 | `tests/helpers/exchangeVectors.ts` | One runner for the vectors |
 | `tests/browser/desk-return.spec.ts` | X4, X5, X6, X10 in a browser, both apps, both sizes |
+| `tests/unit/keptSlip.test.ts` | X14: the keeper holds a slip for its own register only, clears, and touches no storage |
+| `tests/browser/slip-back.spec.ts` | X14 in a browser, both apps, both sizes: Back, another register, leaving, an edited record |

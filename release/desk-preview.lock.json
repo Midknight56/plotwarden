@@ -2,12 +2,12 @@
   "lock": 1,
   "name": "plotwarden-review-desk",
   "version": "0.1.0",
-  "revision": "c1df8ba7bd9745e7ed6e9583f2e58d2db1446b9f",
+  "revision": "590aedce7bde9627899459caa57cea3869a5abd8",
   "entry": "index.html",
   "files": {
-    "asset-manifest.json": "b460917ea352a089a954949e817b026f6394be13364ea25129632c40cd67c3ff",
-    "assets/index-C3HW4NrS.js": "6e9321dfbcc6ed8f887c52b435bee8866836fa2f1949d002b2e992213f6f0010",
-    "index.html": "1b88342965f953f931354e4399d8ea5796d50c4c02ffe0d4e4ae66d05c343622"
+    "asset-manifest.json": "b026ac3ae9c49e066ae5c41febd7e22f042de0fd2a6023732c0e7500aa29034e",
+    "assets/index-Bfi8IxLV.js": "9949097f8dd0811c22f9c3568c3a88e960112c1104e36716ea5890e7281a760e",
+    "index.html": "de94dfac6a4db0177b89286429b09de6c0058de3ae74428b47cbcd5639e9f2c3"
   },
   "bundled": [
     {

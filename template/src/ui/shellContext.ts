@@ -11,6 +11,7 @@ import type { BlobWrite, CommitError } from "../data/transaction";
 import type { StoredEvent } from "../events";
 import type { Settings } from "../preferences";
 import type { SearchName } from "../search";
+import type { SlipKeeper } from "./keptSlip";
 import type { DomainError, Site, Uuid } from "../types";
 
 /** What an app entry hands to the shell. The app owns its words, rules and sheets. */
@@ -97,6 +98,11 @@ export interface OpenRegister {
   today: LocalDate;
   /** Another tab saved a later revision. */
   stale: boolean;
+  /**
+   * The return slip the keeper opened in this visit to this register, held in memory only. It is let go when the
+   * register changes or the keeper leaves it. It is never stored.
+   */
+  slips: SlipKeeper;
   run(commands: AnyCommand[], options?: RunOptions): Promise<RunOutcome>;
   reload(): Promise<void>;
 }

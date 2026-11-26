@@ -136,3 +136,14 @@ Tests: `tests/unit/exchangeCopy.test.ts`, `tests/unit/exchangeFlow.test.ts`, bro
 
 1. When the review file preview is shown, it shall list what the file holds in plain words: "The site name you typed", "The review date", the file format, the kind of register and its revision number, random keys that hold no name, and "For each check: your label, the reason and what to do". Each field of the file shall be covered by one of these lines, and a field with no line of its own shall give the line "More fields. Choose Show field names to see them."
 2. When the preview is shown, the exact field names (the whole file, then each check) shall stay behind a button "Show field names". The button shall say "Hide field names" while they are shown, and shall carry `aria-expanded`. The names are not on the page until it is pressed. A change to an input or a new preview shall close them.
+
+## X14 The opened slip stays for this visit to a register
+
+Tests: `tests/unit/keptSlip.test.ts`, `tests/unit/exchangeFlow.test.ts`, browser `slip-back.spec.ts` and `judge-guide.spec.ts`. Implements X5, X6.4, R23.1. Task 18.
+
+1. When the keeper has opened a return slip and leaves Committee review by "Open matching record", then comes back to Committee review (by the browser Back button, or by "Back to register" and "Committee review" in the same register), the screen shall show the same slip again with every row, without the keeper choosing the file again. Focus goes to the page heading, as on any new page.
+2. The kept slip shall belong to the register it was opened in. When the keeper opens another register (a churchyard or a garden, a practice register or one of their own), the screen shall show no slip. When the keeper leaves the register, for example by "Back to registers", the slip shall be gone. Opening the first register again shall not bring it back.
+3. The kept slip shall live in memory for this visit only. It shall never be written to IndexedDB, localStorage, sessionStorage, a cache, a backup, a family file, a visitor file or a committee file, and it shall change no revision.
+4. When the slip shows again, each row's status shall be worked out again from the register as it is now. A record edited in between shows its new state: a reading that was reviewed no longer reads "Ready to check", and a row whose check is closed reads "Issue already closed". "Record receipt" is offered only for rows that are ready now.
+5. When the keeper chooses another file, the new file replaces the kept slip. A file that is refused replaces it too, so the screen never shows a slip the keeper did not just choose or come back to.
+6. Both registers get this from the shared Exchange screen. No app has code of its own for it.

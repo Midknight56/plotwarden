@@ -48,3 +48,7 @@ Each task writes its test first, sees it fail on the missing behaviour (a stub t
 - The plain lines are tied to the field names by a table in `exchangeFlow.ts`. A new field of the file gives "More fields. Choose Show field names to see them." until it gets its own line. The Desk holds a pinned copy of `template/src/exchange/*` only, and this task changed no file there, so no new export is needed.
 - The control has no `aria-controls`, because the panel is not drawn while it is closed. Its state is carried by `aria-expanded`.
 - The 12 px gap between "Show field names" and "Download review file" was not measured. The browser spec measures it when it runs.
+
+## Task 18: the opened slip stays for this visit to a register
+
+- [x] 5.18 Committee review shows the opened slip again after "Open matching record" and Back, with its rows worked out again, and never in another register or after leaving the register (X14). Spec first: `requirements.md` X14, `design.md` E8. Files: `template/src/ui/{keptSlip.ts,Exchange.tsx,RegisterShell.tsx,shellContext.ts}`, `tests/unit/{keptSlip,exchangeFlow}.test.ts`, `tests/browser/{slip-back,judge-guide}.spec.ts`, `docs/judge-guide.md`, `docs/kiro-log.md`. T IDs: browser `slip-back.spec.ts`, `judge-guide.spec.ts`; unit `keptSlip.test.ts`. Red command: `npx vitest run tests/unit/keptSlip.test.ts` against a stub that throws "not implemented", then the browser specs against the build before the change.

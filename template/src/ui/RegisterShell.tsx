@@ -29,6 +29,7 @@ import { Settings as SettingsScreen } from "./Settings";
 import { SiteMap } from "./SiteMap";
 import { Status } from "./Status";
 import { TraceEditor } from "./TraceEditor";
+import { createSlipKeeper } from "./keptSlip";
 import { ButtonLink } from "./controls";
 import { COPY, fill } from "./copy";
 import { commitMessage } from "./messages";
@@ -171,6 +172,9 @@ function RegisterFrame({ siteId, children }: { siteId: string; children: ReactNo
   const [loaded, setLoaded] = useState<Loaded | "missing" | "failed" | null>(null);
   const [stale, setStale] = useState(false);
   const latest = useRef<Loaded | null>(null);
+  // The slip the keeper opened in this visit, in memory only. Another register or leaving this one lets it go (spec 05, X14).
+  const [slips] = useState(createSlipKeeper);
+  useEffect(() => () => slips.clear(), [slips, siteId]);
 
   /** A practice register is read at its own fixed date. Every other register is read today. */
   const todayFor = useCallback(
@@ -278,10 +282,11 @@ function RegisterFrame({ siteId, children }: { siteId: string; children: ReactNo
       revision: loaded.revision,
       today: todayFor(loaded.site),
       stale,
+      slips,
       run,
       reload: load,
     };
-  }, [loaded, stale, run, load, shell, todayFor]);
+  }, [loaded, stale, slips, run, load, shell, todayFor]);
 
   if (loaded === "missing") return <NotFound />;
   if (loaded === "failed") {
