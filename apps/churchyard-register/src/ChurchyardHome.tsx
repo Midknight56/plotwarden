@@ -9,7 +9,7 @@ import { Button, ButtonLink, CODE_MARK, CodeTabbed, LinkGroup, TextField, keepSe
 import { formatPartialDate } from "../../../template/src/ui/copy";
 import { plotRows } from "../../../template/src/ui/plotView";
 import { useShell } from "../../../template/src/ui/shellContext";
-import { MapKey, SheetSvg, useElementWidth } from "../../../template/src/ui/SiteMap";
+import { MapKey, SheetSvg, PlotPicker, usePlotPress, useElementWidth } from "../../../template/src/ui/SiteMap";
 import { Status } from "../../../template/src/ui/Status";
 import { churchRecords } from "./adapter";
 import { reservationLine } from "./copy";
@@ -89,7 +89,14 @@ export function ChurchyardHome() {
       ),
     [open.state.map, rows, selectedId, width],
   );
-
+  /** A press on a drawn plot opens its record. The home keeps the chosen plot and the search first, so Back returns to them. */
+  const openRecord = (plotId: string) => {
+    if (plotId !== selectedId) navigate(`/r/${open.site.id}?plot=${plotId}`, { replace: true, search: query });
+    navigate(`/r/${open.site.id}/plot/${plotId}`);
+  };
+  const lines = useMemo(() => new Map(rows.map((r) => [r.plot.plotId, r.line])), [rows]);
+  const { pressed, tapped, plotAction } = usePlotPress({ sheet, lines, selectedId: selectedId, onOpen: openRecord });
+  const choosePlot = (plotId: string) => navigate(`/r/${open.site.id}${plotId === "" ? "" : `?plot=${plotId}`}`, { replace: true, ...(query === "" ? {} : { search: query }) });
   // After "Show on map", the selected plot's heading takes focus, so the result is announced and in view.
   useEffect(() => {
     if (plotParam !== "") heading.current?.focus({ preventScroll: false });
@@ -223,7 +230,6 @@ export function ChurchyardHome() {
               </h2>
               {selected === undefined ? null : (
                 <div className="actions">
-                  <ButtonLink href={`${base}/plot/${selected.plot.plotId}`}>{t("openPlot")}</ButtonLink>
                   <ButtonLink href={`${base}/map?plot=${selected.plot.plotId}`}>{t("siteMap")}</ButtonLink>
                 </div>
               )}
@@ -262,9 +268,10 @@ export function ChurchyardHome() {
             )}
           </section>
           <div ref={holder} className="sheet-scroll" role="region" aria-label={t("siteMap")} tabIndex={0}>
-            {sheet.empty ? <p className="lead">{t("noMapYet")}</p> : <SheetSvg model={sheet} label={t("mapDescription")} />}
+            {sheet.empty ? <p className="lead">{t("noMapYet")}</p> : <SheetSvg model={sheet} label={t("mapDescriptionOpen")} onSurface={tapped} onSurfaceDown={pressed} plotAction={plotAction} />}
           </div>
           <MapKey />
+          <PlotPicker rows={rows} selectedId={selectedId} base={base} onChoose={choosePlot} />
         </div>
 
         <div className="desk-index on-ground">

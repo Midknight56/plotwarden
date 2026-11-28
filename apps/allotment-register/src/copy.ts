@@ -44,6 +44,7 @@ export const ALLOT_COPY: Readonly<Record<string, string>> = {
   seeTenancies: "See current tenancies",
   seeFees: "See season fees",
   searchHeading: "Find a plot or a person",
+  searchPromptHome: "Search for a name or code, tap a plot on the map, or choose a plot.",
   nameOrCode: "Name or plot code",
   openPlot: "Open plot",
   tenantOf: "Holder of {code}",

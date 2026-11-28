@@ -26,7 +26,7 @@ export const CHURCH_COPY: Readonly<Record<string, string>> = {
   showOnMap: "Show on map",
   summaryLine: "{code} · {section} · {state}",
   deskSummary: "Selected plot",
-  noPlotSelected: "No plot selected. Search, then choose Show on map.",
+  noPlotSelected: "No plot selected. Search and choose Show on map, tap a plot on the map, or choose a plot.",
   burialsCount: "{count} burials",
   burialsCountOne: "1 burial",
   unplacedCount: "{count} burials with no plot",

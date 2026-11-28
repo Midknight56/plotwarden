@@ -9,7 +9,7 @@ import type { SearchEntry, SearchName } from "../../../template/src/search";
 import { Button, ButtonLink, LinkGroup, TextField, keepSearch } from "../../../template/src/ui/controls";
 import { plotRows } from "../../../template/src/ui/plotView";
 import { useShell } from "../../../template/src/ui/shellContext";
-import { MapKey, SheetSvg, useElementWidth } from "../../../template/src/ui/SiteMap";
+import { MapKey, SheetSvg, PlotPicker, usePlotPress, useElementWidth } from "../../../template/src/ui/SiteMap";
 import { allotRecords } from "./adapter";
 import { useAllot } from "./intent";
 import { freePlotsAt } from "./projection";
@@ -71,7 +71,14 @@ export function AllotmentHome() {
       ),
     [open.state.map, rows, markedId, width],
   );
-
+  /** A press on a drawn plot opens its record. The home keeps the chosen plot and the search first, so Back returns to them. */
+  const openRecord = (plotId: string) => {
+    if (plotId !== selectedId) navigate(`/r/${open.site.id}?plot=${plotId}`, { replace: true, search: query });
+    navigate(`/r/${open.site.id}/plot/${plotId}`);
+  };
+  const lines = useMemo(() => new Map(rows.map((r) => [r.plot.plotId, r.line])), [rows]);
+  const { pressed, tapped, plotAction } = usePlotPress({ sheet, lines, selectedId: selectedId, onOpen: openRecord });
+  const choosePlot = (plotId: string) => navigate(`/r/${open.site.id}${plotId === "" ? "" : `?plot=${plotId}`}`, { replace: true, ...(query === "" ? {} : { search: query }) });
   const go = (q: string, plot = "") => navigate(`/r/${open.site.id}${plot === "" ? "" : `?plot=${plot}`}`, q === "" ? undefined : { search: q });
   const submit = (event: FormEvent) => {
     event.preventDefault();
@@ -208,7 +215,7 @@ export function AllotmentHome() {
               </div>
             </form>
             {query.trim() === "" ? (
-              <p>{t("searchPrompt")}</p>
+              <p>{t("searchPromptHome")}</p>
             ) : hits.length === 0 ? (
               <p>{t("noMatchesFor", { query })}</p>
             ) : (
@@ -252,9 +259,10 @@ export function AllotmentHome() {
             </p>
           )}
           <div ref={holder} className="sheet-scroll" role="region" aria-label={t("siteMap")} tabIndex={0}>
-            {sheet.empty ? <p className="lead">{t("noMapYet")}</p> : <SheetSvg model={sheet} label={t("mapDescription")} />}
+            {sheet.empty ? <p className="lead">{t("noMapYet")}</p> : <SheetSvg model={sheet} label={t("mapDescriptionOpen")} onSurface={tapped} onSurfaceDown={pressed} plotAction={plotAction} />}
           </div>
           <MapKey />
+          <PlotPicker rows={rows} selectedId={selectedId} base={base} onChoose={choosePlot} />
         </div>
 
         <div className="desk-index on-ground">

@@ -344,51 +344,25 @@ export function MapKey() {
   );
 }
 
-export function SiteMap() {
-  const { t, app, route, navigate } = useShell();
-  const open = useRegister();
-  const base = `#/r/${open.site.id}`;
-  const selected = route.query.get("plot") ?? "";
-  // The view date is in the address as `asAt`, a date and nothing else. Today has no `asAt`.
-  const asAt = asAtOf(route.query, open.today);
-  const viewDate = asAt ?? open.today;
-  const [zoom, setZoom] = useState(1);
-  const [printStatus, setPrintStatus] = useState<"idle" | "preparing" | "ready">("idle");
-  const holder = useRef<HTMLDivElement>(null);
-  const width = useElementWidth(holder);
-
-  const floor = useMemo(() => claimFloorFor(app, open.state), [app, open.state]);
-  const rows = useMemo(() => plotRows(open, t, viewDate, floor), [open, t, viewDate, floor]);
-  const sheet = useMemo(
-    () =>
-      buildSheet(
-        {
-          map: open.state.map,
-          plots: rows.map((r) => ({ plotId: r.plot.plotId, code: r.plot.code, mark: { ...(r.summary.primary === undefined ? {} : { state: r.summary.primary }), needsChecking: r.summary.needsChecking } })),
-          ...(selected === "" ? {} : { selectedPlotId: selected }),
-        },
-        { width, zoom },
-      ),
-    [open.state.map, rows, selected, width, zoom],
-  );
-  const chosen = rows.find((r) => r.plot.plotId === selected);
-
-  const byId = useMemo(() => new Map(rows.map((r) => [r.plot.plotId, r])), [rows]);
+/**
+ * The press behaviour of a map that opens a plot's record: a click or tap on a drawn plot, and one tab stop with the arrow
+ * keys, Home, End, Enter and Space. The Site map and both register homes use it, so they behave alike.
+ */
+export function usePlotPress(opts: { sheet: SheetModel; lines: ReadonlyMap<string, string>; selectedId: string; onOpen: (plotId: string) => void }) {
+  const { t, app } = useShell();
+  const { sheet, lines, selectedId, onOpen } = opts;
   const [focusId, setFocusId] = useState("");
   const nodes = useRef(new Map<string, SVGGElement>());
   // The one tab stop is the focused plot, else the chosen plot, else the first plot in reading order.
   const reading = useMemo(() => [...sheet.plots].sort((a, b) => a.box.y - b.box.y || a.box.x - b.box.x), [sheet.plots]);
-  const tabId = [focusId, selected, reading[0]?.plotId ?? ""].find((id) => id !== "" && byId.has(id) && reading.some((p) => p.plotId === id)) ?? "";
-
-  /** The same choice as the list makes: the plot goes into the address with the date kept, and nothing is saved. */
-  const choose = (plotId: string) => navigate(`/r/${open.site.id}/map${queryOf({ plot: plotId, asAt })}`, { replace: true, search: route.search });
+  const tabId = [focusId, selectedId, reading[0]?.plotId ?? ""].find((id) => id !== "" && lines.has(id) && reading.some((p) => p.plotId === id)) ?? "";
 
   // Where the pointer went down, so that a drag is not read as a tap.
   const down = useRef<{ x: number; y: number; type: string } | null>(null);
   const pressed = (event: React.PointerEvent<SVGSVGElement>) => {
     down.current = { x: event.clientX, y: event.clientY, type: event.pointerType };
   };
-  /** A tap or a click on a drawn plot chooses it. A drag, a tap on ground or a path, or a tap between plots changes nothing. */
+  /** A tap or a click on a drawn plot opens it. A drag, a tap on ground or a path, or a tap between plots changes nothing. */
   const tapped = (event: React.MouseEvent<SVGSVGElement>) => {
     const start = down.current;
     down.current = null;
@@ -399,15 +373,8 @@ export function SiteMap() {
     const at: [number, number] = [((event.clientX - bounds.left) * sheet.width) / bounds.width, ((event.clientY - bounds.top) * sheet.height) / bounds.height];
     const shape = app.adapter.theme.plotShape === "arch" ? "arch" : "polygon";
     const picked = pickPlot(sheet.plots, at, { shape, radius: pickRadius(kind) });
-    if (picked !== undefined) openRecord(picked);
+    if (picked !== undefined) onOpen(picked);
   };
-
-  /** One press opens the plot's own record. The map entry keeps the chosen plot and the date, so Back returns to them. */
-  function openRecord(plotId: string) {
-    if (plotId !== selected) choose(plotId);
-    navigate(`/r/${open.site.id}/plot/${plotId}`);
-  }
-
   const moveFocus = (from: string, key: string) => {
     const here = sheet.plots.find((p) => p.plotId === from);
     if (here === undefined) return;
@@ -438,7 +405,7 @@ export function SiteMap() {
   };
   const plotAction = {
     tabId,
-    nameOf: (id: string) => t("openPlotNamed", { line: byId.get(id)?.line ?? "" }),
+    nameOf: (id: string) => t("openPlotNamed", { line: lines.get(id) ?? "" }),
     onFocusPlot: setFocusId,
     register: (id: string, el: SVGGElement | null) => {
       if (el === null) nodes.current.delete(id);
@@ -447,13 +414,71 @@ export function SiteMap() {
     onKey: (event: React.KeyboardEvent<SVGGElement>, id: string) => {
       if (event.key === "Enter" || event.key === " ") {
         event.preventDefault();
-        openRecord(id);
+        onOpen(id);
       } else if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End"].includes(event.key)) {
         event.preventDefault();
         moveFocus(id, event.key);
       }
     },
   };
+  return { pressed, tapped, plotAction };
+}
+
+/** The list that does what a press on the map does, in full size controls: choose a plot, then open its record. */
+export function PlotPicker({ rows, selectedId, base, onChoose }: { rows: readonly { plot: { plotId: string }; line: string }[]; selectedId: string; base: string; onChoose: (plotId: string) => void }) {
+  const { t } = useShell();
+  return (
+    <div className="stack">
+      <SelectField label={t("choosePlot")} value={selectedId} onChange={onChoose} options={[{ value: "", label: t("noPlotChosen") }, ...rows.map((r) => ({ value: r.plot.plotId, label: r.line }))]} />
+      {selectedId === "" ? null : (
+        <div className="actions">
+          <ButtonLink href={`${base}/plot/${selectedId}`}>{t("openPlot")}</ButtonLink>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function SiteMap() {
+  const { t, app, route, navigate } = useShell();
+  const open = useRegister();
+  const base = `#/r/${open.site.id}`;
+  const selected = route.query.get("plot") ?? "";
+  // The view date is in the address as `asAt`, a date and nothing else. Today has no `asAt`.
+  const asAt = asAtOf(route.query, open.today);
+  const viewDate = asAt ?? open.today;
+  const [zoom, setZoom] = useState(1);
+  const [printStatus, setPrintStatus] = useState<"idle" | "preparing" | "ready">("idle");
+  const holder = useRef<HTMLDivElement>(null);
+  const width = useElementWidth(holder);
+
+  const floor = useMemo(() => claimFloorFor(app, open.state), [app, open.state]);
+  const rows = useMemo(() => plotRows(open, t, viewDate, floor), [open, t, viewDate, floor]);
+  const sheet = useMemo(
+    () =>
+      buildSheet(
+        {
+          map: open.state.map,
+          plots: rows.map((r) => ({ plotId: r.plot.plotId, code: r.plot.code, mark: { ...(r.summary.primary === undefined ? {} : { state: r.summary.primary }), needsChecking: r.summary.needsChecking } })),
+          ...(selected === "" ? {} : { selectedPlotId: selected }),
+        },
+        { width, zoom },
+      ),
+    [open.state.map, rows, selected, width, zoom],
+  );
+  const chosen = rows.find((r) => r.plot.plotId === selected);
+
+  /** The same choice as the list makes: the plot goes into the address with the date kept, and nothing is saved. */
+  const choose = (plotId: string) => navigate(`/r/${open.site.id}/map${queryOf({ plot: plotId, asAt })}`, { replace: true, search: route.search });
+
+  /** One press opens the plot's own record. The map entry keeps the chosen plot and the date, so Back returns to them. */
+  function openRecord(plotId: string) {
+    if (plotId !== selected) choose(plotId);
+    navigate(`/r/${open.site.id}/plot/${plotId}`);
+  }
+
+  const lines = useMemo(() => new Map(rows.map((r) => [r.plot.plotId, r.line])), [rows]);
+  const { pressed, tapped, plotAction } = usePlotPress({ sheet, lines, selectedId: selected, onOpen: openRecord });
 
   const print = () => {
     setPrintStatus("preparing");
