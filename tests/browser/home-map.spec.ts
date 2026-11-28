@@ -103,6 +103,43 @@ for (const { app, code, other, search } of CASES) {
       await expect(page).toHaveURL(new RegExp(`/plot/${moved}$`));
     });
 
+    test("a click on the code tab text and a tap on its plate open the chosen plot, and its background does not", async ({ page }) => {
+      // Choose one plot from the list, then press the tab of another that the sheet marks.
+      const id = await idOf(page, other);
+      await page.getByLabel("Choose a plot", { exact: true }).selectOption(id);
+      const tab = page.locator("svg.sheet g[data-tab-plot]");
+      await expect(tab).toHaveAttribute("data-tab-plot", id);
+      await tab.scrollIntoViewIfNeeded();
+      const plate = await tab.locator("rect.tab").boundingBox();
+      if (plate === null) throw new Error("no tab plate");
+      const mid = { x: plate.x + plate.width / 2, y: plate.y + plate.height / 2 };
+      await page.mouse.click(mid.x, mid.y);
+      await expect(page).toHaveURL(new RegExp(`/plot/${id}$`));
+      await page.goBack();
+      await expect(page.locator("svg.sheet g[data-tab-plot]")).toHaveAttribute("data-tab-plot", id);
+      const again = await page.locator("svg.sheet g[data-tab-plot] rect.tab").boundingBox();
+      if (again === null) throw new Error("no tab plate");
+      await page.touchscreen.tap(again.x + 3, again.y + again.height / 2);
+      await expect(page).toHaveURL(new RegExp(`/plot/${id}$`));
+    });
+
+    test("a drag from the tab and a press on open ground open nothing", async ({ page }) => {
+      const id = await idOf(page, other);
+      await page.getByLabel("Choose a plot", { exact: true }).selectOption(id);
+      const before = page.url();
+      const plate = await page.locator("svg.sheet g[data-tab-plot] rect.tab").boundingBox();
+      if (plate === null) throw new Error("no tab plate");
+      await page.mouse.move(plate.x + plate.width / 2, plate.y + plate.height / 2);
+      await page.mouse.down();
+      await page.mouse.move(plate.x + plate.width / 2 + 40, plate.y + plate.height / 2 + 40, { steps: 4 });
+      await page.mouse.up();
+      expect(page.url()).toBe(before);
+      // The top left corner of the sheet is margin, with no plot, tab or path.
+      const sheet = await page.locator("svg.sheet").boundingBox();
+      if (sheet === null) throw new Error("no sheet");
+      await page.mouse.click(sheet.x + 2, sheet.y + 2);
+      expect(page.url()).toBe(before);
+    });
     test("the list opens the chosen plot and the home layout passes the measurement", async ({ page }) => {
       const id = await idOf(page, other);
       const chooser = page.getByLabel("Choose a plot", { exact: true });

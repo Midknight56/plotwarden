@@ -281,7 +281,8 @@ export function SheetSvg({
         <path d="M0 -14 L6 8 L0 3 L-6 8 Z" />
       </g>
       {model.tab === undefined ? null : (
-        <g>
+        // On an interactive sheet the tab belongs to the chosen plot, and a press on it opens that plot.
+        <g data-tab-plot={onSurface === undefined ? undefined : model.plots.find((p) => p.selected)?.plotId}>
           <rect className="tab" x={model.tab.x} y={model.tab.y} width={model.tab.width} height={model.tab.height} />
           <text className="label tab-text" data-kind="tab" x={model.tab.x + model.tab.width / 2} y={model.tab.y + 20} fontSize={model.tab.size} textAnchor="middle">
             {model.tab.code}
@@ -370,6 +371,9 @@ export function usePlotPress(opts: { sheet: SheetModel; lines: ReadonlyMap<strin
     const bounds = event.currentTarget.getBoundingClientRect();
     if (bounds.width === 0 || bounds.height === 0) return;
     const kind = start?.type ?? (event.nativeEvent as Partial<PointerEvent>).pointerType ?? "";
+    // The code tab of the chosen plot is drawn apart from the plot. It carries that plot's ID, so no point is searched for.
+    const tabOf = event.target instanceof Element ? event.target.closest("[data-tab-plot]")?.getAttribute("data-tab-plot") : null;
+    if (tabOf !== null && tabOf !== undefined && tabOf !== "" && lines.has(tabOf)) return onOpen(tabOf);
     const at: [number, number] = [((event.clientX - bounds.left) * sheet.width) / bounds.width, ((event.clientY - bounds.top) * sheet.height) / bounds.height];
     const shape = app.adapter.theme.plotShape === "arch" ? "arch" : "polygon";
     const picked = pickPlot(sheet.plots, at, { shape, radius: pickRadius(kind) });
