@@ -664,7 +664,7 @@ test("every map page of the keeper's own register shows the same plot a name sea
   await expect(page.getByRole("heading", { level: 1, name: "Site map" })).toBeVisible();
 
   // The map and its key come before the zoom controls, and the map is on view without scrolling far.
-  const sheet = await page.getByRole("img", { name: /Site map/ }).boundingBox();
+  const sheet = await page.locator("svg.sheet").first().boundingBox();
   const key = await page.getByRole("list", { name: "Map key" }).boundingBox();
   const zoomIn = await page.getByRole("button", { name: "Zoom in" }).boundingBox();
   expect(sheet && key && zoomIn).toBeTruthy();

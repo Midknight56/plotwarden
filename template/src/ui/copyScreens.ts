@@ -91,6 +91,8 @@ export const SCREEN_COPY: Readonly<Record<string, string>> = {
   backToToday: "Back to today",
   plotCodesHeading: "Plot codes",
   mapDescription: "Site map. Choose a plot from the list below.",
+  mapDescriptionOpen: "Site map. Press a plot to open its record. With the keyboard, use the arrow keys to move between plots, then Enter.",
+  openPlotNamed: "Open plot {line}",
   northArrow: "North",
   allSections: "All sections",
   backToMap: "Back to map",

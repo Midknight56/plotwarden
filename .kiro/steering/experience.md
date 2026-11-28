@@ -19,7 +19,7 @@ inclusion: always
 | Required sizes | 360 by 640 and 1920 by 1080 |
 
 - No horizontal page scroll. No sticky overlay or decoration over text. Actions follow their form in normal flow.
-- Dense maps are never grids of tiny buttons. Every map selection has an equal list selection.
+- Dense maps are never grids of tiny buttons in the tab order. Map plots drawn at their true place may be pressed and are reached by one roving tab stop with arrow keys. Every map selection has an equal full size list selection on the same page. Only those plots are let off the 44 px size and 12 px gap, as WCAG 2.2 2.5.8 allows (Essential, Equivalent).
 - Churchyard ink `#22252C` on `#FAF5E9`. Garden ink `#1B312A` on `#F7F5E8`. Test every theme state, including high contrast.
 - Map key sits directly below the map: Free (open outline), Reserved (slash), Taken (solid centre), Unusable (cross). The word always appears with its symbol. "Needs checking" uses a dotted outline.
 

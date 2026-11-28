@@ -46,7 +46,7 @@ test.describe("the map from paper", () => {
     // The map, with its key directly below and the plot list one press away.
     await page.getByRole("link", { name: "Back to map" }).click();
     await expect(page.getByRole("heading", { level: 1, name: "Site map" })).toBeVisible();
-    const sheet = page.getByRole("img", { name: /Site map/ });
+    const sheet = page.getByRole("group", { name: /Site map/ });
     await expect(sheet).toBeVisible();
     const key = page.getByRole("list", { name: "Map key" });
     for (const word of ["Free", "Reserved", "Taken", "Unusable", "Needs checking"]) {
@@ -98,7 +98,7 @@ test.describe("the map from paper", () => {
     await expect(page.getByRole("heading", { level: 2, name: "Plot codes" })).toBeVisible();
     await expect(page.getByText(/^As at \d{4}-\d{2}-\d{2}$/)).toBeVisible();
     await expect(page.getByRole("button", { name: "Print site map" })).toBeHidden();
-    await expect(page.getByRole("img", { name: /Site map/ })).toBeVisible();
+    await expect(page.getByRole("group", { name: /Site map/ })).toBeVisible();
     await page.emulateMedia({ media: "screen" });
 
     // The same data comes back after a reload, from this device.
@@ -232,7 +232,7 @@ test.describe("the map from paper", () => {
     await expect(page.getByText("Map saved.")).toBeVisible();
 
     await page.getByRole("link", { name: "Back to map" }).click();
-    const sheet = page.getByRole("img", { name: /Site map/ });
+    const sheet = page.getByRole("group", { name: /Site map/ });
     await expect(sheet.locator("text", { hasText: "Odd Lawn" })).toBeVisible();
     await expect(sheet.locator("text", { hasText: "Yew Walk" })).toBeVisible();
     await expect(sheet.locator("text", { hasText: "Lantern Gate" })).toBeVisible();

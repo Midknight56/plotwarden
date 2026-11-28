@@ -1308,7 +1308,11 @@ test.describe("Churchyard Register, the screens with sheets of their own (7.20, 
       await settle(page);
     };
     await visit("/map");
-    expect(await tabNames(page, 8)).toEqual(["Back to register", "Open plot list", "Edit map", "Site map", "Show the site as at", "Choose a plot", "Zoom in", "Print site map"]);
+    // The map scroller, then exactly one plot tab stop (roving focus), then the side sheet.
+    const mapTabs = await tabNames(page, 9);
+    expect(mapTabs[4]).toMatch(/^Open plot Y\d+ \u00b7 /);
+    mapTabs.splice(4, 1);
+    expect(mapTabs).toEqual(["Back to register", "Open plot list", "Edit map", "Site map", "Show the site as at", "Choose a plot", "Zoom in", "Print site map"]);
     await visit(`/plot/${plot}`);
     expect(await tabNames(page, 23)).toEqual([
       "Back to plot list", "Back to register", "Show on map", "Open burial", "Open burial", "Record a burial", "Reserve a space", "Space label", "Add a space",

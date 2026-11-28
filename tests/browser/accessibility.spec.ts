@@ -295,7 +295,7 @@ for (const app of APPS) {
       const siteId = await openPractice(page, app);
       await page.goto(`/#/r/${siteId}/map`);
       await settle(page);
-      await expect(page.getByRole("img", { name: /Site map/ })).toBeVisible();
+      await expect(page.getByRole("group", { name: /Site map/ })).toBeVisible();
       await expect(page.getByLabel("Choose a plot", { exact: true })).toBeVisible();
       await tabTo(page, "Open plot list");
       await page.keyboard.press("Enter");

@@ -29,7 +29,9 @@ export function siteIdOf(page: Page): string {
 
 /** The route of the open register, such as `map` or `plot/abc`, from the address. */
 export async function registerRoute(page: Page, siteId: string, area = ""): Promise<void> {
-  await page.goto(`${new URL(page.url()).origin}/#/r/${siteId}${area === "" ? "" : `/${area}`}`);
+  // Keep the path of the app (a live site serves each app under its own path). Local apps are at "/".
+  const here = new URL(page.url());
+  await page.goto(`${here.origin}${here.pathname}#/r/${siteId}${area === "" ? "" : `/${area}`}`);
 }
 
 /** Open the practice register from the library of an app, as a first time visitor would. */

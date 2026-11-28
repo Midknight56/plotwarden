@@ -1,7 +1,8 @@
 // Layout measurements for the browser specs. Test helper. The template never imports it.
 // It measures real rectangles in CSS pixels: the 16 px edge, the 12 px gap, the 44 by 44 px
 // target, the 12 px text floor, no sideways scroll, the contrast of text and focus rings,
-// and whether another element covers a target. Nothing is excluded to make a page pass.
+// and whether another element covers a target. Nothing is excluded to make a page pass, with one narrow, named
+// exception: the plots of the Site map (see `spatialPlotExemptions`).
 import type { Page } from "@playwright/test";
 
 export interface Violation {
@@ -26,7 +27,7 @@ export async function measureLayout(page: Page, options: MeasureOptions = {}): P
       return timing === undefined || timing.iterations === Infinity || a.playState === "finished" || a.playState === "idle";
     }),
   );
-  const found = await page.evaluate((opts) => {
+  const { found, targets: measured, plots, equivalents, plotHits } = await page.evaluate((opts) => {
     const violations: { rule: string; element: string; detail: string }[] = [];
     const TOLERANCE = 0.5;
     const add = (rule: string, el: Element, detail: string) => {
@@ -77,10 +78,40 @@ export async function measureLayout(page: Page, options: MeasureOptions = {}): P
       return { el, left: r.left + dx, top: r.top + dy, right: r.right + dx, bottom: r.bottom + dy };
     });
 
+    const nameOf = (el: Element): string => {
+      const id = el.id === "" ? "" : `#${el.id}`;
+      const name = (el.getAttribute("aria-label") ?? el.textContent ?? "").trim().replace(/\s+/g, " ").slice(0, 40);
+      return `${el.tagName.toLowerCase()}${id} "${name}"`;
+    };
+    // Size and gap are checked outside the page, by `targetSizeAndGap`, from this plain data.
+    const targetData = boxes.map((b) => ({
+      element: nameOf(b.el),
+      short: `${b.el.tagName.toLowerCase()} "${(b.el.textContent ?? "").trim().slice(0, 24)}"`,
+      left: b.left,
+      top: b.top,
+      right: b.right,
+      bottom: b.bottom,
+      nested: boxes.flatMap((o, j) => (o.el !== b.el && (o.el.contains(b.el) || b.el.contains(o.el)) ? [j] : [])),
+      ...(b.el.matches(opts.SPATIAL_PLOT) ? { spatialPlotId: b.el.getAttribute("data-plot-id") ?? "" } : {}),
+    }));
+    // The facts that decide the map plot exception: each plot control, and each same page list of plots.
+    const plotData = [...document.querySelectorAll(opts.SPATIAL_PLOT)].map((el) => ({
+      plotId: el.getAttribute("data-plot-id") ?? "",
+      inSiteMap: el.closest("svg.sheet")?.getAttribute("role") === "group",
+      hasFootprint: el.querySelector(":scope > .plot") !== null,
+    }));
+    const equivalentData = [...document.querySelectorAll("select")].map((s) => {
+      const r = s.getBoundingClientRect();
+      return {
+        label: [...(s.labels ?? [])].map((l) => (l.textContent ?? "").trim()).join(" "),
+        visible: visible(s),
+        width: r.width,
+        height: r.height,
+        values: [...s.options].map((o) => o.value),
+      };
+    });
+
     for (const b of boxes) {
-      const w = b.right - b.left;
-      const h = b.bottom - b.top;
-      if (w < 44 - TOLERANCE || h < 44 - TOLERANCE) add("target_size", b.el, `${w.toFixed(1)} by ${h.toFixed(1)} px`);
       if (b.left < 16 - TOLERANCE || b.right > vw - 16 + TOLERANCE) {
         add("edge_inset", b.el, `left ${b.left.toFixed(1)}, right edge ${(vw - b.right).toFixed(1)} px from the viewport`);
       }
@@ -100,19 +131,6 @@ export async function measureLayout(page: Page, options: MeasureOptions = {}): P
       }
     }
 
-    for (let i = 0; i < boxes.length; i += 1) {
-      const a = boxes[i] as Box;
-      for (let j = i + 1; j < boxes.length; j += 1) {
-        const c = boxes[j] as Box;
-        if (a.el.contains(c.el) || c.el.contains(a.el)) continue;
-        const dx = Math.max(0, a.left - c.right, c.left - a.right);
-        const dy = Math.max(0, a.top - c.bottom, c.top - a.bottom);
-        const gap = Math.hypot(dx, dy);
-        if (gap < 12 - TOLERANCE) {
-          add("target_gap", a.el, `${gap.toFixed(1)} px from ${c.el.tagName.toLowerCase()} "${(c.el.textContent ?? "").trim().slice(0, 24)}"`);
-        }
-      }
-    }
 
     // ---- Text size and contrast ------------------------------------------------------------
     const parse = (value: string): [number, number, number, number] | undefined => {
@@ -171,8 +189,36 @@ export async function measureLayout(page: Page, options: MeasureOptions = {}): P
     }
 
     // ---- Is a target covered by something else? ------------------------------------------------
+    // A map plot is read as plain facts, at the centre of its group and at the centre of its drawn footprint, and
+    // judged by `plotCoverage` once the plot exception is known. Every other target is judged here, as before.
+    const hitFacts: PlotHitFact[] = [];
+    const probe = (target: Element, shape: Element) => {
+      (shape as HTMLElement).scrollIntoView({ block: "center", inline: "nearest" });
+      const r = shape.getBoundingClientRect();
+      const x = Math.min(Math.max(r.left + r.width / 2, 1), vw - 1);
+      const y = Math.min(Math.max(r.top + r.height / 2, 1), window.innerHeight - 1);
+      const hit = document.elementFromPoint(x, y);
+      const sheet = target.closest("svg.sheet");
+      return {
+        at: `${Math.round(x)}, ${Math.round(y)}`,
+        top: hit?.tagName.toLowerCase() ?? "nothing",
+        inView: r.top >= 0 && r.bottom <= window.innerHeight,
+        onTarget: hit !== null && (hit === target || target.contains(hit) || hit.contains(target) || hit.closest("label")?.contains(target) === true),
+        sameSheet: hit !== null && sheet !== null && (hit === sheet || sheet.contains(hit)),
+      };
+    };
     if (opts.skipHitTest !== true) {
       for (const b of boxes) {
+        if (b.el.matches(opts.SPATIAL_PLOT)) {
+          const footprint = b.el.querySelector(":scope > .plot");
+          hitFacts.push({
+            plotId: b.el.getAttribute("data-plot-id") ?? "",
+            element: nameOf(b.el),
+            group: probe(b.el, b.el),
+            ...(footprint === null ? {} : { footprint: probe(b.el, footprint) }),
+          });
+          continue;
+        }
         (b.el as HTMLElement).scrollIntoView({ block: "center", inline: "nearest" });
         const r = b.el.getBoundingClientRect();
         const x = Math.min(Math.max(r.left + r.width / 2, 1), vw - 1);
@@ -185,9 +231,129 @@ export async function measureLayout(page: Page, options: MeasureOptions = {}): P
       }
       window.scrollTo(0, 0);
     }
-    return violations;
-  }, options);
-  return [...found, ...(await measureSheetLabels(page))];
+    return { found: violations, targets: targetData, plots: plotData, equivalents: equivalentData, plotHits: hitFacts };
+  }, { ...options, SPATIAL_PLOT });
+  const exempt = spatialPlotExemptions(plots, equivalents);
+  return [...found, ...targetSizeAndGap(measured, exempt), ...plotCoverage(plotHits, exempt), ...(await measureSheetLabels(page))];
+}
+
+export interface HitProbe {
+  at: string;
+  /** The tag of the top element at the point. */
+  top: string;
+  inView: boolean;
+  /** The top element is the target, inside it, or holds it. */
+  onTarget: boolean;
+  /** The top element is the plot's own `svg.sheet` or inside it. */
+  sameSheet: boolean;
+}
+
+export interface PlotHitFact {
+  plotId: string;
+  element: string;
+  /** At the centre of the whole group, which holds turf, base and code as well as the plot. */
+  group: HitProbe;
+  /** At the centre of the drawn `.plot` footprint, the shape a click is read against. */
+  footprint?: HitProbe;
+}
+
+/**
+ * Whether a map plot is covered. A plot that is not exempt is judged like any target, at its group centre. An exempt
+ * plot is judged at the centre of its footprint. There the top element may be the plot, or any part of the same
+ * sheet (a hollow footprint lets the section outline or the sheet show through), because the sheet's own click
+ * handler reads the point against the plot shapes (`pickPlot`). Anything outside that sheet on top is a cover.
+ */
+export function plotCoverage(facts: readonly PlotHitFact[], exempt: ReadonlySet<string>): Violation[] {
+  const out: Violation[] = [];
+  for (const f of facts) {
+    const spatial = exempt.has(f.plotId) && f.footprint !== undefined;
+    const p = spatial ? (f.footprint as HitProbe) : f.group;
+    const ok = p.onTarget || (spatial && p.sameSheet);
+    if (!ok && p.inView) out.push({ rule: "covered_target", element: f.element, detail: `at ${p.at} the top element is ${p.top}` });
+  }
+  return out;
+}
+
+// ---- Target size and gap, and the one map plot exception ---------------------------------------------
+// Every control must be 44 by 44 px and 12 px from every other control. A plot of the Site map is a control drawn at
+// its true place and size on the plan, so it cannot grow or move apart without lying about the site. WCAG 2.2, 2.5.8,
+// allows this under two exceptions: Essential (a pin at its true place) and Equivalent (a full size control on the
+// same page does the same thing). Here the equivalent is the "Choose a plot" list with "Open plot", which are measured
+// like every other control. So a plot is let off size and gap only when all of these hold:
+//   - it is a `g[role=button][data-plot-id]` inside the Site map sheet, and holds its own drawn `.plot` footprint;
+//   - a visible "Choose a plot" select on the same page, itself at least 44 by 44 px, lists that same plot ID.
+// The measured box is the whole group (footprint, turf, base and code), which is larger than the footprint a click is
+// read against; the finger check in `template/src/map/pick.ts` still refuses a point near two plots. Edge inset, clip
+// inset, cover, text and contrast checks still apply to plots. A plot is never let off a gap to a normal control.
+
+/** The CSS selector of a map plot control. Nothing else can be let off. */
+export const SPATIAL_PLOT = 'svg.sheet g[role="button"][data-plot-id]';
+
+export interface PlotFact {
+  plotId: string;
+  /** The sheet is the interactive Site map (role group), not a picture. */
+  inSiteMap: boolean;
+  hasFootprint: boolean;
+}
+
+export interface EquivalentFact {
+  label: string;
+  visible: boolean;
+  width: number;
+  height: number;
+  values: string[];
+}
+
+/** The plot IDs that may be smaller and closer than 44 px and 12 px, because a full size list on the page holds them. */
+export function spatialPlotExemptions(plots: readonly PlotFact[], equivalents: readonly EquivalentFact[]): Set<string> {
+  const listed = new Set<string>();
+  for (const e of equivalents) {
+    if (e.label !== "Choose a plot" || !e.visible || e.width < 43.5 || e.height < 43.5) continue;
+    for (const v of e.values) if (v !== "") listed.add(v);
+  }
+  const out = new Set<string>();
+  for (const p of plots) if (p.plotId !== "" && p.inSiteMap && p.hasFootprint && listed.has(p.plotId)) out.add(p.plotId);
+  return out;
+}
+
+export interface TargetBox {
+  element: string;
+  /** The tag and text used to name the other target in a gap. */
+  short: string;
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+  /** Indices of targets that contain this one or that it contains. They are not measured against each other. */
+  nested: number[];
+  /** Set only for a target that matches `SPATIAL_PLOT`. */
+  spatialPlotId?: string;
+}
+
+/** The 44 by 44 px size and the 12 px gap, for every target. Only a plot in `exempt` is let off, and only from another such plot. */
+export function targetSizeAndGap(boxes: readonly TargetBox[], exempt: ReadonlySet<string>): Violation[] {
+  const TOLERANCE = 0.5;
+  const out: Violation[] = [];
+  const isExempt = (b: TargetBox): boolean => b.spatialPlotId !== undefined && exempt.has(b.spatialPlotId);
+  for (const b of boxes) {
+    const w = b.right - b.left;
+    const h = b.bottom - b.top;
+    if (isExempt(b)) continue;
+    if (w < 44 - TOLERANCE || h < 44 - TOLERANCE) out.push({ rule: "target_size", element: b.element, detail: `${w.toFixed(1)} by ${h.toFixed(1)} px` });
+  }
+  for (let i = 0; i < boxes.length; i += 1) {
+    const a = boxes[i] as TargetBox;
+    for (let j = i + 1; j < boxes.length; j += 1) {
+      const c = boxes[j] as TargetBox;
+      if (a.nested.includes(j) || c.nested.includes(i)) continue;
+      if (isExempt(a) && isExempt(c)) continue;
+      const dx = Math.max(0, a.left - c.right, c.left - a.right);
+      const dy = Math.max(0, a.top - c.bottom, c.top - a.bottom);
+      const gap = Math.hypot(dx, dy);
+      if (gap < 12 - TOLERANCE) out.push({ rule: "target_gap", element: a.element, detail: `${gap.toFixed(1)} px from ${c.short}` });
+    }
+  }
+  return out;
 }
 
 /** The ink of the focus ring against the page, for one focused element. 3 to 1 is the floor. */

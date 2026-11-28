@@ -1,5 +1,5 @@
 // The site map: the shared sheet on a screen, with its key directly below and the plot list one press away.
-// The overview has no button per plot. A plot is chosen from the list, which holds the same plots.
+// A click or tap on a plot opens its record. The keyboard reaches the plots with one tab stop and the arrow keys, and the list holds the same plots.
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode, RefObject } from "react";
 import { codeWidth } from "../map/labels";
@@ -158,6 +158,7 @@ export function SheetSvg({
   onSurface,
   onSurfaceDown,
   extra,
+  plotAction,
 }: {
   model: SheetModel;
   label: string;
@@ -165,6 +166,14 @@ export function SheetSvg({
   onSurface?: (event: React.MouseEvent<SVGSVGElement>) => void;
   onSurfaceDown?: (event: React.PointerEvent<SVGSVGElement>) => void;
   extra?: ReactNode;
+  /** When set, each plot is a button with one roving tab stop. Without it the sheet is a picture, as in print. */
+  plotAction?: {
+    tabId: string;
+    nameOf: (plotId: string) => string;
+    onKey: (event: React.KeyboardEvent<SVGGElement>, plotId: string) => void;
+    onFocusPlot: (plotId: string) => void;
+    register: (plotId: string, el: SVGGElement | null) => void;
+  };
 }) {
   const { north } = model;
   const { app } = useShell();
@@ -173,7 +182,7 @@ export function SheetSvg({
   return (
     <svg
       className="sheet"
-      role="img"
+      role={plotAction === undefined ? "img" : "group"}
       aria-label={label}
       width={model.width}
       height={model.height}
@@ -214,7 +223,20 @@ export function SheetSvg({
         </g>
       ))}
       {model.plots.map((plot) => (
-        <g key={plot.plotId} data-plot-id={onSurface === undefined ? undefined : plot.plotId}>
+        <g
+          key={plot.plotId}
+          data-plot-id={onSurface === undefined ? undefined : plot.plotId}
+          {...(plotAction === undefined
+            ? {}
+            : {
+                role: "button",
+                tabIndex: plot.plotId === plotAction.tabId ? 0 : -1,
+                "aria-label": plotAction.nameOf(plot.plotId),
+                onKeyDown: (event: React.KeyboardEvent<SVGGElement>) => plotAction.onKey(event, plot.plotId),
+                onFocus: () => plotAction.onFocusPlot(plot.plotId),
+                ref: (el: SVGGElement | null) => plotAction.register(plot.plotId, el),
+              })}
+        >
           {arched ? (
             <>
               <Turf box={plot.box} />
@@ -351,6 +373,13 @@ export function SiteMap() {
   );
   const chosen = rows.find((r) => r.plot.plotId === selected);
 
+  const byId = useMemo(() => new Map(rows.map((r) => [r.plot.plotId, r])), [rows]);
+  const [focusId, setFocusId] = useState("");
+  const nodes = useRef(new Map<string, SVGGElement>());
+  // The one tab stop is the focused plot, else the chosen plot, else the first plot in reading order.
+  const reading = useMemo(() => [...sheet.plots].sort((a, b) => a.box.y - b.box.y || a.box.x - b.box.x), [sheet.plots]);
+  const tabId = [focusId, selected, reading[0]?.plotId ?? ""].find((id) => id !== "" && byId.has(id) && reading.some((p) => p.plotId === id)) ?? "";
+
   /** The same choice as the list makes: the plot goes into the address with the date kept, and nothing is saved. */
   const choose = (plotId: string) => navigate(`/r/${open.site.id}/map${queryOf({ plot: plotId, asAt })}`, { replace: true, search: route.search });
 
@@ -370,7 +399,60 @@ export function SiteMap() {
     const at: [number, number] = [((event.clientX - bounds.left) * sheet.width) / bounds.width, ((event.clientY - bounds.top) * sheet.height) / bounds.height];
     const shape = app.adapter.theme.plotShape === "arch" ? "arch" : "polygon";
     const picked = pickPlot(sheet.plots, at, { shape, radius: pickRadius(kind) });
-    if (picked !== undefined && picked !== selected) choose(picked);
+    if (picked !== undefined) openRecord(picked);
+  };
+
+  /** One press opens the plot's own record. The map entry keeps the chosen plot and the date, so Back returns to them. */
+  function openRecord(plotId: string) {
+    if (plotId !== selected) choose(plotId);
+    navigate(`/r/${open.site.id}/plot/${plotId}`);
+  }
+
+  const moveFocus = (from: string, key: string) => {
+    const here = sheet.plots.find((p) => p.plotId === from);
+    if (here === undefined) return;
+    let next: string | undefined;
+    if (key === "Home") next = reading[0]?.plotId;
+    else if (key === "End") next = reading[reading.length - 1]?.plotId;
+    else {
+      const [ux, uy] = key === "ArrowRight" ? [1, 0] : key === "ArrowLeft" ? [-1, 0] : key === "ArrowDown" ? [0, 1] : [0, -1];
+      const cx = here.box.x + here.box.width / 2;
+      const cy = here.box.y + here.box.height / 2;
+      let best = Infinity;
+      for (const p of sheet.plots) {
+        if (p.plotId === from) continue;
+        const dx = p.box.x + p.box.width / 2 - cx;
+        const dy = p.box.y + p.box.height / 2 - cy;
+        const along = dx * ux + dy * uy;
+        if (along <= 0) continue;
+        const score = along + 2 * Math.abs(dx * uy - dy * ux);
+        if (score < best) {
+          best = score;
+          next = p.plotId;
+        }
+      }
+    }
+    if (next === undefined) return;
+    setFocusId(next);
+    nodes.current.get(next)?.focus();
+  };
+  const plotAction = {
+    tabId,
+    nameOf: (id: string) => t("openPlotNamed", { line: byId.get(id)?.line ?? "" }),
+    onFocusPlot: setFocusId,
+    register: (id: string, el: SVGGElement | null) => {
+      if (el === null) nodes.current.delete(id);
+      else nodes.current.set(id, el);
+    },
+    onKey: (event: React.KeyboardEvent<SVGGElement>, id: string) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        openRecord(id);
+      } else if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End"].includes(event.key)) {
+        event.preventDefault();
+        moveFocus(id, event.key);
+      }
+    },
   };
 
   const print = () => {
@@ -402,7 +484,7 @@ export function SiteMap() {
       <div className="map-layout">
         <div className="stack map-main">
           <div ref={holder} className="sheet-scroll" role="region" aria-label={t("siteMap")} tabIndex={0}>
-            <SheetSvg model={sheet} label={t("mapDescription")} onSurface={tapped} onSurfaceDown={pressed} />
+            <SheetSvg model={sheet} label={t("mapDescriptionOpen")} onSurface={tapped} onSurfaceDown={pressed} plotAction={plotAction} />
           </div>
           <MapKey />
         </div>

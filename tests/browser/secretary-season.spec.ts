@@ -232,7 +232,7 @@ test.describe("the desk", () => {
     // The key sits directly below the plan and holds the four states with their words.
     const key = page.getByRole("list", { name: "Map key" });
     for (const word of ["Free", "Reserved", "Taken", "Unusable"]) await expect(key.getByText(word, { exact: true })).toBeVisible();
-    const sheetBox = await page.getByRole("img", { name: /Site map/ }).boundingBox();
+    const sheetBox = await page.locator("svg.sheet").first().boundingBox();
     const keyBox = await key.boundingBox();
     const gap = (keyBox?.y ?? 0) - ((sheetBox?.y ?? 0) + (sheetBox?.height ?? 0));
     expect(gap).toBeGreaterThanOrEqual(0);
