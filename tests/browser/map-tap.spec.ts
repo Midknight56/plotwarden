@@ -98,6 +98,57 @@ async function tabToPlot(page: Page): Promise<void> {
   }
   throw new Error("Tab did not reach a map plot in 12 presses");
 }
+/**
+ * The middle of the ground between the two plots that stand side by side with the least ground between them, after the
+ * map and the page are scrolled to it. The point is read again after the scroll, and it is checked: inside the sheet,
+ * inside the viewport, strictly between the two plot footprints, and the top element there belongs to the same sheet.
+ */
+async function gapPoint(page: Page): Promise<{ x: number; y: number }> {
+  const found = await page.evaluate(async () => {
+    const svg = document.querySelector<SVGSVGElement>("svg.sheet");
+    if (svg === null) return { error: "no sheet" };
+    const shapes = [...svg.querySelectorAll<SVGGraphicsElement>(".plot")];
+    const rects = () => shapes.map((e) => e.getBoundingClientRect());
+    let best: { a: number; b: number; gap: number } | null = null;
+    const first = rects();
+    first.forEach((a, ia) => {
+      first.forEach((b, ib) => {
+        if (a.width === 0 || b.width === 0) return;
+        const gap = b.left - a.right;
+        if (gap <= 0 || Math.abs(a.top + a.height / 2 - (b.top + b.height / 2)) > 4) return;
+        if (best === null || gap < best.gap) best = { a: ia, b: ib, gap };
+      });
+    });
+    if (best === null) return { error: "no two plots side by side" };
+    const pair: { a: number; b: number } = best;
+    const mid = (r: DOMRect[]) => {
+      const a = r[pair.a] as DOMRect;
+      const b = r[pair.b] as DOMRect;
+      return { a, b, x: (a.right + b.left) / 2, y: (Math.max(a.top, b.top) + Math.min(a.bottom, b.bottom)) / 2 };
+    };
+    const holder = svg.parentElement as HTMLElement;
+    const m0 = mid(first);
+    holder.scrollLeft += m0.x - (holder.getBoundingClientRect().left + holder.clientWidth / 2);
+    window.scrollBy(0, m0.y - window.innerHeight / 2);
+    await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+    const { a, b, x, y } = mid(rects());
+    const s = svg.getBoundingClientRect();
+    const h = holder.getBoundingClientRect();
+    const hit = document.elementFromPoint(x, y);
+    return {
+      x,
+      y,
+      inSheet: x > s.left && x < s.right && y > s.top && y < s.bottom && x > h.left && x < h.right && y > h.top && y < h.bottom,
+      inViewport: x > 0 && x < window.innerWidth && y > 0 && y < window.innerHeight,
+      between: x > a.right && x < b.left && y > Math.max(a.top, b.top) && y < Math.min(a.bottom, b.bottom),
+      hitInSheet: hit !== null && (hit === svg || svg.contains(hit)),
+      top: hit === null ? "nothing" : hit.tagName.toLowerCase(),
+    };
+  });
+  if ("error" in found) throw new Error(`no ground between plots: ${found.error}`);
+  expect(found, `ground point at ${found.x}, ${found.y} (top element ${found.top})`).toMatchObject({ inSheet: true, inViewport: true, between: true, hitInSheet: true });
+  return { x: found.x, y: found.y };
+}
 /** Choose a plot the way a keyboard user does: focus the field and type the code. */
 async function byKeyboard(page: Page, code: string): Promise<void> {
   await chooser(page).focus();
@@ -273,41 +324,26 @@ for (const { app, code, other } of CASES) {
       });
 
       test("a tap on ground between two plots chooses nothing, and keeps a choice that was made", async ({ page }) => {
-        // The two plots that stand side by side with the least ground between them. The map is scrolled to that ground.
-        const point = await page.evaluate(async () => {
-          const svg = document.querySelector<SVGSVGElement>("svg.sheet");
-          if (svg === null) return null;
-          const boxes = [...svg.querySelectorAll<SVGGraphicsElement>(".plot")].map((e) => e.getBoundingClientRect()).filter((b) => b.width > 0);
-          let best: { x: number; y: number; gap: number } | null = null;
-          for (const a of boxes) {
-            for (const b of boxes) {
-              const gap = b.left - a.right;
-              if (gap <= 0 || Math.abs(a.top + a.height / 2 - (b.top + b.height / 2)) > 4) continue;
-              if (best === null || gap < best.gap) best = { x: a.right + gap / 2, y: a.top + a.height / 2, gap };
-            }
-          }
-          if (best === null) return null;
-          const before = svg.getBoundingClientRect();
-          const holder = svg.parentElement as HTMLElement;
-          holder.scrollLeft += best.x - (holder.getBoundingClientRect().left + holder.clientWidth / 2);
-          window.scrollBy(0, best.y - window.innerHeight / 2);
-          await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
-          const after = svg.getBoundingClientRect();
-          return { x: best.x + (after.left - before.left), y: best.y + (after.top - before.top), gap: best.gap };
-        });
-        expect(point).not.toBeNull();
-        if (point === null) return;
+        // The point is found again, and the map scrolled to it, right before every press: choosing from the list scrolls
+        // the page, so a point found earlier could land on the list instead of the map.
         expect((await choice(page)).value).toBe("");
-        await page.touchscreen.tap(point.x, point.y);
+        const p1 = await gapPoint(page);
+        await page.touchscreen.tap(p1.x, p1.y);
         expect((await choice(page)).value).toBe("");
-        await page.mouse.click(point.x, point.y);
+        await expect(page).not.toHaveURL(/\/plot\//);
+        const p2 = await gapPoint(page);
+        await page.mouse.click(p2.x, p2.y);
         expect((await choice(page)).value).toBe("");
+        await expect(page).not.toHaveURL(/\/plot\//);
 
         await byKeyboard(page, code);
         const before = await choice(page);
-        await page.touchscreen.tap(point.x, point.y);
+        const p3 = await gapPoint(page);
+        await page.touchscreen.tap(p3.x, p3.y);
         expect(await choice(page)).toEqual(before);
-        await page.mouse.click(point.x, point.y);
+        await expect(page).not.toHaveURL(/\/plot\//);
+        const p4 = await gapPoint(page);
+        await page.mouse.click(p4.x, p4.y);
         expect(await choice(page)).toEqual(before);
         await expect(page).not.toHaveURL(/\/plot\//);
       });
